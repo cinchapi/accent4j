@@ -37,6 +37,9 @@ import org.fusesource.jansi.AnsiConsole;
 public class AnsiStringBuilder {
     // Install support for the AnsiConsole and ensure that it is uninstalled
     // when the JVM dies
+    //
+    // NOTE: This static block will only be executed when this class is loaded
+    // into the JVM (i.e. someone is actually using it)
     static {
         AnsiConsole.systemInstall();
         Runtime.getRuntime().addShutdownHook(new Thread() {
