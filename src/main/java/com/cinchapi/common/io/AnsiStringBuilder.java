@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 Cinchapi Inc.
+ * Copyright (c) 2015 Cinchapi Inc.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 package com.cinchapi.common.io;
+
+import org.fusesource.jansi.Ansi;
+import org.fusesource.jansi.Ansi.Color;
+import org.fusesource.jansi.AnsiConsole;
 
 /**
  * A {@link StringBuilder}-like interface for creating strings that are
@@ -51,15 +55,46 @@ public class AnsiStringBuilder {
     private final Ansi ansi = Ansi.ansi();
 
     /**
+     * Append the {@code text} to this builder and apply no formatting.
+     * 
+     * @param text the string to append
+     * @return this
+     */
+    public AnsiStringBuilder append(String text) {
+        return append(text, false);
+    }
+
+    /**
+     * Append the {@code text} to this builder and format it to appear with
+     * the specified {@code bold}ness.
+     * 
+     * @param text the string to append
+     * @param bold a flag that indicates whether the text should appear bold
+     * @return this
+     */
+    public AnsiStringBuilder append(String text, boolean bold) {
+        return append(text, Color.DEFAULT, bold);
+    }
+
+    /**
+     * Append the {@code text} to this builder and format it to appear with
+     * the specified {@code color}.
+     * 
+     * @param text the string to append
+     * @param color the display {@link Color} for the text
+     * @return this
+     */
+    public AnsiStringBuilder append(String text, Color color) {
+        return append(text, color, false);
+    }
+
+    /**
      * Append the {@code text} to this builder and format it to appear with
      * the specified {@code color} and {@code bold}ness.
      * 
-     * @param text
-     *            the string to append
-     * @param color
-     *            the display {@link Color} for the text
-     * @param bold
-     *            a flag that indicates whether the text should appear bold
+     * @param text the string to append
+     * @param color the display {@link Color} for the text
+     * @param bold a flag that indicates whether the text should appear bold
      * @return this
      */
     public AnsiStringBuilder append(String text, Color color, boolean bold) {
@@ -76,52 +111,11 @@ public class AnsiStringBuilder {
     }
 
     /**
-     * Append the {@code text} to this builder and apply no formatting.
-     * 
-     * @param text
-     *            the string to append
-     * @return this
-     */
-    public AnsiStringBuilder append(String text) {
-        return append(text, false);
-    }
-
-    /**
-     * Append the {@code text} to this builder and format it to appear with
-     * the specified {@code bold}ness.
-     * 
-     * @param text
-     *            the string to append
-     * @param bold
-     *            a flag that indicates whether the text should appear bold
-     * @return this
-     */
-    public AnsiStringBuilder append(String text, boolean bold) {
-        return append(text, Color.DEFAULT, bold);
-    }
-
-    /**
-     * Append the {@code text} to this builder and format it to appear with
-     * the specified {@code color}.
-     * 
-     * @param text
-     *            the string to append
-     * @param color
-     *            the display {@link Color} for the text
-     * @return this
-     */
-    public AnsiStringBuilder append(String text, Color color) {
-        return append(text, color, false);
-    }
-
-    /**
      * Append the {@code text} to this builder and highlight it with a
      * background of {@code color}.
      * 
-     * @param text
-     *            the string to append
-     * @param color
-     *            the highlight {@link Color} for the text
+     * @param text the string to append
+     * @param color the highlight {@link Color} for the text
      * @return this
      */
     public AnsiStringBuilder highlight(String text, Color color) {
@@ -132,12 +126,9 @@ public class AnsiStringBuilder {
      * Append the {@code text} to this builder, highlight it with {@code color}
      * and format it to appear with the specified {@code bold} ness.
      * 
-     * @param text
-     *            the string to append
-     * @param color
-     *            the highlight {@link Color} for the text
-     * @param bold
-     *            a flag that indicates whether the text should appear bold
+     * @param text the string to append
+     * @param color the highlight {@link Color} for the text
+     * @param bold a flag that indicates whether the text should appear bold
      * @return this
      */
     public AnsiStringBuilder highlight(String text, Color color, boolean bold) {
@@ -147,16 +138,27 @@ public class AnsiStringBuilder {
     /**
      * Append the {@code text} to this builder, highlight it with
      * {@code bgColor} and format it to appear with the specified
+     * {@code textColor}.
+     * 
+     * @param text the string to append
+     * @param bgColor the highlight {@link Color} for the text
+     * @param textColor the display {@link Color} for the text
+     * @return this
+     */
+    public AnsiStringBuilder highlight(String text, Color bgColor,
+            Color textColor) {
+        return highlight(text, bgColor, textColor, false);
+    }
+
+    /**
+     * Append the {@code text} to this builder, highlight it with
+     * {@code bgColor} and format it to appear with the specified
      * {@code textColor} and {@code bold}ness.
      * 
-     * @param text
-     *            the string to append
-     * @param bgColor
-     *            the highlight {@link Color} for the text
-     * @param textColor
-     *            the display {@link Color} for the text
-     * @param bold
-     *            a flag that indicates whether the text should appear bold
+     * @param text the string to append
+     * @param bgColor the highlight {@link Color} for the text
+     * @param textColor the display {@link Color} for the text
+     * @param bold a flag that indicates whether the text should appear bold
      * @return this
      */
     public AnsiStringBuilder highlight(String text, Color bgColor,
@@ -172,24 +174,6 @@ public class AnsiStringBuilder {
         ansi.a(text);
         ansi.reset();
         return this;
-    }
-
-    /**
-     * Append the {@code text} to this builder, highlight it with
-     * {@code bgColor} and format it to appear with the specified
-     * {@code textColor}.
-     * 
-     * @param text
-     *            the string to append
-     * @param bgColor
-     *            the highlight {@link Color} for the text
-     * @param textColor
-     *            the display {@link Color} for the text
-     * @return this
-     */
-    public AnsiStringBuilder highlight(String text, Color bgColor,
-            Color textColor) {
-        return highlight(text, bgColor, textColor, false);
     }
 
     @Override
