@@ -35,18 +35,32 @@ import org.fusesource.jansi.AnsiConsole;
  * @author Jeff Nelson
  */
 public class AnsiStringBuilder {
-    // Install support for the AnsiConsole and ensure that it is uninstalled
-    // when the JVM dies
-    static {
-        AnsiConsole.systemInstall();
-        Runtime.getRuntime().addShutdownHook(new Thread() {
 
-            @Override
-            public void run() {
-                AnsiConsole.systemUninstall();
-            }
-        });
+    /**
+     * Call {@link AnsiConsole#systemInstall()} if we have not already done so.
+     * This is encapsulated as a separate method so that we don't add support
+     * unless these methods are actually used.
+     */
+    private static void installAnsiConsole() {
+        if(!installedAnsiConsole) {
+            // Install support for the AnsiConsole and ensure that it is
+            // uninstalled when the JVM dies
+            AnsiConsole.systemInstall();
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+
+                @Override
+                public void run() {
+                    AnsiConsole.systemUninstall();
+                }
+            });
+        }
     }
+
+    /**
+     * A flag that tracks whether the {@link AnsiConsole} has been
+     * {@link AnsiConsole#systemInstall() installed}.
+     */
+    private static boolean installedAnsiConsole = false;
 
     /**
      * The instance of {@link Ansi} that does all the work. Here, we merely
@@ -98,6 +112,7 @@ public class AnsiStringBuilder {
      * @return this
      */
     public AnsiStringBuilder append(String text, Color color, boolean bold) {
+        installAnsiConsole();
         ansi.fg(color);
         if(bold) {
             ansi.bold();
@@ -163,6 +178,7 @@ public class AnsiStringBuilder {
      */
     public AnsiStringBuilder highlight(String text, Color bgColor,
             Color textColor, boolean bold) {
+        installAnsiConsole();
         ansi.bg(bgColor);
         ansi.fg(textColor);
         if(bold) {
