@@ -32,56 +32,34 @@ import java.util.Map.Entry;
 public final class AnyObjects {
 
     /**
-     * The custom {@link EmptyDefinition empty definitions} that are provided
-     * for classes.
+     * Check if {@code value} is {@code null} or semantically
+     * {@link #isNullOrEmpty(Object) empty}. If so, throw an
+     * {@link IllegalArgumentException}. Otherwise, return {@code value}.
+     * 
+     * @param value the value to check
+     * @return {@code value} if it is not {@code null} or <em>empty</em>
      */
-    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
-    static {
-        registerEmptyDefinition(String.class, new EmptyDefinition<String>() {
-
-            @Override
-            public boolean metBy(String object) {
-                return object.isEmpty();
-            }
-
-        });
-        registerEmptyDefinition(Collection.class,
-                new EmptyDefinition<Collection>() {
-
-                    @Override
-                    public boolean metBy(Collection object) {
-                        return object.isEmpty();
-                    }
-
-                });
-        registerEmptyDefinition(Map.class, new EmptyDefinition<Map>() {
-
-            @Override
-            public boolean metBy(Map object) {
-                return object.isEmpty();
-            }
-
-        });
+    public static <T> T checkNotNullOrEmpty(T value) {
+        return checkNotNullOrEmpty(value, null);
     }
-
     /**
-     * Register a custom {@link EmptyDefinition} for all objects that are either
-     * a member of or {@link Class#isAssignableFrom(Class) assignable from}
-     * {@code clazz}.
+     * Check if {@code value} is {@code null} or semantically
+     * {@link #isNullOrEmpty(Object) empty}. If so, throw an
+     * {@link IllegalArgumentException} with {@code message}. Otherwise, return
+     * {@code value}.
      * 
-     * <p>
-     * <strong>NOTE:</strong> This method is not thread safe, so avoid
-     * dynamically registering definitions from multiple threads on-demand. This
-     * function is designed to be used at a defined time during the
-     * application's lifecycle (i.e. during bootstrap).
-     * </p>
-     * 
-     * @param clazz the {@link Class} to register
-     * @param def the {@link EmptyDefinition} to associate with {@code clazz}
+     * @param value the value to check
+     * @param message the message for the exception
+     * @return {@code value} if it is not {@code null} or <em>empty</em>
      */
-    public static <T> void registerEmptyDefinition(Class<T> clazz,
-            EmptyDefinition<T> def) {
-        defs.put(clazz, def);
+    public static <T> T checkNotNullOrEmpty(T value, Object message) {
+        if(!isNullOrEmpty(value)) {
+            return value;
+        }
+        else {
+            throw message == null ? new IllegalArgumentException()
+                    : new IllegalArgumentException(message.toString());
+        }
     }
 
     /**
@@ -120,18 +98,58 @@ public final class AnyObjects {
         }
     }
 
-    public static <T> T checkNotNullOrEmpty(T value, Object message) {
-        if(!isNullOrEmpty(value)) {
-            return value;
-        }
-        else {
-            throw message == null ? new IllegalArgumentException()
-                    : new IllegalArgumentException(message.toString());
-        }
+    /**
+     * Register a custom {@link EmptyDefinition} for all objects that are either
+     * a member of or {@link Class#isAssignableFrom(Class) assignable from}
+     * {@code clazz}.
+     * 
+     * <p>
+     * <strong>NOTE:</strong> This method is not thread safe, so avoid
+     * dynamically registering definitions from multiple threads on-demand. This
+     * function is designed to be used at a defined time during the
+     * application's lifecycle (i.e. during bootstrap).
+     * </p>
+     * 
+     * @param clazz the {@link Class} to register
+     * @param def the {@link EmptyDefinition} to associate with {@code clazz}
+     */
+    public static <T> void registerEmptyDefinition(Class<T> clazz,
+            EmptyDefinition<T> def) {
+        defs.put(clazz, def);
     }
 
-    public static <T> T checkNotNullOrEmpty(T value) {
-        return checkNotNullOrEmpty(value, null);
+    /**
+     * The custom {@link EmptyDefinition empty definitions} that are provided
+     * for classes.
+     */
+    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
+
+    static {
+        registerEmptyDefinition(String.class, new EmptyDefinition<String>() {
+
+            @Override
+            public boolean metBy(String object) {
+                return object.isEmpty();
+            }
+
+        });
+        registerEmptyDefinition(Collection.class,
+                new EmptyDefinition<Collection>() {
+
+                    @Override
+                    public boolean metBy(Collection object) {
+                        return object.isEmpty();
+                    }
+
+                });
+        registerEmptyDefinition(Map.class, new EmptyDefinition<Map>() {
+
+            @Override
+            public boolean metBy(Map object) {
+                return object.isEmpty();
+            }
+
+        });
     }
 
     private AnyObjects() {/* noop */}

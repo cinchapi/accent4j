@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2015 Cinchapi Inc.
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,36 +27,38 @@ import org.junit.Test;
 import com.cinchapi.common.base.AnyObjects;
 
 /**
- * 
+ * Unit tests for {@link AnyObjects} functions.
  * 
  * @author Jeff Nelson
  */
 public class AnyObjectsTest {
-    
+
     @Test
-    public void testIsNullOrEmptyString(){
+    public void testIsNullOrEmptyString() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(""));
     }
-    
+
     @Test
-    public void testIsNullOrEmptyList(){
+    public void testIsNullOrEmptyList() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(new ArrayList<Object>()));
     }
-    
+
     @Test
-    public void testIsNullOrEmptyMap(){
-        Assert.assertTrue(AnyObjects.isNullOrEmpty(new HashMap<Object, Object>()));
-        Assert.assertTrue(AnyObjects.isNullOrEmpty(new TreeMap<Object, Object>()));
+    public void testIsNullOrEmptyMap() {
+        Assert.assertTrue(AnyObjects
+                .isNullOrEmpty(new HashMap<Object, Object>()));
+        Assert.assertTrue(AnyObjects
+                .isNullOrEmpty(new TreeMap<Object, Object>()));
     }
-    
+
     @Test
-    public void testIsNullOrEmptySet(){
+    public void testIsNullOrEmptySet() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(new HashSet<Object>()));
         Assert.assertTrue(AnyObjects.isNullOrEmpty(new TreeSet<Object>()));
     }
-    
+
     @Test
-    public void testIsNullOrEmptyNull(){
+    public void testIsNullOrEmptyNull() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(null));
     }
 
