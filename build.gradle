@@ -35,7 +35,7 @@ version = globalVersion
 
 jar {
     manifest {
-        attributes("Specificiation-Title": "Accent", "Specificiation-Version": version, "Implementation-Version": version)
+        attributes("Specificiation-Title": "Accent4J", "Specificiation-Version": version, "Implementation-Version": version)
     }
 }
 
@@ -72,15 +72,15 @@ uploadArchives {
             pom.version = _version
 
             pom.project {
-               name 'Accent'
+               name 'Accent4J'
                packaging 'jar'
-               description 'Accent is a suite of libraries, helpers and data structures that make Java programming idioms more fluent.'
+               description 'Accent4J is a suite of libraries, helpers and data structures that make Java programming idioms more fluent.'
                url 'http://cinchapi.com'
 
                scm {
-                   url 'git@github.com:cinchapi/accent.git'
-                   connection 'git@github.com:cinchapi/accent.git'
-                   developerConnection 'git@github.com:cinchapi/accent.git'
+                   url 'git@github.com:cinchapi/accent4j.git'
+                   connection 'git@github.com:cinchapi/accent4j.git'
+                   developerConnection 'git@github.com:cinchapi/accent4j.git'
                }
 
                licenses {
@@ -97,11 +97,11 @@ uploadArchives {
                        name 'Jeff Nelson'
                    }
                }
+           }
 
-               def mavenUrl = pom.version.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+){0,1}$') ? 'https://oss.sonatype.org/service/local/staging/deploy/maven2' : 'https://oss.sonatype.org/content/repositories/snapshots'
-               repository(url: mavenUrl) {
-                   authentication(userName: sonatypeUsername, password: sonatypePassword)
-               }
+           def mavenUrl = pom.version.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+){0,1}$') ? 'https://oss.sonatype.org/service/local/staging/deploy/maven2' : 'https://oss.sonatype.org/content/repositories/snapshots'
+           repository(url: mavenUrl) {
+               authentication(userName: sonatypeUsername, password: sonatypePassword)
            }
         }
     }
