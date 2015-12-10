@@ -1,0 +1,108 @@
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.8'
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+repositories {
+    mavenCentral()
+    maven {
+      url 'https://oss.sonatype.org/content/repositories/snapshots/'
+    }
+}
+
+dependencies {
+    compile 'org.fusesource.jansi:jansi:1.11'
+	testCompile 'junit:junit:4.11'
+}
+
+def getVersion = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'bash', 'version.sh'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
+ext.globalVersion  = getVersion()
+
+group = 'com.cinchapi'
+version = globalVersion
+
+jar {
+    manifest {
+        attributes("Specificiation-Title": "Accent", "Specificiation-Version": version, "Implementation-Version": version)
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'sources'
+	from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+	classifier = 'javadoc'
+	from javadoc.destinationDir
+}
+
+artifacts {
+	archives sourcesJar
+	archives javadocJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            // Drop the build component from version number and use that in the
+            // POM file
+            def _version = project.version.split('\\.')
+            _version[3] = _version[3].replaceAll("[0-9]+-", "-")
+            _version[3] = _version[3].replaceAll("[0-9]+", "").trim()
+            _version = _version.join(".").replace(".-", "-").replaceAll('\\.$', "")
+            pom.version = _version
+
+            pom.project {
+               name 'Accent'
+               packaging 'jar'
+               description 'Accent is a suite of libraries, helpers and data structures that make Java programming idioms more fluent.'
+               url 'http://cinchapi.com'
+
+               scm {
+                   url 'git@github.com:cinchapi/accent.git'
+                   connection 'git@github.com:cinchapi/accent.git'
+                   developerConnection 'git@github.com:cinchapi/accent.git'
+               }
+
+               licenses {
+                   license {
+                       name 'The Apache License'
+                       url 'http://opensource.org/licenses/Apache-2.0'
+                       distribution 'repo'
+                   }
+               }
+
+               developers {
+                   developer {
+                       id 'jnelson'
+                       name 'Jeff Nelson'
+                   }
+               }
+
+               def mavenUrl = pom.version.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+){0,1}$') ? 'https://oss.sonatype.org/service/local/staging/deploy/maven2' : 'https://oss.sonatype.org/content/repositories/snapshots'
+               repository(url: mavenUrl) {
+                   authentication(userName: sonatypeUsername, password: sonatypePassword)
+               }
+           }
+        }
+    }
+}
