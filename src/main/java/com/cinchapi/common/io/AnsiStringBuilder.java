@@ -41,8 +41,9 @@ public class AnsiStringBuilder {
      * This is encapsulated as a separate method so that we don't add support
      * unless these methods are actually used.
      */
-    private static void installAnsiConsole() {
+    private static void installAnsiConsole() {      
         if(!installedAnsiConsole) {
+            System.out.println("installing ansi console");
             // Install support for the AnsiConsole and ensure that it is
             // uninstalled when the JVM dies
             AnsiConsole.systemInstall();
@@ -53,6 +54,7 @@ public class AnsiStringBuilder {
                     AnsiConsole.systemUninstall();
                 }
             });
+            installedAnsiConsole = true;
         }
     }
 
