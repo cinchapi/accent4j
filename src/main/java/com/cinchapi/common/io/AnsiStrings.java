@@ -108,4 +108,6 @@ public class AnsiStrings {
         AnsiStringBuilder asb = new AnsiStringBuilder();
         return asb.highlight(text, bgColor, textColor, bold).toString();
     }
+
+    private AnsiStrings() {/* noinit */}
 }

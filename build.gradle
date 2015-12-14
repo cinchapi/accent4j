@@ -16,6 +16,8 @@ repositories {
 
 dependencies {
     compile 'org.fusesource.jansi:jansi:1.11'
+    compile 'com.google.code.findbugs:jsr305:3.0.1'
+    
 	testCompile 'junit:junit:4.11'
 }
 

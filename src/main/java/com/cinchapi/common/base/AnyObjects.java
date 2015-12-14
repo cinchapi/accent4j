@@ -42,6 +42,7 @@ public final class AnyObjects {
     public static <T> T checkNotNullOrEmpty(T value) {
         return checkNotNullOrEmpty(value, null);
     }
+
     /**
      * Check if {@code value} is {@code null} or semantically
      * {@link #isNullOrEmpty(Object) empty}. If so, throw an
@@ -152,6 +153,6 @@ public final class AnyObjects {
         });
     }
 
-    private AnyObjects() {/* noop */}
+    private AnyObjects() {/* noinit */}
 
 }
