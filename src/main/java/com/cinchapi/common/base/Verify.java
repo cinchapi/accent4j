@@ -15,34 +15,13 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.List;
-
 /**
- * 
+ * A collection of functions to either successfully verify a condition or throw
+ * an exception.
  * 
  * @author Jeff Nelson
  */
 public final class Verify {
-
-    public static void elementAt(int position, Iterable<?> iterable) {
-
-    }
-
-    public static void elementAt(int position, List<?> list) {
-
-    }
-
-    public static void elementAt(int position, Object[] array) {
-
-    }
-
-    public static void elementAt(int position, String string) {
-
-    }
-
-    public static void isNull(Object object) {
-
-    }
 
     /**
      * Verify that {@code object} is {@link Class#isAssignableFrom(Class) an
@@ -94,62 +73,6 @@ public final class Verify {
             throw new ClassCastException(AnyStrings.format(errorMsgTemplate,
                     errorMsgArgs));
         }
-    }
-
-    public static void notLargerThan(int size, Iterable<?> iterable) {
-
-    }
-
-    public static void notLargerThan(int size, List<?> list) {
-
-    }
-
-    public static void notLargerThan(int size, Object[] array) {
-
-    }
-
-    public static void notLargerThan(int size, String string) {
-
-    }
-
-    public static void notNull(Object object) {
-
-    }
-
-    public static void notSmallerThan(int size, Iterable<?> iterable) {
-
-    }
-
-    public static void notSmallerThan(int size, List<?> list) {
-
-    }
-
-    public static void notSmallerThan(int size, Object[] array) {
-
-    }
-
-    public static void notSmallerThan(int size, String string) {
-
-    }
-
-    public static void size(int size, Iterable<?> iterable) {
-
-    }
-
-    public static void size(int size, List<?> list) {
-
-    }
-
-    public static void size(int size, Object[] array) {
-
-    }
-
-    public static void size(int size, String string) {
-
-    }
-
-    public static void state(boolean condition) {
-
     }
 
     /**
