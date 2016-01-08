@@ -21,7 +21,7 @@ package com.cinchapi.common.base;
  * 
  * @author Jeff Nelson
  */
-public enum TernaryLogic {
+public enum Ternary {
     TRUE, FALSE, UNSURE
 
 }
