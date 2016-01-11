@@ -22,6 +22,21 @@ package com.cinchapi.common.base;
  * @author Jeff Nelson
  */
 public enum TernaryTruth {
-    TRUE, FALSE, UNSURE
+    TRUE, FALSE, UNSURE;
+
+    /**
+     * Return the boolean value that for this ternary truth value once converted
+     * to two-valued logic.
+     * 
+     * @return the two-valued logic analog for this
+     */
+    public boolean boolValue() {
+        if(this == TRUE) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
 
 }
