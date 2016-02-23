@@ -32,6 +32,60 @@ public final class Characters {
      */
     public static final char ESCAPE = '\\';
 
+    /**
+     * Return {@code true} if {@code c} is an escape sequence.
+     * 
+     * @param c a character
+     * @return {@code true} if {@code c} is an escape sequence
+     */
+    public static boolean isEscapeSequence(char c) {
+        switch (c) {
+        case '\t':
+        case '\b':
+        case '\n':
+        case '\r':
+        case '\f':
+        case '\'':
+        case '\"':
+        case '\\':
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /**
+     * If {@code c} is an {@link #isEscapeSequence(char) escape sequence} return
+     * the character that is being escaped (i.e. '\n' will return 'n').
+     * Otherwise, return the null literal character '0'.
+     * 
+     * @param c a character
+     * @return the escaped character if {@code c} is an escape sequence,
+     *         otherwise '0'
+     */
+    public static char getEscapedCharOrNullLiteral(char c) {
+        switch (c) {
+        case '\t':
+            return 't';
+        case '\b':
+            return 'b';
+        case '\n':
+            return 'n';
+        case '\r':
+            return 'r';
+        case '\f':
+            return 'f';
+        case '\'':
+            return '\'';
+        case '\"':
+            return '"';
+        case '\\':
+            return '\\';
+        default:
+            return '0';
+        }
+    }
+
     private Characters() {/* noinit */}
 
 }
