@@ -134,6 +134,18 @@ public final class Reflection {
         }
     }
 
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public static <T> T getStatic(String variable, Class<?> clazz) {
+        try {
+            Field field = getField(variable, clazz, null);
+            return (T) field.get(null);
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
     /**
      * Given an object, return an array containing all the {@link Field} objects
      * that represent those declared within {@code obj's} entire class hierarchy
@@ -249,22 +261,8 @@ public final class Reflection {
         }
     }
 
-    /**
-     * Return the {@link Field} object} that holds the variable with
-     * {@code name} in {@code obj}, if it exists. Otherwise a
-     * NoSuchFieldException is thrown.
-     * <p>
-     * This method will take care of making the field accessible.
-     * </p>
-     * 
-     * @param name the name of the field to get
-     * @param obj the object from which to get the field
-     * @return the {@link Field} object
-     * @throws NoSuchFieldException
-     */
-    private static Field getField(String name, Object obj) {
+    private static Field getField(String name, Class<?> clazz, Object obj) {
         try {
-            Class<?> clazz = obj.getClass();
             Field field = null;
             while (clazz != null && field == null) {
                 try {
@@ -287,6 +285,23 @@ public final class Reflection {
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
         }
+    }
+
+    /**
+     * Return the {@link Field} object} that holds the variable with
+     * {@code name} in {@code obj}, if it exists. Otherwise a
+     * NoSuchFieldException is thrown.
+     * <p>
+     * This method will take care of making the field accessible.
+     * </p>
+     * 
+     * @param name the name of the field to get
+     * @param obj the object from which to get the field
+     * @return the {@link Field} object
+     * @throws NoSuchFieldException
+     */
+    private static Field getField(String name, Object obj) {
+        return getField(name, obj.getClass(), obj);
     }
 
     /**
