@@ -64,6 +64,30 @@ public final class AnyObjects {
     }
 
     /**
+     * Given a list of {@code candidates}, return the first object that is an
+     * instance of the type represented by {@code clazz}. If none of the
+     * {@code candidates} are instances, throw an
+     * {@link IllegalArgumentException}.
+     * 
+     * @param clazz the actual or superclass for which at least one of the
+     *            candidate objects must be an instance
+     * @param candidates the objects to check
+     * @return the first of the {@code candidates} that is an instance of
+     *         {@code clazz}
+     * @throws IllegalArgumentException
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T firstInstanceOf(Class<T> clazz, Object... candidates)
+            throws IllegalArgumentException {
+        for (Object candidate : candidates) {
+            if(clazz.isAssignableFrom(candidate.getClass())) {
+                return (T) candidate;
+            }
+        }
+        throw new IllegalArgumentException();
+    }
+
+    /**
      * Return {@code true} if {@code value} is {@code null} or <em>empty</em>
      * based on the semantics of the class.
      * <p>

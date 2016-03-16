@@ -62,4 +62,11 @@ public class AnyObjectsTest {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(null));
     }
 
+    @Test
+    public void testFirstInstanceOf() {
+        Integer a = 1;
+        Assert.assertEquals(a, AnyObjects.firstInstanceOf(Number.class, "a",
+                true, 1, 12, new Object()));
+    }
+
 }
