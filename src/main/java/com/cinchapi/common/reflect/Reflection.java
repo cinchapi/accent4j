@@ -22,6 +22,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 import javax.annotation.Nullable;
 
@@ -54,6 +55,27 @@ import com.cinchapi.common.base.CheckedExceptions;
  * @author Jeff Nelson
  */
 public final class Reflection {
+
+    /**
+     * Return a {@link Callable} that can execute
+     * {@link #call(Object, String, Object...)} asynchronously.
+     * 
+     * @param obj the object on which to call the method
+     * @param methodName the name of the method to call
+     * @param args the method parameters
+     * @return a {@link Callable} that can be used for asynchronous execution
+     */
+    public static <T> Callable<T> callable(final Object obj,
+            final String methodName, final Object... args) {
+        return new Callable<T>() {
+
+            @Override
+            public T call() throws Exception {
+                return Reflection.call(obj, methodName, args);
+            }
+
+        };
+    }
 
     /**
      * Call the method named {@code methodName} on the specified {@code obj}
