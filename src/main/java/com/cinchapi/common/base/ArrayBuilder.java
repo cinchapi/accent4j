@@ -224,7 +224,7 @@ public class ArrayBuilder<T> {
                 continue;
             }
         }
-        if(length > 9) {
+        if(length > 10) {
             for (T arg : moreArgs) {
                 array[index] = arg;
                 ++index;
