@@ -78,16 +78,48 @@ public final class Reflection {
     }
 
     /**
-     * Call the method named {@code methodName} on the specified {@code obj}
-     * instance and provide all the {@code args} as parameters.
+     * Use reflection to call an instance method on {@code obj} with the
+     * specified {@code args} if and only if that method is natively accessible
+     * according to java language access rules.
      * 
-     * @param obj the object on which to call the method
-     * @param methodName the name of the method to call
-     * @param args the method parameters
-     * @return the result of the method call
+     * @param obj
+     * @param methodName
+     * @param args
+     * @return the result of calling the method
+     */
+    public static <T> T callIfAccessible(Object obj, String methodName,
+            Object... args) {
+        return call(false, obj, methodName, args);
+    }
+
+    /**
+     * Use reflection to call an instance method on {@code obj} with the
+     * specified {@code args}.
+     * 
+     * @param obj
+     * @param methodName
+     * @param args
+     * @return the result of calling the method
+     */
+    public static <T> T call(Object obj, String methodName, Object... args) {
+        return call(true, obj, methodName, args);
+    }
+
+    /**
+     * Use reflection to call an instance method on {@code obj} with the
+     * specified {@code args}.
+     * 
+     * @param setAccessible an indication as to whether the reflective call
+     *            should suppress Java language access checks or not
+     * @param obj
+     * @param methodName
+     * @param args
+     * @return the result of calling the method
      */
     @SuppressWarnings("unchecked")
-    public static <T> T call(Object obj, String methodName, Object... args) {
+    public static <T> T call(boolean setAccessible, Object obj,
+            String methodName, Object... args) {
+        // TODO cache method instances
         try {
             Class<?> clazz = obj.getClass();
             Class<?>[] parameterTypes = new Class<?>[args.length];
@@ -118,12 +150,11 @@ public final class Reflection {
                 }
             }
             if(method != null) {
-                method.setAccessible(true);
+                method.setAccessible(setAccessible);
                 return (T) method.invoke(obj, args);
             }
             else {
-                throw new NoSuchMethodException("No method named " + methodName
-                        + " that takes " + Arrays.toString(args) + " exists");
+                throw new NoSuchMethodException();
             }
         }
         catch (ReflectiveOperationException e) {
@@ -153,6 +184,83 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Reflectively get the value of the {@code field} from the provided
+     * {@code object} and attempt an automatic type cast.
+     * 
+     * @param field the {@link Field} object representing the desired variable
+     * @param object the object whose value for the {@code field} should be
+     *            retrieved
+     * @return the value of {@code field} in {@code object} if it exists,
+     *         otherwise {@code null}
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public static <T> T getCasted(Field field, Object object) {
+        try {
+            field.setAccessible(true);
+            return (T) field.get(object);
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * This is literally just syntactic sugar for {@link Class#forName(String)}
+     * that doesn't throw a checked exception.
+     * 
+     * @param name the name of the class
+     * @return the {@link Class} object if can be found
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Class<T> getClassCasted(String name) {
+        try {
+            return (Class<T>) Class.forName(name);
+        }
+        catch (ClassNotFoundException e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return a {@link Method} instance from {@code clazz} named {@code method}
+     * (that takes arguments of {@code paramTypes} respectively)
+     * while making a best effort attempt to unbox primitive parameter types
+     * 
+     * @param clazz the class instance in which the method is contained
+     * @param method the name of the method
+     * @param paramTypes the types for the respective paramters
+     * @return a {@link Method} instance that has been set to be accessible
+     */
+    public static Method getMethodUnboxed(Class<?> clazz, String method,
+            Class<?>... paramTypes) {
+        Class<?>[] altParamTypes = new Class<?>[paramTypes.length];
+        for (int i = 0; i < altParamTypes.length; ++i) {
+            altParamTypes[i] = unbox(paramTypes[i]);
+        }
+        try {
+            Method m = clazz.getDeclaredMethod(method, paramTypes);
+            m.setAccessible(true);
+            return m;
+        }
+        catch (NoSuchMethodException e) {
+            try {
+                // Attempt to find a method using the alt param types.
+                // This will usually bear fruit in cases where a method
+                // has a primitive type parameter and Java autoboxing
+                // causes the passed in parameters to have a wrapper
+                // type instead of the appropriate primitive type.
+                Method m = clazz.getDeclaredMethod(method, altParamTypes);
+                m.setAccessible(true);
+                return m;
+            }
+            catch (NoSuchMethodException e2) {
+                throw CheckedExceptions.throwAsRuntimeException(e);
+            }
         }
     }
 
