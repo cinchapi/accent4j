@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.base;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,7 +49,7 @@ public class ArrayBuilder<T> {
      * The number of elements that have been {@link #add(Object) added} to
      * the array.
      */
-    private byte length = 0;
+    private int length = 0;
 
     /**
      * The first 10 args are assigned to instance variables for memory
@@ -177,60 +178,65 @@ public class ArrayBuilder<T> {
      */
     @SuppressWarnings("unchecked")
     public T[] build() {
-        T[] array = (T[]) new Object[length];
-        T current = arg0;
-        boolean exit = false;
-        int index = 0;
-        while (!exit) {
-            if(current == null) {
-                exit = true;
-                continue;
-            }
-            else {
-                array[index] = current;
-                switch (index) {
-                case 0:
-                    current = arg1;
-                    break;
-                case 1:
-                    current = arg2;
-                    break;
-                case 2:
-                    current = arg3;
-                    break;
-                case 3:
-                    current = arg4;
-                    break;
-                case 4:
-                    current = arg5;
-                    break;
-                case 5:
-                    current = arg6;
-                    break;
-                case 6:
-                    current = arg7;
-                    break;
-                case 7:
-                    current = arg8;
-                    break;
-                case 8:
-                    current = arg9;
-                    break;
-                default:
-                    current = null;
-                    break;
+        if(arg0 == null) {
+            return (T[]) new Object[0];
+        }
+        else {
+            T[] array = (T[]) Array.newInstance(arg0.getClass(), length);
+            T current = arg0;
+            boolean exit = false;
+            int index = 0;
+            while (!exit) {
+                if(current == null) {
+                    exit = true;
+                    continue;
                 }
-                ++index;
-                continue;
+                else {
+                    array[index] = current;
+                    switch (index) {
+                    case 0:
+                        current = arg1;
+                        break;
+                    case 1:
+                        current = arg2;
+                        break;
+                    case 2:
+                        current = arg3;
+                        break;
+                    case 3:
+                        current = arg4;
+                        break;
+                    case 4:
+                        current = arg5;
+                        break;
+                    case 5:
+                        current = arg6;
+                        break;
+                    case 6:
+                        current = arg7;
+                        break;
+                    case 7:
+                        current = arg8;
+                        break;
+                    case 8:
+                        current = arg9;
+                        break;
+                    default:
+                        current = null;
+                        break;
+                    }
+                    ++index;
+                    continue;
+                }
             }
-        }
-        if(length > 10) {
-            for (T arg : moreArgs) {
-                array[index] = arg;
-                ++index;
+            if(length > 10) {
+                for (T arg : moreArgs) {
+                    array[index] = arg;
+                    ++index;
+                }
             }
+            return array;
         }
-        return array;
     }
 
 }

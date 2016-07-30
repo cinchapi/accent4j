@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cinchapi Inc.
+ * Copyright (c) 2016 Cinchapi Inc.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,40 +16,29 @@
 
 package com.cinchapi.common.base;
 
+import java.util.Random;
 import java.util.UUID;
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 public class ArrayBuilderTest {
 
-    private ArrayBuilder<Object> arrayBuilder;
-
-    @Before
-    public void testArrayBuilder() {
-        arrayBuilder = ArrayBuilder.builder();
-
-        Assert.assertNotNull(arrayBuilder);
-    }
-
     @Test
-    public void testAddToArray() {
-        int size = 100;
-
-        for (int i = 0; i < size; i++) {
-            arrayBuilder.add(UUID.randomUUID().toString());
+    public void testSize() {
+        int size = new Random().nextInt(200) + 1;
+        ArrayBuilder<UUID> builder = ArrayBuilder.builder();
+        for (int i = 0; i < size; ++i) {
+            builder.add(UUID.randomUUID());
         }
-        int length = arrayBuilder.build().length;
-        Assert.assertEquals(length, size);
+        UUID[] uuids = builder.build();
+        Assert.assertEquals(size, uuids.length);
     }
-
-    @Test(expected = NegativeArraySizeException.class)
-    public void testNegativeArraySizeException() {
-        int size = 1000;
-        for (int i = 0; i < size; i++) {
-            arrayBuilder.add(UUID.randomUUID().toString());
-        }
-        arrayBuilder.build();
+    
+    @Test
+    public void testBuildEmptyArray(){
+        ArrayBuilder<UUID> builder = ArrayBuilder.builder();
+        UUID[] uuids = builder.build();
+        Assert.assertEquals(0, uuids.length);
     }
 }
