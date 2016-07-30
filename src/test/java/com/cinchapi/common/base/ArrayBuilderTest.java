@@ -24,14 +24,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 
-public class ArrayBuilderTest
-{
+public class ArrayBuilderTest {
+
     private ArrayBuilder<Object> arrayBuilder;
 
 
     @Before
-    public void testArrayBuilder()
-    {
+    public void testArrayBuilder() {
         arrayBuilder = ArrayBuilder.builder();
 
         Assert.assertNotNull( arrayBuilder );
@@ -39,12 +38,10 @@ public class ArrayBuilderTest
 
 
     @Test
-    public void testAddToArray()
-    {
+    public void testAddToArray() {
         int size = 100;
 
-        for ( int i = 0; i < size; i++ )
-        {
+        for ( int i = 0; i < size; i++ ) {
             arrayBuilder.add( UUID.randomUUID().toString() );
         }
 
@@ -53,13 +50,13 @@ public class ArrayBuilderTest
         Assert.assertEquals( length, size );
     }
 
-    @Test(expected = NegativeArraySizeException.class)
-    public void testNegativeArraySizeException(){
+
+    @Test( expected = NegativeArraySizeException.class )
+    public void testNegativeArraySizeException() {
 
         int size = 1000;
 
-        for ( int i = 0; i < size; i++ )
-        {
+        for ( int i = 0; i < size; i++ ) {
             arrayBuilder.add( UUID.randomUUID().toString() );
         }
 
