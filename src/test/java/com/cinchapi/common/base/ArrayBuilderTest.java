@@ -35,7 +35,7 @@ public class ArrayBuilderTest {
         Assert.assertEquals(size, uuids.length);
     }
     
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testBuildEmptyArray(){
         ArrayBuilder<UUID> builder = ArrayBuilder.builder();
         UUID[] uuids = builder.build();

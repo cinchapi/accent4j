@@ -179,7 +179,7 @@ public class ArrayBuilder<T> {
     @SuppressWarnings("unchecked")
     public T[] build() {
         if(arg0 == null) {
-            return (T[]) new Object[0];
+            throw new IllegalStateException();
         }
         else {
             T[] array = (T[]) Array.newInstance(arg0.getClass(), length);
