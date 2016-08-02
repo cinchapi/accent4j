@@ -83,6 +83,21 @@ public class ReflectionTest {
         Reflection.get("foo", a);
     }
 
+    @Test
+    public void testConstructorAutoboxingSupport() {
+        Integer integer = random.nextInt();
+        B b = Reflection.newInstance(B.class, integer);
+        Assert.assertNotNull(b);
+    }
+
+    @Test
+    public void testMethodAutoboxingSupport() {
+        int integer = random.nextInt();
+        B b = new B(2);
+        Reflection.call(b, "bigInteger", integer);
+        Assert.assertTrue(true); // lack of exception means we passed...
+    }
+
     private static class A {
 
         private final String string;
@@ -114,6 +129,10 @@ public class ReflectionTest {
         }
 
         private long integer(int multiple) {
+            return multiple * integer;
+        }
+
+        private long bigInteger(Integer multiple) {
             return multiple * integer;
         }
     }

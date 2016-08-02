@@ -300,7 +300,9 @@ public final class Reflection {
                     for (int i = 0; i < args.length; ++i) {
                         Object arg = args[i];
                         Class<?> type = paramTypes[i];
-                        if(!type.isAssignableFrom(arg.getClass())) {
+                        Class<?> altType = getAltType(type);
+                        if(!type.isAssignableFrom(arg.getClass())
+                                && !altType.isAssignableFrom(arg.getClass())) {
                             continue outer;
                         }
                     }
@@ -408,6 +410,48 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return the boxed version of {@code clazz} if it is a primitive, or the
+     * unboxed version if it is a wrapper.
+     * 
+     * @param clazz the class for which the alt type is returned
+     * @return the alt type
+     */
+    private static Class<?> getAltType(Class<?> clazz) {
+        if(clazz.isPrimitive()) {
+            if(clazz == int.class) {
+                return Integer.class;
+            }
+            else if(clazz == long.class) {
+                return Long.class;
+            }
+            else if(clazz == float.class) {
+                return Float.class;
+            }
+            else if(clazz == double.class) {
+                return Double.class;
+            }
+            else if(clazz == short.class) {
+                return Short.class;
+            }
+            else if(clazz == byte.class) {
+                return Byte.class;
+            }
+            else if(clazz == char.class) {
+                return Character.class;
+            }
+            else if(clazz == boolean.class) {
+                return Boolean.class;
+            }
+            else {
+                return clazz;
+            }
+        }
+        else {
+            return unbox(clazz);
         }
     }
 
