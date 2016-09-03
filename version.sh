@@ -38,8 +38,15 @@ if [ -z "$1" ] ; then
 	if [ ! -f $COUNTER_FILE ] ; then
 		echo 0 > $COUNTER_FILE
 	fi
-	COUNTER=`cat $COUNTER_FILE`
-	((COUNTER++))
+	if [ -z ${CONTAINER_BUILD+x} ]; then
+		COUNTER=`cat $COUNTER_FILE`
+		((COUNTER++))
+	else
+		# If the build is run in a container, the COUNTER_FILE will be wiped
+		# away on each build, so we'll use the current unix timestamp for the
+		# counter.
+		COUNTER=`date +%s`
+	fi
 	echo $COUNTER > $COUNTER_FILE
 	VERSION=$VERSION.$COUNTER
 	case $BRANCH in
@@ -72,12 +79,22 @@ else
 
 		# Find all the build.gradle files and update the version if it is
 		# listed.
-		files=( `find . -name "build.gradle" | cut -d / -f 2,3` )
+		files=( `find . -name "build.gradle" | cut -d / -f 2-` )
 		for file in "${files[@]}"
 		do
 			sed -i '' -E "s/pom.version = '[0-9]+\.[0-9]+\.[0-9]'+/pom.version = '$NEW_VERSION'/g" $file
 			sed -i '' -E "s/pom.version = '[0-9]+\.[0-9]+\.[0-9]-SNAPSHOT'+/pom.version = '$NEW_VERSION-SNAPSHOT'/g" $file
 		done
+
+		# concourse-driver-java
+		sed -i '' -E "s/[0-9]+\.[0-9]+\.[0-9]+/$NEW_VERSION/g" concourse-driver-java/README.md
+
+		# concourse-driver-php
+		sed -i '' -E "s/[0-9]+\.[0-9]+\.[0-9]+/$NEW_VERSION/g" concourse-driver-php/README.md
+		sed -i '' -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEW_VERSION\"/g" concourse-driver-php/composer.json
+
+		# concourse-driver-python
+		sed -i '' -E "s/version='[0-9]+\.[0-9]+\.[0-9]'+/version='$NEW_VERSION'/g" concourse-driver-python/README.md
 
 		echo "The version has been set to $NEW_VERSION"
 	else
