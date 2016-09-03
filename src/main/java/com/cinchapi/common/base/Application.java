@@ -20,6 +20,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
@@ -78,6 +79,17 @@ public final class Application {
             }
 
         };
+    }
+    
+    /**
+     * Return a {@link Path} to the java executable that was used to launch the
+     * current application.
+     * 
+     * @return the java path
+     */
+    public static Path whichJava() {
+        return Paths.get(System.getProperty("java.home") + File.separator
+                + "bin" + File.separator + "java");
     }
 
 }
