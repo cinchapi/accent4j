@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.cinchapi.common.base;
+package com.cinchapi.common.runtime;
 
 import java.io.File;
 import java.net.URISyntaxException;
@@ -24,6 +24,9 @@ import java.nio.file.Paths;
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
+
+import com.cinchapi.common.base.AdHocIterator;
+import com.cinchapi.common.base.CheckedExceptions;
 
 /**
  * Utility functions for interacting with the current application instance.
