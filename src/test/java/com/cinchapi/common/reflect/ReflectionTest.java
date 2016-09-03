@@ -15,6 +15,8 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.Random;
 
 import org.junit.Assert;
@@ -98,6 +100,31 @@ public class ReflectionTest {
         Assert.assertTrue(true); // lack of exception means we passed...
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void testCallIfNotAnnotated() {
+        A a = new A("restricted");
+        Reflection.callIf(
+                (method) -> !method.isAnnotationPresent(Restricted.class), a,
+                "restricted");
+    }
+
+    @Test
+    public void testCallIf() {
+        A a = new A("not restricted");
+        Reflection.callIf(
+                (method) -> !method.isAnnotationPresent(Restricted.class), a,
+                "string");
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testCallIfNotPrivate() {
+        A a = new A("not restricted");
+        Reflection.callIf((method) -> method.isAccessible(), a, "string");
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    private @interface Restricted {}
+
     private static class A {
 
         private final String string;
@@ -107,6 +134,11 @@ public class ReflectionTest {
         }
 
         private String string() {
+            return string;
+        }
+
+        @Restricted
+        public String restricted() {
             return string;
         }
 

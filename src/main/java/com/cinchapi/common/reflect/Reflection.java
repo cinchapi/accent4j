@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 
 import javax.annotation.Nullable;
 
@@ -88,6 +89,39 @@ public final class Reflection {
             }
 
         };
+    }
+
+    /**
+     * Call {@code methodName} on the specified {@code obj} with the specified
+     * {@code args} if and only if the {@code evaluate} function returns
+     * {@code true}.
+     * 
+     * @param evaluate the {@link Function} that is given the (possibly cached)
+     *            {@link Method} instance that corresponds to {@code methodName}
+     *            ; use this to evaluate whether the method should be called
+     * @param obj the Object on which the method is called
+     * @param methodName the name of the method to call
+     * @param args the args to pass to the method
+     * @return the result of calling the method
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T callIf(Function<Method, Boolean> evaluate, Object obj,
+            String methodName, Object... args) {
+        Method method = getMethod(false, methodName, obj.getClass(), args);
+        if(evaluate.apply(method)) {
+            try {
+                method.setAccessible(true);
+                return (T) method.invoke(obj, args);
+            }
+            catch (ReflectiveOperationException e) {
+                throw CheckedExceptions.throwAsRuntimeException(e);
+            }
+        }
+        else {
+            throw new IllegalStateException("Cannot call " + method
+                    + " reflectively because "
+                    + "the evaluation function returned false");
+        }
     }
 
     /**
