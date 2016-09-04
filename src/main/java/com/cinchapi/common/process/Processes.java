@@ -20,6 +20,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,7 +51,7 @@ public class Processes {
         AtomicBoolean finished = new AtomicBoolean(false);
         List<String> stdout = Lists.newArrayList();
         List<String> stderr = Lists.newArrayList();
-
+        CountDownLatch latch = new CountDownLatch(2);
         try {
             // Asynchronously exhaust stdout so process doesn't hang
             executor.execute(() -> {
@@ -60,6 +61,7 @@ public class Processes {
                     while (!finished.get()) {
                         stdout.addAll(CharStreams.readLines(reader));
                     }
+                    latch.countDown();
                 }
                 catch (IOException e) {
                     throw Throwables.propagate(e);
@@ -74,6 +76,7 @@ public class Processes {
                     while (!finished.get()) {
                         stderr.addAll(CharStreams.readLines(reader));
                     }
+                    latch.countDown();
                 }
                 catch (IOException e) {
                     throw Throwables.propagate(e);
@@ -81,6 +84,7 @@ public class Processes {
             });
             int code = process.waitFor();
             finished.set(true);
+            latch.await();
             Map<ProcessData, Object> data = new HashMap<>(3);
             data.put(ProcessData.EXIT_CODE, code);
             data.put(ProcessData.STDOUT, stdout);
