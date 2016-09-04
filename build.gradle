@@ -18,6 +18,8 @@ dependencies {
     compile 'org.fusesource.jansi:jansi:1.11'
     compile 'com.google.code.findbugs:jsr305:3.0.1'
     compile 'com.google.guava:guava:19.0'
+    compile 'org.slf4j:slf4j-api:1.7.5'
+    compile 'ch.qos.logback:logback-classic:1.0.13'
 
 	testCompile 'junit:junit:4.11'
 }
