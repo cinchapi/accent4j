@@ -122,6 +122,14 @@ public class ReflectionTest {
         Reflection.callIf((method) -> method.isAccessible(), a, "string");
     }
 
+    @Test
+    public void testCallMethodWithNullArgument() {
+        B b = new B(1);
+        String arg = null;
+        Reflection.call(b, "nullOkay", arg);
+        Assert.assertTrue(true); // lack of NPE means test passes
+    }
+
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
 
@@ -167,6 +175,8 @@ public class ReflectionTest {
         private long bigInteger(Integer multiple) {
             return multiple * integer;
         }
+
+        private void nullOkay(String object) {}
     }
 
 }

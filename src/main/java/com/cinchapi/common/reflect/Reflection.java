@@ -28,6 +28,8 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 
 import com.cinchapi.common.base.CheckedExceptions;
+import com.google.common.base.Throwables;
+import com.google.common.collect.Lists;
 
 /**
  * A collection of tools for using reflection to access or modify objects.
@@ -307,6 +309,24 @@ public final class Reflection {
     }
 
     /**
+     * Return a new instance of the specified {@code clazz} by calling the
+     * appropriate constructor with the specified {@code args}.
+     * 
+     * @param clazz the fully qualified name of the {@link Class}
+     * @param args the args to pass to the constructor
+     * @return the new instance
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T newInstance(String clazz, Object... args) {
+        try {
+            return (T) newInstance(Class.forName(clazz), args);
+        }
+        catch (ReflectiveOperationException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
      * Given a {@link Class}, create a new instance by calling the appropriate
      * constructor for the given {@code args}.
      * 
@@ -558,36 +578,91 @@ public final class Reflection {
         try {
             Class<?>[] parameterTypes = new Class<?>[args.length];
             Class<?>[] altParameterTypes = new Class<?>[args.length];
+            List<Integer> nulls = Lists
+                    .newArrayListWithCapacity(args.length / 2);
             for (int i = 0; i < args.length; i++) {
-                parameterTypes[i] = args[i].getClass();
-                altParameterTypes[i] = unbox(args[i].getClass());
+                Object arg = args[i];
+                if(arg != null) {
+                    parameterTypes[i] = arg.getClass();
+                    altParameterTypes[i] = unbox(arg.getClass());
+                }
+                else {
+                    nulls.add(i);
+                }
             }
             Method method = null;
-            while (clazz != null && method == null) {
-                try {
-                    method = clazz.getDeclaredMethod(name, parameterTypes);
-                }
-                catch (NoSuchMethodException e) {
+            if(nulls.isEmpty()) {
+                while (clazz != null && method == null) {
                     try {
-                        // Attempt to find a method using the alt param types.
-                        // This will usually bear fruit in cases where a method
-                        // has a primitive type parameter and Java autoboxing
-                        // causes the passed in parameters to have a wrapper
-                        // type instead of the appropriate primitive type.
-                        method = clazz.getDeclaredMethod(name,
-                                altParameterTypes);
+                        method = clazz.getDeclaredMethod(name, parameterTypes);
                     }
-                    catch (NoSuchMethodException e2) {
-                        clazz = clazz.getSuperclass();
+                    catch (NoSuchMethodException e) {
+                        try {
+                            // Attempt to find a method using the alt param
+                            // types. This will usually bear fruit in cases
+                            // where a method has a primitive type parameter and
+                            // Java autoboxing causes the passed in parameters
+                            // to have a wrapper type instead of the appropriate
+                            // primitive type.
+                            method = clazz.getDeclaredMethod(name,
+                                    altParameterTypes);
+                        }
+                        catch (NoSuchMethodException e2) {
+                            clazz = clazz.getSuperclass();
+                        }
                     }
                 }
+            }
+            else {
+                // Since at least of the args was null, we have to manually try
+                // to match the method signature. This approach isn't perfect
+                // because it is possible that the nulls will make it impossible
+                // to find a unique match. In which case, we'll throw an
+                // Exception.
+                Method matched = null;
+                outer: for (Method potential : clazz.getDeclaredMethods()) {
+                    if(potential.getName().equals(name)
+                            && potential.getParameterCount() == args.length) {
+                        int i = 0;
+                        for (Class<?> clz : potential.getParameterTypes()) {
+                            if(!nulls.contains(i)) {
+                                if(parameterTypes[i] != clz
+                                        && altParameterTypes[i] == clz) {
+                                    break outer;
+                                }
+                            }
+                            ++i;
+                        }
+                        if(matched == null) {
+                            matched = potential;
+                        }
+                        else {
+                            // Found an additional method that can potentially
+                            // match, so we have to throw an Exception since we
+                            // can't be sure what to call
+                            throw new IllegalArgumentException(
+                                    "Trying to invoke method "
+                                            + "'"
+                                            + name
+                                            + "' with args "
+                                            + Arrays.asList(args)
+                                            + " isn't "
+                                            + "possible because there are too many null "
+                                            + "values and it is impossible to decide which "
+                                            + "method is desired");
+                        }
+                    }
+                }
+                method = matched;
             }
             if(method != null) {
                 method.setAccessible(setAccessible);
                 return method;
             }
             else {
-                throw new NoSuchMethodException();
+                throw new NoSuchMethodException("Could not find method '"
+                        + name + "' that is invokable with args: "
+                        + Arrays.asList(args));
             }
         }
         catch (ReflectiveOperationException e) {
