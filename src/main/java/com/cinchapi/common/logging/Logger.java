@@ -59,6 +59,11 @@ public final class Logger {
     private final String directory;
 
     /**
+     * A flag that indicates whether the Logger should log to the console.
+     */
+    private final boolean enableConsoleLogging;
+
+    /**
      * The internal logger for the {@link #error(String, Object...)} method.
      */
     private final ch.qos.logback.classic.Logger error;
@@ -92,7 +97,7 @@ public final class Logger {
      * @param maxFileSize
      */
     private Logger(String name, Level level, String directory,
-            String maxFileSize) {
+            String maxFileSize, boolean enableConsoleLogging) {
         Preconditions.checkNotNull(name);
         Preconditions.checkNotNull(level);
         Preconditions.checkNotNull(directory);
@@ -100,6 +105,7 @@ public final class Logger {
         this.level = level;
         this.directory = directory;
         this.maxFileSize = maxFileSize;
+        this.enableConsoleLogging = enableConsoleLogging;
         this.info = setup(name + ":info", "info.log");
         this.error = setup(name + ":error", "error.log");
         this.warn = setup(name + ":warn", "warn.log");
@@ -165,6 +171,11 @@ public final class Logger {
      * @return the internal logger
      */
     private ch.qos.logback.classic.Logger setup(String name, String file) {
+        if(enableConsoleLogging) {
+            ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory
+                    .getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+            root.detachAndStopAllAppenders();
+        }
         LoggerContext context = (LoggerContext) LoggerFactory
                 .getILoggerFactory();
         // Configure Pattern
@@ -216,6 +227,7 @@ public final class Logger {
     public static class Builder {
         private String directory;
 
+        private boolean enableConsoleLogging = false;
         private Level level = Level.INFO;
         private String maxFileSize = "10MB";
         private String name;
@@ -228,7 +240,8 @@ public final class Logger {
          * @return the Logger
          */
         public Logger build() {
-            return new Logger(name, level, directory, maxFileSize);
+            return new Logger(name, level, directory, maxFileSize,
+                    enableConsoleLogging);
         }
 
         /**
@@ -239,6 +252,19 @@ public final class Logger {
          */
         public Builder directory(String directory) {
             this.directory = directory;
+            return this;
+        }
+
+        /**
+         * Specify whether the returned {@link Logger} should log to the
+         * console.
+         * 
+         * @param enable a boolean that indicates if consle logging should be
+         *            enabled
+         * @return this
+         */
+        public Builder enableConsoleLogging(boolean enable) {
+            this.enableConsoleLogging = enable;
             return this;
         }
 
