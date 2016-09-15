@@ -627,7 +627,7 @@ public final class Reflection {
                         for (Class<?> clz : potential.getParameterTypes()) {
                             if(!nulls.contains(i)) {
                                 if(parameterTypes[i] != clz
-                                        && altParameterTypes[i] == clz) {
+                                        && altParameterTypes[i] != clz) {
                                     break outer;
                                 }
                             }
