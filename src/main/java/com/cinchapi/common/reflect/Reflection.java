@@ -17,6 +17,7 @@ package com.cinchapi.common.reflect;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -439,7 +440,11 @@ public final class Reflection {
             return (T) method.invoke(obj, args);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            Throwable ex = e;
+            if(ex instanceof InvocationTargetException && e.getCause() != null) {
+                ex = ex.getCause();
+            }
+            throw Throwables.propagate(ex);
         }
     }
 
@@ -463,7 +468,11 @@ public final class Reflection {
             return (T) method.invoke(null, args);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            Throwable ex = e;
+            if(ex instanceof InvocationTargetException && e.getCause() != null) {
+                ex = ex.getCause();
+            }
+            throw Throwables.propagate(ex);
         }
     }
 
