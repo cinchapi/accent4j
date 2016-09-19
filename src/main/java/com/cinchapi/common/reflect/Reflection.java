@@ -576,93 +576,56 @@ public final class Reflection {
             Class<?> clazz, Object... args) {
         // TODO cache method instances
         try {
-            Class<?>[] parameterTypes = new Class<?>[args.length];
-            Class<?>[] altParameterTypes = new Class<?>[args.length];
-            List<Integer> nulls = Lists
-                    .newArrayListWithCapacity(args.length / 2);
-            for (int i = 0; i < args.length; i++) {
-                Object arg = args[i];
-                if(arg != null) {
-                    parameterTypes[i] = arg.getClass();
-                    altParameterTypes[i] = unbox(arg.getClass());
-                }
-                else {
-                    nulls.add(i);
-                }
-            }
-            Method method = null;
-            if(nulls.isEmpty()) {
-                while (clazz != null && method == null) {
-                    try {
-                        method = clazz.getDeclaredMethod(name, parameterTypes);
-                    }
-                    catch (NoSuchMethodException e) {
-                        try {
-                            // Attempt to find a method using the alt param
-                            // types. This will usually bear fruit in cases
-                            // where a method has a primitive type parameter and
-                            // Java autoboxing causes the passed in parameters
-                            // to have a wrapper type instead of the appropriate
-                            // primitive type.
-                            method = clazz.getDeclaredMethod(name,
-                                    altParameterTypes);
-                        }
-                        catch (NoSuchMethodException e2) {
-                            clazz = clazz.getSuperclass();
-                        }
-                    }
-                }
-            }
-            else {
-                // Since at least of the args was null, we have to manually try
-                // to match the method signature. This approach isn't perfect
-                // because it is possible that the nulls will make it impossible
-                // to find a unique match. In which case, we'll throw an
-                // Exception.
-                Method matched = null;
-                outer: for (Method potential : clazz.getDeclaredMethods()) {
-                    if(potential.getName().equals(name)
-                            && potential.getParameterCount() == args.length) {
-                        int i = 0;
-                        for (Class<?> clz : potential.getParameterTypes()) {
-                            if(!nulls.contains(i)) {
-                                if(parameterTypes[i] != clz
-                                        && altParameterTypes[i] != clz) {
+            List<Method> potential = Lists.newArrayListWithCapacity(1);
+            while (clazz != null) {
+                outer: for (Method method : clazz.getDeclaredMethods()) {
+                    if(method.getParameterCount() == args.length
+                            && method.getName().equals(name)) {
+                        Class<?>[] expectedParamTypes = method
+                                .getParameterTypes();
+                        for (int i = 0; i < args.length; ++i) {
+                            Object arg = args[i];
+                            if(arg != null) {
+                                Class<?> expected = expectedParamTypes[i];
+                                Class<?> actual = arg.getClass();
+                                if(expected == actual
+                                        || expected == unbox(actual)
+                                        || expected.isAssignableFrom(actual)) {
+                                    continue;
+                                }
+                                else {
                                     break outer;
                                 }
                             }
-                            ++i;
+                            else {
+                                continue;
+                            }
                         }
-                        if(matched == null) {
-                            matched = potential;
-                        }
-                        else {
-                            // Found an additional method that can potentially
-                            // match, so we have to throw an Exception since we
-                            // can't be sure what to call
-                            throw new IllegalArgumentException(
-                                    "Trying to invoke method "
-                                            + "'"
-                                            + name
-                                            + "' with args "
-                                            + Arrays.asList(args)
-                                            + " isn't "
-                                            + "possible because there are too many null "
-                                            + "values and it is impossible to decide which "
-                                            + "method is desired");
-                        }
+                        potential.add(method);
+                    }
+                    else {
+                        continue;
                     }
                 }
-                method = matched;
+                clazz = clazz.getSuperclass();
             }
-            if(method != null) {
-                method.setAccessible(setAccessible);
-                return method;
-            }
-            else {
+            int matches = potential.size();
+            if(matches < 1) {
                 throw new NoSuchMethodException("Could not find method '"
                         + name + "' that is invokable with args: "
                         + Arrays.asList(args));
+            }
+            else if(matches > 1) {
+                throw new IllegalArgumentException("Trying to invoke method "
+                        + "'" + name + "' with args " + Arrays.asList(args)
+                        + " isn't possible because there are too many null "
+                        + "values and it is impossible to decide which "
+                        + "method is desired");
+            }
+            else {
+                Method method = potential.get(0);
+                method.setAccessible(setAccessible);
+                return method;
             }
         }
         catch (ReflectiveOperationException e) {

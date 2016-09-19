@@ -17,10 +17,13 @@ package com.cinchapi.common.reflect;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.List;
 import java.util.Random;
 
 import org.junit.Assert;
 import org.junit.Test;
+
+import com.google.common.collect.Lists;
 
 /**
  * Unit tests for the {@link Reflection} utility class.
@@ -129,6 +132,22 @@ public class ReflectionTest {
         Reflection.call(b, "nullOkay", arg);
         Assert.assertTrue(true); // lack of NPE means test passes
     }
+    
+    @Test
+    public void testCallMethodSuperClassParameterType(){
+        A a = new A("foo");
+        List<String> list = Lists.newArrayList("1");
+        List<String> listlist = Reflection.call(a, "list", list, list);
+        Assert.assertEquals(2, listlist.size());
+    }
+    
+    @Test
+    public void testCallMethodSuperClassParameterTypeOneIsNull(){
+        A a = new A("foo");
+        List<String> list = Lists.newArrayList("1");
+        List<String> listlist = Reflection.call(a, "list", list, null);
+        Assert.assertEquals(1, listlist.size());
+    }
 
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
@@ -148,6 +167,13 @@ public class ReflectionTest {
         @Restricted
         public String restricted() {
             return string;
+        }
+        
+        public List<String> list(List<String> list, List<String> list2){
+            if(list2 != null){
+                list.addAll(list2);
+            }
+            return list;
         }
 
         private String string(int count) {
