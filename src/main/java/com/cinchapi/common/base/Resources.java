@@ -17,12 +17,15 @@ package com.cinchapi.common.base;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+
+import com.google.common.base.Throwables;
 
 /**
  * Utilities to handle getting resources in a standard and portable way.
@@ -94,6 +97,50 @@ public class Resources {
         }
         catch (URISyntaxException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Finds a resource with a given name. The rules for searching resources
+     * associated with a given class are implemented by the defining
+     * {@linkplain ClassLoader class loader} of the class. This method
+     * delegates to this object's class loader. If this object was loaded by
+     * the bootstrap class loader, the method delegates to
+     * {@link ClassLoader#getSystemResourceAsStream}.
+     * 
+     * <p>
+     * Before delegation, an absolute resource name is constructed from the
+     * given resource name using this algorithm:
+     * 
+     * <ul>
+     * 
+     * <li>If the {@code name} begins with a {@code '/'} (<tt>'&#92;u002f'</tt>
+     * ), then the absolute name of the resource is the portion of the
+     * {@code name} following the {@code '/'}.
+     * 
+     * <li>Otherwise, the absolute name is of the following form:
+     * 
+     * <blockquote> {@code modified_package_name/name} </blockquote>
+     * 
+     * <p>
+     * Where the {@code modified_package_name} is the package name of this
+     * object with {@code '/'} substituted for {@code '.'} (
+     * <tt>'&#92;u002e'</tt>).
+     * 
+     * </ul>
+     * 
+     * @param name name of the desired resource
+     * @return A {@link java.io.InputStream} object or {@code null} if
+     *         no resource with this name is found
+     * @throws NullPointerException If {@code name} is {@code null}
+     * @since JDK1.1
+     */
+    public static InputStream getAsStream(String name) {
+        try {
+            return get(name).openStream();
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
         }
     }
 
