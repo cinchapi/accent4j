@@ -444,6 +444,9 @@ public final class Reflection {
             if(ex instanceof InvocationTargetException && e.getCause() != null) {
                 ex = ex.getCause();
             }
+            else {
+                ex = Throwables.getRootCause(ex);
+            }
             throw Throwables.propagate(ex);
         }
     }
@@ -471,6 +474,9 @@ public final class Reflection {
             Throwable ex = e;
             if(ex instanceof InvocationTargetException && e.getCause() != null) {
                 ex = ex.getCause();
+            }
+            else {
+                ex = Throwables.getRootCause(ex);
             }
             throw Throwables.propagate(ex);
         }
