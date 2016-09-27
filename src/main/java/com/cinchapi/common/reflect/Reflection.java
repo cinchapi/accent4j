@@ -435,7 +435,8 @@ public final class Reflection {
     @SuppressWarnings("unchecked")
     private static <T> T call(boolean setAccessible, Object obj,
             String methodName, Object... args) {
-        Method method = getMethod(true, methodName, obj.getClass(), args);
+        Method method = getMethod(setAccessible, methodName, obj.getClass(),
+                args);
         try {
             return (T) method.invoke(obj, args);
         }

@@ -149,7 +149,7 @@ public class ReflectionTest {
         Assert.assertEquals(1, listlist.size());
     }
 
-    @Test(expected = NoSuchMethodException.class)
+    @Test(expected = RuntimeException.class)
     public void testCallIfAccessible() {
         A a = new A("foo");
         Reflection.callIfAccessible(a, "string");
