@@ -132,21 +132,27 @@ public class ReflectionTest {
         Reflection.call(b, "nullOkay", arg);
         Assert.assertTrue(true); // lack of NPE means test passes
     }
-    
+
     @Test
-    public void testCallMethodSuperClassParameterType(){
+    public void testCallMethodSuperClassParameterType() {
         A a = new A("foo");
         List<String> list = Lists.newArrayList("1");
         List<String> listlist = Reflection.call(a, "list", list, list);
         Assert.assertEquals(2, listlist.size());
     }
-    
+
     @Test
-    public void testCallMethodSuperClassParameterTypeOneIsNull(){
+    public void testCallMethodSuperClassParameterTypeOneIsNull() {
         A a = new A("foo");
         List<String> list = Lists.newArrayList("1");
         List<String> listlist = Reflection.call(a, "list", list, null);
         Assert.assertEquals(1, listlist.size());
+    }
+
+    @Test(expected = NoSuchMethodException.class)
+    public void testCallIfAccessible() {
+        A a = new A("foo");
+        Reflection.callIfAccessible(a, "string");
     }
 
     @Retention(RetentionPolicy.RUNTIME)
@@ -168,9 +174,9 @@ public class ReflectionTest {
         public String restricted() {
             return string;
         }
-        
-        public List<String> list(List<String> list, List<String> list2){
-            if(list2 != null){
+
+        public List<String> list(List<String> list, List<String> list2) {
+            if(list2 != null) {
                 list.addAll(list2);
             }
             return list;
