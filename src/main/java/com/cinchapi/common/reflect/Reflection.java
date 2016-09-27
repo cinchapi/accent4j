@@ -110,7 +110,7 @@ public final class Reflection {
     @SuppressWarnings("unchecked")
     public static <T> T callIf(Function<Method, Boolean> evaluate, Object obj,
             String methodName, Object... args) {
-        Method method = getMethod(false, methodName, obj.getClass(), args);
+        Method method = getMethod(true, methodName, obj.getClass(), args);
         if(evaluate.apply(method)) {
             try {
                 method.setAccessible(true);

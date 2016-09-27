@@ -17,6 +17,7 @@ package com.cinchapi.common.reflect;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Random;
 
@@ -122,7 +123,9 @@ public class ReflectionTest {
     @Test(expected = IllegalStateException.class)
     public void testCallIfNotPrivate() {
         A a = new A("not restricted");
-        Reflection.callIf((method) -> method.isAccessible(), a, "string");
+        Reflection.callIf(
+                (method) -> !Modifier.isPrivate(method.getModifiers()), a,
+                "string");
     }
 
     @Test
