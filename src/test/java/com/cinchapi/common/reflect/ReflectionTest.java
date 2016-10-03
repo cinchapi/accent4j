@@ -157,6 +157,12 @@ public class ReflectionTest {
         A a = new A("foo");
         Reflection.callIfAccessible(a, "string");
     }
+    
+    @Test
+    public void testCallRedeclaredMethod(){
+        B b = new B(1);
+        Reflection.call(b, "redeclare");
+    }
 
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
@@ -175,6 +181,10 @@ public class ReflectionTest {
 
         @Restricted
         public String restricted() {
+            return string;
+        }
+        
+        public String redeclare(){
             return string;
         }
 
@@ -209,6 +219,11 @@ public class ReflectionTest {
 
         private long bigInteger(Integer multiple) {
             return multiple * integer;
+        }
+        
+        @Override
+        public String redeclare(){
+            return "" + integer;
         }
 
         private void nullOkay(String object) {}

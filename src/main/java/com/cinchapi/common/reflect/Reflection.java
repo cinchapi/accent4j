@@ -623,7 +623,12 @@ public final class Reflection {
                         continue;
                     }
                 }
-                clazz = clazz.getSuperclass();
+                if(potential.isEmpty()) {
+                    clazz = clazz.getSuperclass();
+                }
+                else {
+                    break;
+                }
             }
             int matches = potential.size();
             if(matches < 1) {
