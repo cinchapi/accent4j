@@ -15,7 +15,6 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -28,7 +27,6 @@ import java.util.Map.Entry;
  * 
  * @author Jeff Nelson
  */
-@SuppressWarnings("rawtypes")
 public final class AnyObjects {
 
     /**
@@ -150,31 +148,11 @@ public final class AnyObjects {
     private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
 
     static {
-        registerEmptyDefinition(String.class, new EmptyDefinition<String>() {
-
-            @Override
-            public boolean metBy(String object) {
-                return object.isEmpty();
-            }
-
-        });
-        registerEmptyDefinition(Collection.class,
-                new EmptyDefinition<Collection>() {
-
-                    @Override
-                    public boolean metBy(Collection object) {
-                        return object.isEmpty();
-                    }
-
-                });
-        registerEmptyDefinition(Map.class, new EmptyDefinition<Map>() {
-
-            @Override
-            public boolean metBy(Map object) {
-                return object.isEmpty();
-            }
-
-        });
+        registerEmptyDefinition(String.class, string -> string.isEmpty());
+        registerEmptyDefinition(Iterable.class,
+                iterable -> !iterable.iterator().hasNext());
+        registerEmptyDefinition(Map.class, map -> map.isEmpty());
+        registerEmptyDefinition(Object[].class, object -> object.length == 0);
     }
 
     private AnyObjects() {/* noinit */}

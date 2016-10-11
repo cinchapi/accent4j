@@ -20,6 +20,7 @@ package com.cinchapi.common.base;
  * 
  * @author Jeff Nelson
  */
+@FunctionalInterface
 public interface EmptyDefinition<T> {
 
     /**
