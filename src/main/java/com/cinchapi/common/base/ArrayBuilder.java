@@ -123,6 +123,19 @@ public class ArrayBuilder<T> {
     private ArrayBuilder() {/* no-op */}
 
     /**
+     * Add all the {@code args} to the array.
+     * 
+     * @param args the arg to add
+     * @return this
+     */
+    public ArrayBuilder<T> add(T[] args) {
+        for (T arg : args) {
+            add(arg);
+        }
+        return this;
+    }
+
+    /**
      * Add {@code arg} to the array.
      * 
      * @param arg the arg to add
