@@ -163,6 +163,12 @@ public class ReflectionTest {
         B b = new B(1);
         Reflection.call(b, "redeclare");
     }
+    
+    @Test
+    public void testIntegerAndLongInterchangeable(){
+        A a = new A("foo");
+        Reflection.call(a, "tryLong", 1);
+    }
 
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
@@ -173,6 +179,10 @@ public class ReflectionTest {
 
         public A(String string) {
             this.string = string;
+        }
+        
+        public long tryLong(long l){
+            return l;
         }
 
         private String string() {

@@ -22,7 +22,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 
@@ -31,12 +33,14 @@ import javax.annotation.Nullable;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * A collection of tools for using reflection to access or modify objects.
  * <strong>Use with caution.</strong>
  * <p>
- * <em>This class helps you do some naughty things. Think carefully about whether
+ * <em>This class helps you do some naughty things. Think carefully about
+ * whether
  * you should be using reflection in your application (its usage is usually a
  * sign of broken design, but there are some legitimate cases where its
  * necessary).</em>
@@ -121,9 +125,9 @@ public final class Reflection {
             }
         }
         else {
-            throw new IllegalStateException("Cannot call " + method
-                    + " reflectively because "
-                    + "the evaluation function returned false");
+            throw new IllegalStateException(
+                    "Cannot call " + method + " reflectively because "
+                            + "the evaluation function returned false");
         }
     }
 
@@ -442,7 +446,8 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             Throwable ex = e;
-            if(ex instanceof InvocationTargetException && e.getCause() != null) {
+            if(ex instanceof InvocationTargetException
+                    && e.getCause() != null) {
                 ex = ex.getCause();
             }
             else {
@@ -473,7 +478,8 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             Throwable ex = e;
-            if(ex instanceof InvocationTargetException && e.getCause() != null) {
+            if(ex instanceof InvocationTargetException
+                    && e.getCause() != null) {
                 ex = ex.getCause();
             }
             else {
@@ -606,7 +612,9 @@ public final class Reflection {
                                 Class<?> actual = arg.getClass();
                                 if(expected == actual
                                         || expected == unbox(actual)
-                                        || expected.isAssignableFrom(actual)) {
+                                        || expected.isAssignableFrom(actual)
+                                        || getInterchangeableClasses(actual)
+                                                .contains(expected)) {
                                     continue;
                                 }
                                 else {
@@ -632,8 +640,8 @@ public final class Reflection {
             }
             int matches = potential.size();
             if(matches < 1) {
-                throw new NoSuchMethodException("Could not find method '"
-                        + name + "' that is invokable with args: "
+                throw new NoSuchMethodException("Could not find method '" + name
+                        + "' that is invokable with args: "
                         + Arrays.asList(args));
             }
             else if(matches > 1) {
@@ -689,6 +697,31 @@ public final class Reflection {
         }
         else {
             return clazz;
+        }
+    }
+
+    /**
+     * Return a set of classes that are considered to be interchangeable with
+     * {@code clazz}.
+     * 
+     * @param clazz
+     * @return a set of classes
+     */
+    private static Set<Class<?>> getInterchangeableClasses(Class<?> clazz) {
+        if(clazz == int.class) {
+            return Sets.newHashSet(long.class, Long.class, Integer.class);
+        }
+        else if(clazz == Integer.class) {
+            return Sets.newHashSet(long.class, Long.class, int.class);
+        }
+        else if(clazz == long.class) {
+            return Sets.newHashSet(int.class, Long.class, Integer.class);
+        }
+        else if(clazz == Long.class) {
+            return Sets.newHashSet(long.class, int.class, Integer.class);
+        }
+        else {
+            return Collections.emptySet();
         }
     }
 
