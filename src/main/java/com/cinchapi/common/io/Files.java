@@ -46,11 +46,11 @@ public final class Files {
      * @return the checksum of the directory
      */
     public static String directoryChecksum(String directory) {
-        String hash = Platform.isMacOsX() ? "shasum -a 256 -p" : "sha256sum";
+        String hash = Platform.isMacOsX() ? "shasum -a 256" : "sha256sum";
         try {
             Process process = Processes
                     .getBuilderWithPipeSupport("find . -type f -exec " + hash
-                            + " {} \\; | sort -k 2 | " + hash
+                            + " --binary {} \\; | sort -k 2 | " + hash
                             + " | cut -d ' ' -f 1")
                     .directory(Paths.get(expandPath(directory)).toFile())
                     .start();
