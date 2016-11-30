@@ -20,13 +20,17 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.AbstractList;
 import java.util.Iterator;
 
 import javax.annotation.Nullable;
 
 import com.cinchapi.common.base.CheckedExceptions;
+import com.cinchapi.common.base.Platform;
 import com.cinchapi.common.base.ReadOnlyIterator;
+import com.cinchapi.common.process.Processes;
+import com.cinchapi.common.process.Processes.ProcessResult;
 
 /**
  * Utility methods for working with files.
@@ -34,6 +38,35 @@ import com.cinchapi.common.base.ReadOnlyIterator;
  * @author Jeff Nelson
  */
 public final class Files {
+
+    /**
+     * Return the checksum for all the files in the {@code directory}.
+     * 
+     * @param directory the directory whose checksum is generated
+     * @return the checksum of the directory
+     */
+    public static String directoryChecksum(String directory) {
+        String hash = Platform.isMacOsX() ? "shasum -a 256 -p" : "sha256sum";
+        try {
+            Process process = Processes
+                    .getBuilderWithPipeSupport("find . -type f -exec " + hash
+                            + " {} \\; | sort -k 2 | " + hash
+                            + " | cut -d ' ' -f 1")
+                    .directory(Paths.get(expandPath(directory)).toFile())
+                    .start();
+            ProcessResult result = Processes.waitFor(process);
+            if(result.exitCode() == 0) {
+                return result.out().get(0);
+            }
+            else {
+                throw new RuntimeException(result.err().toString());
+            }
+        }
+        catch (IOException e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+
+    }
 
     /**
      * Expand the given {@code path} so that it contains completely normalized
@@ -58,8 +91,8 @@ public final class Files {
      */
     public static String expandPath(String path, String cwd) {
         path = path.replaceAll("~", USER_HOME);
-        Path base = cwd == null || cwd.isEmpty() ? BASE_PATH : FileSystems
-                .getDefault().getPath(cwd);
+        Path base = cwd == null || cwd.isEmpty() ? BASE_PATH
+                : FileSystems.getDefault().getPath(cwd);
         return base.resolve(path).normalize().toString();
     }
 
@@ -111,8 +144,8 @@ public final class Files {
                     BufferedReader reader;
                     {
                         try {
-                            reader = new BufferedReader(new FileReader(
-                                    expandPath(file, rwd)));
+                            reader = new BufferedReader(
+                                    new FileReader(expandPath(file, rwd)));
                             line = reader.readLine();
                         }
                         catch (IOException e) {
@@ -156,7 +189,7 @@ public final class Files {
 
         };
 
-    }
+    }    
 
     /**
      * The user's home directory, which is used to expand path names with "~"
@@ -168,11 +201,11 @@ public final class Files {
      * The working directory from which the current JVM process was launched.
      */
     private static String WORKING_DIRECTORY = System.getProperty("user.dir");
-
+    
     /**
      * The base path that is used to resolve and normalize other relative paths.
      */
-    private static Path BASE_PATH = FileSystems.getDefault().getPath(
-            WORKING_DIRECTORY);
+    private static Path BASE_PATH = FileSystems.getDefault()
+            .getPath(WORKING_DIRECTORY);
 
 }
