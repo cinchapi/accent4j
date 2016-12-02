@@ -18,6 +18,8 @@ package com.cinchapi.common.io;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,6 +33,7 @@ import com.cinchapi.common.base.Platform;
 import com.cinchapi.common.base.ReadOnlyIterator;
 import com.cinchapi.common.process.Processes;
 import com.cinchapi.common.process.Processes.ProcessResult;
+import com.google.common.base.Throwables;
 
 /**
  * Utility methods for working with files.
@@ -38,6 +41,36 @@ import com.cinchapi.common.process.Processes.ProcessResult;
  * @author Jeff Nelson
  */
 public final class Files {
+
+    /**
+     * Delete {@code directory}. If files are added to the directory while its
+     * being deleted, this method will make a best effort to delete those files
+     * as well.
+     * 
+     * @param directory
+     */
+    public static void deleteDirectory(String directory) {
+        try (DirectoryStream<Path> stream = java.nio.file.Files
+                .newDirectoryStream(Paths.get(directory))) {
+            for (Path path : stream) {
+                if(java.nio.file.Files.isDirectory(path)) {
+                    deleteDirectory(path.toString());
+                }
+                else {
+                    java.nio.file.Files.delete(path);
+                }
+            }
+            java.nio.file.Files.delete(Paths.get(directory));
+        }
+        catch (IOException e) {
+            if(e.getClass() == DirectoryNotEmptyException.class) {
+                deleteDirectory(directory);
+            }
+            else {
+                throw Throwables.propagate(e);
+            }
+        }
+    }
 
     /**
      * Return the checksum for all the files in the {@code directory}.
@@ -189,7 +222,7 @@ public final class Files {
 
         };
 
-    }    
+    }
 
     /**
      * The user's home directory, which is used to expand path names with "~"
@@ -201,7 +234,7 @@ public final class Files {
      * The working directory from which the current JVM process was launched.
      */
     private static String WORKING_DIRECTORY = System.getProperty("user.dir");
-    
+
     /**
      * The base path that is used to resolve and normalize other relative paths.
      */
