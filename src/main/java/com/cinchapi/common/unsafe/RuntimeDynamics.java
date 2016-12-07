@@ -43,7 +43,7 @@ public final class RuntimeDynamics {
      * @return the anonymous object
      */
     @SuppressWarnings({ "unchecked", "restriction", "rawtypes" })
-    public Object newAnonymousObject() {
+    public static Object newAnonymousObject() {
         try {
             StringBuilder source = new StringBuilder();
             String clazz = "A" + System.currentTimeMillis();
