@@ -19,6 +19,7 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.AbstractCollection;
@@ -61,7 +62,17 @@ public final class Application {
                         if(index < urls.length) {
                             URL url = urls[index];
                             try {
-                                return new File(url.toURI()).toPath();
+                                Path path = new File(url.toURI()).toPath();
+                                if(Files.exists(path)) {
+                                    // It is possible to pass non-existing paths
+                                    // to the JVM classpath, so we need to
+                                    // ensure they exist here so the caller
+                                    // isn't surprised
+                                    return path;
+                                }
+                                else {
+                                    return findNext();
+                                }
                             }
                             catch (URISyntaxException e) {
                                 throw CheckedExceptions
@@ -83,7 +94,7 @@ public final class Application {
 
         };
     }
-    
+
     /**
      * Return a {@link Path} to the java executable that was used to launch the
      * current application.
