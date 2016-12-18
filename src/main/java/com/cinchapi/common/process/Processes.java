@@ -221,14 +221,9 @@ public class Processes {
      * @param process
      */
     public static void waitForSuccessfulCompletion(Process process) {
-        try {
-            int exitVal = process.waitFor();
-            if(exitVal != 0) {
-                throw new RuntimeException(getStdErr(process).toString());
-            }
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
+        ProcessResult result = waitFor(process);
+        if(result.exitCode() != 0) {
+            throw new RuntimeException(result.out().toString());
         }
     }
 
@@ -293,6 +288,7 @@ public class Processes {
 
         /**
          * Return the {@link Process process's} standard error.
+         * 
          * @return stderr
          */
         public List<String> err() {
