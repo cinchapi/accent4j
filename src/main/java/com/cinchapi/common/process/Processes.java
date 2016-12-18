@@ -145,9 +145,8 @@ public class Processes {
             Throwables.propagate(e);
         }
         if(process != null) {
-            waitForSuccessfulCompletion(process);
-            List<String> lines = readStream(process.getInputStream());
-            for (String line : lines) {
+            ProcessResult result = waitForSuccessfulCompletion(process);
+            for (String line : result.out()) {
                 if(line.contains(pid)) {
                     return true;
                 }
@@ -219,12 +218,14 @@ public class Processes {
      * {@code 0}.
      * 
      * @param process
+     * @return the {@link ProcessResult}
      */
-    public static void waitForSuccessfulCompletion(Process process) {
+    public static ProcessResult waitForSuccessfulCompletion(Process process) {
         ProcessResult result = waitFor(process);
         if(result.exitCode() != 0) {
             throw new RuntimeException(result.out().toString());
         }
+        return result;
     }
 
     /**
