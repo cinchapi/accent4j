@@ -237,9 +237,8 @@ public class Processes {
      * @return the lines in the stream
      */
     private static List<String> readStream(InputStream stream) {
-        try {
-            BufferedReader out = new BufferedReader(
-                    new InputStreamReader(stream));
+        try (BufferedReader out = new BufferedReader(
+                new InputStreamReader(stream))) {
             String line;
             List<String> output = Lists.newArrayList();
             while ((line = out.readLine()) != null) {
