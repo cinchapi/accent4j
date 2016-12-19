@@ -181,6 +181,7 @@ public class Processes {
                     while (!finished.get()) {
                         stdout.addAll(CharStreams.readLines(reader));
                     }
+                    reader.close();
                     latch.countDown();
                 }
                 catch (IOException e) {
@@ -196,6 +197,7 @@ public class Processes {
                     while (!finished.get()) {
                         stderr.addAll(CharStreams.readLines(reader));
                     }
+                    reader.close();
                     latch.countDown();
                 }
                 catch (IOException e) {
