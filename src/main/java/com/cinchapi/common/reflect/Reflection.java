@@ -121,7 +121,15 @@ public final class Reflection {
                 return (T) method.invoke(obj, args);
             }
             catch (ReflectiveOperationException e) {
-                throw CheckedExceptions.throwAsRuntimeException(e);
+                Throwable ex = e;
+                if(ex instanceof InvocationTargetException
+                        && e.getCause() != null) {
+                    ex = ex.getCause();
+                }
+                else {
+                    ex = Throwables.getRootCause(ex);
+                }
+                throw Throwables.propagate(ex);
             }
         }
         else {
