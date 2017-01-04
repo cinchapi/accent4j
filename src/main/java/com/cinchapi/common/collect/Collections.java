@@ -35,7 +35,7 @@ public final class Collections {
      * @return a {@link Set} with all the distinct elements in the
      *         {@code collection}
      */
-    public <T> Set<T> ensureSet(Collection<T> collection) {
+    public static <T> Set<T> ensureSet(Collection<T> collection) {
         if(collection instanceof Set) {
             return (Set<T>) collection;
         }
