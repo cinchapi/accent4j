@@ -171,7 +171,7 @@ public final class Logger {
      * @return the internal logger
      */
     private ch.qos.logback.classic.Logger setup(String name, String file) {
-        if(enableConsoleLogging) {
+        if(!enableConsoleLogging) {
             ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory
                     .getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
             root.detachAndStopAllAppenders();
