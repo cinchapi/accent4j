@@ -16,13 +16,16 @@
 package com.cinchapi.common.io;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 import java.util.AbstractList;
 import java.util.Iterator;
 
@@ -34,6 +37,8 @@ import com.cinchapi.common.base.ReadOnlyIterator;
 import com.cinchapi.common.process.Processes;
 import com.cinchapi.common.process.Processes.ProcessResult;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
+import com.google.common.hash.Hashing;
 
 /**
  * Utility methods for working with files.
@@ -102,6 +107,56 @@ public final class Files {
     }
 
     /**
+     * A version of the {@link #directoryChecksum(String)} method that uses
+     * metadata caching for the {@code directory} to speed up checksum
+     * calculations, where possible.
+     * <p>
+     * Do not use this method for security operations because there are subtle
+     * race conditions and possible exploits that can happen when using metadata
+     * caching. However, this method is appropriate to use for validating the
+     * integrity of files in non-critical situations or those where the
+     * likelihood of tampering is low.
+     * </p>
+     * 
+     * @param directory the directory whose checksum is generated
+     * @return the checksum of the directory
+     */
+    public static String directoryChecksumCached(String directory) {
+        Path cache = Paths.get(USER_HOME)
+                .resolve(Paths.get(".cinchapi", "accent4j", ".checksums",
+                        Hashing.sha256()
+                                .hashString(directory, StandardCharsets.UTF_8)
+                                .toString()));
+        File file = cache.toFile();
+        try {
+            String checksum;
+            long directoryLastModified = getMostRecentFileModifiedTime(
+                    directory).toMillis();
+            if(file.exists() && getMostRecentFileModifiedTime(cache.toString())
+                    .toMillis() > directoryLastModified) {
+                checksum = Iterables
+                        .getOnlyElement(readLines(cache.toString()));
+            }
+            else {
+                checksum = directoryChecksum(directory);
+                Thread.sleep(1000); // avoid race condition with file
+                                    // modification timestamps because many file
+                                    // systems only have granularity within 1
+                                    // second.
+                file.getParentFile().mkdirs();
+                file.createNewFile();
+                com.google.common.io.Files.write(checksum, file,
+                        StandardCharsets.UTF_8);
+            }
+            return checksum;
+
+        }
+        catch (IOException | InterruptedException e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
      * Expand the given {@code path} so that it contains completely normalized
      * components (e.g. ".", "..", and "~" are resolved to the correct absolute
      * paths).
@@ -127,6 +182,40 @@ public final class Files {
         Path base = cwd == null || cwd.isEmpty() ? BASE_PATH
                 : FileSystems.getDefault().getPath(cwd);
         return base.resolve(path).normalize().toString();
+    }
+
+    /**
+     * Get the the modified time of the most recently changed file within the
+     * {@code directory}. Please note that this method differs from other
+     * methods that check the modified timestamp of the directory itself as
+     * opposed to checking the modified timestamps of the contents of the
+     * directory.
+     * <p>
+     * This method will recursively search subdirectories for file modifications
+     * as well.
+     * </p>
+     * 
+     * @param directory the directory to check
+     * @return the modified timestamp of the most recently updated file
+     */
+    public static FileTime getMostRecentFileModifiedTime(String directory) {
+        Path path = Paths.get(directory);
+        File file = path.toFile();
+        FileTime recent = FileTime.fromMillis(0);
+        if(file.isDirectory()) {
+            for (File f : file.listFiles()) {
+                FileTime proposed = f.isDirectory()
+                        ? getMostRecentFileModifiedTime(f.getAbsolutePath())
+                        : FileTime.fromMillis(f.lastModified());
+                if(proposed.compareTo(recent) > 0) {
+                    recent = proposed;
+                }
+            }
+            return recent;
+        }
+        else {
+            return FileTime.fromMillis(file.lastModified());
+        }
     }
 
     /**
