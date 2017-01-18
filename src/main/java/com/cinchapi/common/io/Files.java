@@ -31,6 +31,7 @@ import java.util.Iterator;
 
 import javax.annotation.Nullable;
 
+import com.cinchapi.common.base.ArrayBuilder;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Platform;
 import com.cinchapi.common.base.ReadOnlyIterator;
@@ -185,6 +186,35 @@ public final class Files {
     }
 
     /**
+     * Get a consistent file path that represents the hash for the specified
+     * {@code key}.
+     * <p>
+     * This method does <strong>NOT</strong> create a file at the returned path,
+     * or any of the parent directories.
+     * </p>
+     * 
+     * @param key the key to hash
+     * @return the hashed file path
+     */
+    public static Path getHashedFilePath(String key) {
+        String hash = Hashing.sha256().hashString(key, StandardCharsets.UTF_8)
+                .toString();
+        ArrayBuilder<String> array = ArrayBuilder.builder();
+        array.add(".hash");
+        StringBuilder sb = new StringBuilder();
+        char[] chars = hash.toCharArray();
+        for (int i = 0; i < chars.length; ++i) {
+            char c = chars[i];
+            sb.append(c);
+            if(i >= 4 && i % 4 == 0) {
+                array.add(sb.toString());
+                sb.setLength(0);
+            }
+        }
+        return Paths.get(USER_HOME, array.build());
+    }
+
+    /**
      * Get the the modified time of the most recently changed file within the
      * {@code directory}. Please note that this method differs from other
      * methods that check the modified timestamp of the directory itself as
@@ -311,6 +341,21 @@ public final class Files {
 
         };
 
+    }
+
+    /**
+     * Create a temporary directory with the specified {@code prefix}.
+     * 
+     * @param prefix the directory name prefix
+     * @return the path to the temporary directory
+     */
+    public static String tempDir(String prefix) {
+        try {
+            return java.nio.file.Files.createTempDirectory(prefix).toString();
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
     }
 
     /**
