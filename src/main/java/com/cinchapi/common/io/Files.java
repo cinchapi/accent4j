@@ -249,6 +249,34 @@ public final class Files {
     }
 
     /**
+     * Get a consistent temporary directory file path that represents the hash
+     * for the specified {@code key}.
+     * <p>
+     * This method does <strong>NOT</strong> create a file at the returned path,
+     * or any of the parent directories.
+     * </p>
+     * 
+     * @param key the key to hash
+     * @return the hashed file path
+     */
+    public static Path getTemporaryHashedFilePath(String key) {
+        String hash = Hashing.sha256().hashString(key, StandardCharsets.UTF_8)
+                .toString();
+        ArrayBuilder<String> array = ArrayBuilder.builder();
+        StringBuilder sb = new StringBuilder();
+        char[] chars = hash.toCharArray();
+        for (int i = 0; i < chars.length; ++i) {
+            char c = chars[i];
+            sb.append(c);
+            if(i >= 4 && i % 4 == 0) {
+                array.add(sb.toString());
+                sb.setLength(0);
+            }
+        }
+        return Paths.get(TMPDIR.toAbsolutePath().toString(), array.build());
+    }
+
+    /**
      * Return an {@link Iterable} collection that lazily accumulates lines in
      * the underlying {@code file}.
      * <p>
@@ -357,6 +385,27 @@ public final class Files {
             throw Throwables.propagate(e);
         }
     }
+
+    /**
+     * Return the base temporary directory that is used by the JVM without
+     * throwing a checked exception.
+     * 
+     * @return the base tmpdir
+     */
+    private static Path getBaseTemporaryDirectory() {
+        try {
+            return java.nio.file.Files.createTempFile("cnch", ".a4j")
+                    .getParent();
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * The base temporary directory used by the JVM.
+     */
+    private final static Path TMPDIR = getBaseTemporaryDirectory();
 
     /**
      * The user's home directory, which is used to expand path names with "~"
