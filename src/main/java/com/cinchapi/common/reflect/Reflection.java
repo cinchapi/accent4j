@@ -386,6 +386,10 @@ public final class Reflection {
                         + " accepts arguments: " + Arrays.toString(args));
             }
         }
+        catch (InvocationTargetException e) {
+            throw CheckedExceptions.throwAsRuntimeException(
+                    (Exception) e.getTargetException());
+        }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
         }
