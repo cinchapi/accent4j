@@ -32,18 +32,21 @@ import com.google.common.collect.Maps;
 public class Logging {
 
     /**
-     * A cache of the object that is passed to the {@code setLevel} method of
-     * the appropriate Logger.
-     */
-    static Map<String, Object> levelCache = Maps.newHashMap();
-
-    /**
      * Disable ALL logging from {@code clazz}
      * 
      * @param clazz the {@link Class} for which logging should be disabled
      */
     public static void disable(Class<?> clazz) {
-        Logger logger = LoggerFactory.getLogger(clazz);
+        disable(clazz.getName());
+    }
+
+    /**
+     * Disable ALL logging from the {@code name}d parameter.
+     * 
+     * @param clazz the name of the Logger to disable
+     */
+    public static void disable(String name) {
+        Logger logger = LoggerFactory.getLogger(name);
         if(logger instanceof ch.qos.logback.classic.Logger) {
             ((ch.qos.logback.classic.Logger) logger)
                     .setLevel(ch.qos.logback.classic.Level.OFF);
@@ -67,9 +70,8 @@ public class Logging {
                 switch (type) {
                 case "org.slf4j.impl.Log4jLoggerAdapter":
                 default:
-                    level = Reflection
-                            .getStatic("OFF", Reflection
-                                    .getClassCasted("org.apache.log4j.Level"));
+                    level = Reflection.getStatic("OFF", Reflection
+                            .getClassCasted("org.apache.log4j.Level"));
                     break;
                 }
                 levelCache.put(type, level);
@@ -77,4 +79,10 @@ public class Logging {
             Reflection.call(theLogger, "setLevel", level);
         }
     }
+
+    /**
+     * A cache of the object that is passed to the {@code setLevel} method of
+     * the appropriate Logger.
+     */
+    static Map<String, Object> levelCache = Maps.newHashMap();
 }
