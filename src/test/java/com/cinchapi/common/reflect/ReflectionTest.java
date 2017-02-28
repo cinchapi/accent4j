@@ -137,6 +137,14 @@ public class ReflectionTest {
     }
 
     @Test
+    public void testCallOverloadedMethodName() {
+        B b = new B(1);
+        Reflection.call(b, "foo", "1");
+        Reflection.call(b, "foo", 1);
+        Assert.assertTrue(true); // lack of NSME means test passes
+    }
+
+    @Test
     public void testCallMethodSuperClassParameterType() {
         A a = new A("foo");
         List<String> list = Lists.newArrayList("1");
@@ -157,15 +165,15 @@ public class ReflectionTest {
         A a = new A("foo");
         Reflection.callIfAccessible(a, "string");
     }
-    
+
     @Test
-    public void testCallRedeclaredMethod(){
+    public void testCallRedeclaredMethod() {
         B b = new B(1);
         Reflection.call(b, "redeclare");
     }
-    
+
     @Test
-    public void testIntegerAndLongInterchangeable(){
+    public void testIntegerAndLongInterchangeable() {
         A a = new A("foo");
         Reflection.call(a, "tryLong", 1);
     }
@@ -180,8 +188,8 @@ public class ReflectionTest {
         public A(String string) {
             this.string = string;
         }
-        
-        public long tryLong(long l){
+
+        public long tryLong(long l) {
             return l;
         }
 
@@ -193,8 +201,8 @@ public class ReflectionTest {
         public String restricted() {
             return string;
         }
-        
-        public String redeclare(){
+
+        public String redeclare() {
             return string;
         }
 
@@ -230,10 +238,18 @@ public class ReflectionTest {
         private long bigInteger(Integer multiple) {
             return multiple * integer;
         }
-        
+
         @Override
-        public String redeclare(){
+        public String redeclare() {
             return "" + integer;
+        }
+
+        public void foo(String string) {
+
+        }
+
+        public void foo(int integer) {
+
         }
 
         private void nullOkay(String object) {}

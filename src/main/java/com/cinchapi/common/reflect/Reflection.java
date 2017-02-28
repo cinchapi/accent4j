@@ -630,7 +630,7 @@ public final class Reflection {
                                     continue;
                                 }
                                 else {
-                                    break outer;
+                                    continue outer;
                                 }
                             }
                             else {
