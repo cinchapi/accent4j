@@ -225,7 +225,7 @@ public class Processes {
     public static ProcessResult waitForSuccessfulCompletion(Process process) {
         ProcessResult result = waitFor(process);
         if(result.exitCode() != 0) {
-            List<String> msg = result.err().isEmpty() ? result.out() : result.err();
+            List<String> msg = result.out().isEmpty() ? result.err() : result.out();
             throw new RuntimeException(msg.toString());
         }
         return result;
