@@ -43,6 +43,15 @@ public final class Platform {
      * @return {@code true} if this is OS X
      */
     public static boolean isMacOsX() {
+        return isMacOS();
+    }
+
+    /**
+     * Return {@code true} if current platform is macOS based.
+     * 
+     * @return {@code true} if this is OS X
+     */
+    public static boolean isMacOS() {
         return OPERATING_SYSTEM.toLowerCase().contains("os x");
     }
 
