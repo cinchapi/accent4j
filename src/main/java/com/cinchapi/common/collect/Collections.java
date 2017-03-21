@@ -28,6 +28,18 @@ import com.google.common.collect.Sets;
 public final class Collections {
 
     /**
+     * Add the {@code item} to the {@code collection} if it is not {@code null}.
+     * 
+     * @param collection the collection into which a non-null item is added
+     * @param item a possibly non-null item
+     */
+    public static <T> void addIfNotNull(Collection<T> collection, T item) {
+        if(item != null) {
+            collection.add(item);
+        }
+    }
+
+    /**
      * Ensure that the specified {@code collection} is a {@link Set} or
      * transform it into one if it is not.
      * 
