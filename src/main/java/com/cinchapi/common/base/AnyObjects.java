@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.cinchapi.common.base.validate.Check;
+
 /**
  * Helper functions
  * <em>(that are not already contained in {@link java.util.Objects
@@ -119,6 +121,17 @@ public final class AnyObjects {
                 return false;
             }
         }
+    }
+
+    /**
+     * Return {@code null} the {@code check} passes.
+     * 
+     * @param value the value to return if the {@code check} passes
+     * @param check the {@link Check} to run
+     * @return {@code null} or {@code value}
+     */
+    public static <T> T nullUnless(T value, Check<T> check) {
+        return check.passes(value) ? value : null;
     }
 
     /**
