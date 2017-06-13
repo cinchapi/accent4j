@@ -209,15 +209,15 @@ public final class Reflection {
     }
 
     /**
-     * Given an object, return an array containing all the {@link Field} objects
-     * that represent those declared within {@code obj's} entire class hierarchy
-     * after the base {@link Object}.
+     * Given a {@link Class}, return an array containing all the {@link Field}
+     * objects that represent those declared within the class's entire hierarchy
+     * after the base {@link Object} class.
      * 
+     * @param clazz the {@link Class} to inspect
      * @return the array of declared fields
      */
-    public static Field[] getAllDeclaredFields(Object obj) {
+    public static Field[] getAllDeclaredFields(Class<?> clazz) {
         List<Field> fields = new ArrayList<Field>();
-        Class<?> clazz = obj.getClass();
         while (clazz != Object.class) {
             for (Field field : clazz.getDeclaredFields()) {
                 if(!field.getName().equalsIgnoreCase("fields0")
@@ -230,6 +230,18 @@ public final class Reflection {
             clazz = clazz.getSuperclass();
         }
         return fields.toArray(new Field[] {});
+    }
+
+    /**
+     * Given an object, return an array containing all the {@link Field} objects
+     * that represent those declared within {@code obj's} entire class hierarchy
+     * after the base {@link Object}.
+     * 
+     * @param obj the {@link Object} to inspect
+     * @return the array of declared fields
+     */
+    public static Field[] getAllDeclaredFields(Object obj) {
+        return getAllDeclaredFields(obj.getClass());
     }
 
     /**
@@ -322,24 +334,6 @@ public final class Reflection {
     }
 
     /**
-     * Return a new instance of the specified {@code clazz} by calling the
-     * appropriate constructor with the specified {@code args}.
-     * 
-     * @param clazz the fully qualified name of the {@link Class}
-     * @param args the args to pass to the constructor
-     * @return the new instance
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> T newInstance(String clazz, Object... args) {
-        try {
-            return (T) newInstance(Class.forName(clazz), args);
-        }
-        catch (ReflectiveOperationException e) {
-            throw Throwables.propagate(e);
-        }
-    }
-
-    /**
      * Given a {@link Class}, create a new instance by calling the appropriate
      * constructor for the given {@code args}.
      * 
@@ -411,6 +405,24 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return a new instance of the specified {@code clazz} by calling the
+     * appropriate constructor with the specified {@code args}.
+     * 
+     * @param clazz the fully qualified name of the {@link Class}
+     * @param args the args to pass to the constructor
+     * @return the new instance
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T newInstance(String clazz, Object... args) {
+        try {
+            return (T) newInstance(Class.forName(clazz), args);
+        }
+        catch (ReflectiveOperationException e) {
+            throw Throwables.propagate(e);
         }
     }
 
@@ -595,6 +607,31 @@ public final class Reflection {
     }
 
     /**
+     * Return a set of classes that are considered to be interchangeable with
+     * {@code clazz}.
+     * 
+     * @param clazz
+     * @return a set of classes
+     */
+    private static Set<Class<?>> getInterchangeableClasses(Class<?> clazz) {
+        if(clazz == int.class) {
+            return Sets.newHashSet(long.class, Long.class, Integer.class);
+        }
+        else if(clazz == Integer.class) {
+            return Sets.newHashSet(long.class, Long.class, int.class);
+        }
+        else if(clazz == long.class) {
+            return Sets.newHashSet(int.class, Long.class, Integer.class);
+        }
+        else if(clazz == Long.class) {
+            return Sets.newHashSet(long.class, int.class, Integer.class);
+        }
+        else {
+            return Collections.emptySet();
+        }
+    }
+
+    /**
      * Return the {@link Method} object called {@code name} in {@code clazz}
      * that accepts the specified {@code args} and optionally ignore the native
      * java language access rules.
@@ -709,31 +746,6 @@ public final class Reflection {
         }
         else {
             return clazz;
-        }
-    }
-
-    /**
-     * Return a set of classes that are considered to be interchangeable with
-     * {@code clazz}.
-     * 
-     * @param clazz
-     * @return a set of classes
-     */
-    private static Set<Class<?>> getInterchangeableClasses(Class<?> clazz) {
-        if(clazz == int.class) {
-            return Sets.newHashSet(long.class, Long.class, Integer.class);
-        }
-        else if(clazz == Integer.class) {
-            return Sets.newHashSet(long.class, Long.class, int.class);
-        }
-        else if(clazz == long.class) {
-            return Sets.newHashSet(int.class, Long.class, Integer.class);
-        }
-        else if(clazz == Long.class) {
-            return Sets.newHashSet(long.class, int.class, Integer.class);
-        }
-        else {
-            return Collections.emptySet();
         }
     }
 
