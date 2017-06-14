@@ -64,6 +64,21 @@ public final class AnyObjects {
     }
 
     /**
+     * Return {@code theDefault} unless the {@code preferredCheck} passes in
+     * which case the {@code preferred} value is returned.
+     * 
+     * @param theDefault the value to return if the {@code preferredCheck} does
+     *            not pass
+     * @param preferred the value to return if the {@code preferredCheck} passes
+     * @param preferredCheck the {@link Check} to run
+     * @return {@code theDefault} or {@code preferred} value
+     */
+    public static <T> T defaultUnless(T theDefault, T preferred,
+            Check<T> preferredCheck) {
+        return preferredCheck.passes(preferred) ? preferred : theDefault;
+    }
+
+    /**
      * Given a list of {@code candidates}, return the first object that is an
      * instance of the type represented by {@code clazz}. If none of the
      * {@code candidates} are instances, throw an
