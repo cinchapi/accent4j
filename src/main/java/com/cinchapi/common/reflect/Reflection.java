@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
@@ -424,6 +425,25 @@ public final class Reflection {
         catch (ReflectiveOperationException e) {
             throw Throwables.propagate(e);
         }
+    }
+
+    /**
+     * Edit the value of all the variables that correspond to the keys in the
+     * {@code data} with their associated values.
+     * <p>
+     * <strong>NOTE:</strong> This can have grave unintended consequences if you
+     * alter the value of a variable after construction. Especially if other
+     * parts of the code assume that {@code obj} is immutable, or the
+     * {@code variable} is used in a multi threaded context.
+     * </p>
+     * 
+     * @param data a mapping from variable name to value
+     * @param obj the object on which to set the data
+     */
+    public static void set(Map<String, Object> data, Object obj) {
+        data.forEach((variable, value) -> {
+            set(variable, value, obj);
+        });
     }
 
     /**
