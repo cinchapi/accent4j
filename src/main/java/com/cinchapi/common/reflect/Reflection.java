@@ -436,6 +436,11 @@ public final class Reflection {
      * parts of the code assume that {@code obj} is immutable, or the
      * {@code variable} is used in a multi threaded context.
      * </p>
+     * <p>
+     * This method will throw an error if one or more of the keys in the
+     * {@code data} map does not correspond to a named variable within the
+     * {@code obj}'s class.
+     * </p>
      * 
      * @param data a mapping from variable name to value
      * @param obj the object on which to set the data
