@@ -18,6 +18,8 @@ package com.cinchapi.common.collect;
 import java.util.Collection;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.google.common.collect.Sets;
 
 /**
@@ -28,12 +30,28 @@ import com.google.common.collect.Sets;
 public final class Collections {
 
     /**
+     * Add the {@code items} to the {@code collection} if it is not
+     * {@code null}.
+     * 
+     * @param collection a collection into which a non-null collection of
+     *            {@code items} is added
+     * @param items a possibly non-null {@link Collection} of items
+     */
+    public static <T> void addAllIfNotNull(Collection<T> collection,
+            @Nullable Collection<T> items) {
+        if(items != null) {
+            collection.addAll(items);
+        }
+    }
+
+    /**
      * Add the {@code item} to the {@code collection} if it is not {@code null}.
      * 
      * @param collection the collection into which a non-null item is added
      * @param item a possibly non-null item
      */
-    public static <T> void addIfNotNull(Collection<T> collection, T item) {
+    public static <T> void addIfNotNull(Collection<T> collection,
+            @Nullable T item) {
         if(item != null) {
             collection.add(item);
         }
