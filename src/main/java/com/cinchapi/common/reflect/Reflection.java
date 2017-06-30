@@ -31,6 +31,7 @@ import java.util.function.Function;
 
 import javax.annotation.Nullable;
 
+import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -306,6 +307,39 @@ public final class Reflection {
      */
     public static Field getDeclaredField(String name, Object obj) {
         return getField(name, obj);
+    }
+
+    /**
+     * Return the enum value from {@code enumType} with the specified
+     * {@code name}.
+     * 
+     * @param enumType the {@link Enum} class
+     * @param name the value name
+     * @return the {@link Enum} value
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
+            String name) {
+        return Enum.valueOf((Class<Enum>) enumType, name);
+    }
+
+    /**
+     * Return the enum value at position {@code ordinal} for the
+     * {@code enumType}.
+     * 
+     * @param enumType the {@link Enum} class
+     * @param ordinal the value position
+     * @return the {@link Enum} value
+     */
+    public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
+            int ordinal) {
+        try {
+            return enumType.getEnumConstants()[ordinal];
+        }
+        catch (IndexOutOfBoundsException e) {
+            throw new IllegalArgumentException(AnyStrings.format(
+                    "No enum value for {} with ordinal {}", enumType, ordinal));
+        }
     }
 
     /**

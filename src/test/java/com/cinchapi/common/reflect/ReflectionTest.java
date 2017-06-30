@@ -177,6 +177,23 @@ public class ReflectionTest {
         A a = new A("foo");
         Reflection.call(a, "tryLong", 1);
     }
+    
+    @Test
+    public void testGetEnumValueByName(){
+        Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, "BAZ"));
+    }
+    
+    @Test
+    public void testGetEnumValueByOrdinal(){
+        Assert.assertEquals(C.FOO, Reflection.getEnumValue(C.class, 0));
+        Assert.assertEquals(C.BAR, Reflection.getEnumValue(C.class, 1));
+        Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 2));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testGetEnumValueByOrdinalOutOfBounds(){
+        Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 3));
+    }
 
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
@@ -253,6 +270,10 @@ public class ReflectionTest {
         }
 
         private void nullOkay(String object) {}
+    }
+    
+    private static enum C {
+        FOO, BAR, BAZ;
     }
 
 }
