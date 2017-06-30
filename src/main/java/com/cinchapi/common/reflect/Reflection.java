@@ -285,6 +285,30 @@ public final class Reflection {
     }
 
     /**
+     * Return the field with {@code name} that is declared in the class or class
+     * hierarchy.
+     * 
+     * @param name the field name
+     * @param clazz the class that contains the field
+     * @return the {@link Field} object
+     */
+    public static Field getDeclaredField(String name, Class<?> clazz) {
+        return getField(name, clazz);
+    }
+
+    /**
+     * Return the field with {@code name} that is declared in the {@code obj}'s
+     * class or class hierarchy.
+     * 
+     * @param name the field name
+     * @param obj the object whose class contains the field
+     * @return the {@link Field} object
+     */
+    public static Field getDeclaredField(String name, Object obj) {
+        return getField(name, obj);
+    }
+
+    /**
      * Return a {@link Method} instance from {@code clazz} named {@code method}
      * (that takes arguments of {@code paramTypes} respectively)
      * while making a best effort attempt to unbox primitive parameter types
