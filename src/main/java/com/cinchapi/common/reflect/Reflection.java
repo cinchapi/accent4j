@@ -310,20 +310,6 @@ public final class Reflection {
     }
 
     /**
-     * Return the enum value from {@code enumType} with the specified
-     * {@code name}.
-     * 
-     * @param enumType the {@link Enum} class
-     * @param name the value name
-     * @return the {@link Enum} value
-     */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
-            String name) {
-        return Enum.valueOf((Class<? extends Enum>) enumType, name);
-    }
-
-    /**
      * Return the enum value at position {@code ordinal} for the
      * {@code enumType}.
      * 
@@ -340,6 +326,38 @@ public final class Reflection {
             throw new IllegalArgumentException(AnyStrings.format(
                     "No enum value for {} with ordinal {}", enumType, ordinal));
         }
+    }
+
+    /**
+     * Return the enum value from {@code enumType} with the specified
+     * {@code identifier}.
+     * 
+     * @param enumType the {@link Enum} class
+     * @param identifier the value name or ordinal
+     * @return the {@link Enum} value
+     */
+    public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
+            Object identifier) {
+        if(identifier instanceof Integer) {
+            return getEnumValue(enumType, (int) identifier);
+        }
+        else {
+            return getEnumValue(enumType, identifier.toString());
+        }
+    }
+
+    /**
+     * Return the enum value from {@code enumType} with the specified
+     * {@code name}.
+     * 
+     * @param enumType the {@link Enum} class
+     * @param name the value name
+     * @return the {@link Enum} value
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
+            String name) {
+        return Enum.valueOf((Class<? extends Enum>) enumType, name);
     }
 
     /**

@@ -190,6 +190,12 @@ public class ReflectionTest {
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 2));
     }
     
+    @Test
+    public void testGetEnumValueByOrdinalGeneric(){
+        Object ordinal = 0;
+        Assert.assertEquals(C.FOO, Reflection.getEnumValue(C.class, ordinal));
+    }
+    
     @Test(expected = IllegalArgumentException.class)
     public void testGetEnumValueByOrdinalOutOfBounds(){
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 3));
