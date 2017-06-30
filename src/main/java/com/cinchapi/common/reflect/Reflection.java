@@ -320,7 +320,7 @@ public final class Reflection {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static Enum<?> getEnumValue(Class<? extends Enum<?>> enumType,
             String name) {
-        return Enum.valueOf((Class<Enum>) enumType, name);
+        return Enum.valueOf((Class<? extends Enum>) enumType, name);
     }
 
     /**
