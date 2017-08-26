@@ -42,7 +42,7 @@ public final class RuntimeDynamics {
      * 
      * @return the anonymous object
      */
-    @SuppressWarnings({ "unchecked", "restriction", "rawtypes" })
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public static Object newAnonymousObject() {
         try {
             StringBuilder source = new StringBuilder();
