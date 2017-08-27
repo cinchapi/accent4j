@@ -20,6 +20,10 @@ import javax.annotation.Nullable;
 /**
  * A {@link ReadOnlyIterator} that can be used to return items from some ad hoc
  * collection of elements.
+ * <p>
+ * Any initialization that would normally go in a initialization block should be
+ * implemented in the {@link #initialize()} method.
+ * </p>
  * 
  * @author Jeff Nelson
  */
@@ -30,6 +34,7 @@ public abstract class AdHocIterator<T> extends ReadOnlyIterator<T> {
      */
     private T next = null;
     {
+        initialize();
         next = findNext();
     }
 
@@ -53,5 +58,10 @@ public abstract class AdHocIterator<T> extends ReadOnlyIterator<T> {
      */
     @Nullable
     protected abstract T findNext();
+
+    /**
+     * Initialize the state of the {@link AdHocIterator}.
+     */
+    protected void initialize() {/* no-op */};
 
 }
