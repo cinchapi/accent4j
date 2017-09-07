@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Modifier;
@@ -199,6 +200,19 @@ public class ReflectionTest {
     @Test(expected = IllegalArgumentException.class)
     public void testGetEnumValueByOrdinalOutOfBounds(){
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 3));
+    }
+    
+    @Test
+    public void testGetClosestCommonAncestor() {
+        abstract class D {}
+        class DA extends D {}
+        class DB extends D {}
+        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DA.class, DB.class));
+        @SuppressWarnings("serial")
+        class DBA extends DB implements Serializable {}
+        Assert.assertEquals(Serializable.class, Reflection.getClosestCommonAncestor(DBA.class, String.class));
+        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class));
+        Assert.assertEquals(Object.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class, C.class));
     }
 
     @Retention(RetentionPolicy.RUNTIME)

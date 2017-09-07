@@ -31,9 +31,12 @@ import java.util.function.Function;
 
 import javax.annotation.Nullable;
 
+import com.cinchapi.common.base.AnyObjects;
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.CheckedExceptions;
+import com.cinchapi.common.base.Verify;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -283,6 +286,34 @@ public final class Reflection {
         catch (ClassNotFoundException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
         }
+    }
+
+    /**
+     * Return the closest common ancestor class for all of the input
+     * {@code classes}.
+     * 
+     * @param classes the classes that have a common ancestor
+     * @return the closest common ancestor
+     */
+    public static Class<?> getClosestCommonAncestor(Class<?>... classes) {
+        return Iterables.getFirst(getCommonAncestors(classes), Object.class);
+    }
+
+    /**
+     * Return all the common ancestors for the {@code classes}.
+     * 
+     * @param classes
+     * @return the common ancestors of the specified classes
+     */
+    public static Set<Class<?>> getCommonAncestors(Class<?>... classes) {
+        Verify.thatArgument(classes.length > 0);
+        Set<Class<?>> rollingIntersect = Sets
+                .newLinkedHashSet(getClassAncestors(classes[0]));
+        for (int i = 1; i < classes.length; i++) {
+            rollingIntersect.retainAll(getClassAncestors(classes[i]));
+        }
+        return AnyObjects.defaultUnless(Collections.singleton(Object.class),
+                rollingIntersect, set -> !set.isEmpty());
     }
 
     /**
@@ -654,6 +685,34 @@ public final class Reflection {
         else {
             return unbox(clazz);
         }
+    }
+
+    /**
+     * Get all the ancestors for {@code clazz} in an ordered set.
+     * 
+     * @param clazz
+     * @return the ancestors of {@code clazz}
+     */
+    private static Set<Class<?>> getClassAncestors(Class<?> clazz) {
+        Set<Class<?>> classes = Sets.newLinkedHashSet();
+        Set<Class<?>> nextLevel = Sets.newLinkedHashSet();
+        nextLevel.add(clazz);
+        do {
+            classes.addAll(nextLevel);
+            Set<Class<?>> thisLevel = Sets.newLinkedHashSet(nextLevel);
+            nextLevel.clear();
+            for (Class<?> each : thisLevel) {
+                Class<?> superClass = each.getSuperclass();
+                if(superClass != null && superClass != Object.class) {
+                    nextLevel.add(superClass);
+                }
+                for (Class<?> eachInt : each.getInterfaces()) {
+                    nextLevel.add(eachInt);
+                }
+            }
+        }
+        while (!nextLevel.isEmpty());
+        return classes;
     }
 
     /**
