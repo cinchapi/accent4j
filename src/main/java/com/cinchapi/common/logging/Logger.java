@@ -21,6 +21,7 @@ import javax.annotation.concurrent.Immutable;
 
 import org.slf4j.LoggerFactory;
 
+import com.cinchapi.common.io.Files;
 import com.google.common.base.Preconditions;
 
 import ch.qos.logback.classic.Level;
@@ -46,6 +47,18 @@ public final class Logger {
      */
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Return a {@link Logger} that is configured to only log to the console
+     * instead of a specific directory.
+     * 
+     * @param name the name of the Logger
+     * @return the configured Logger
+     */
+    public static Logger console(String name) {
+        return builder().name(name).directory(Files.tempDir("logger"))
+                .enableConsoleLogging(true).level(Level.DEBUG).build();
     }
 
     /**
@@ -194,8 +207,8 @@ public final class Logger {
         rolling.setMaxIndex(1);
         rolling.setMaxIndex(5);
         rolling.setContext(context);
-        rolling.setFileNamePattern(directory + File.separator + file
-                + ".%i.zip");
+        rolling.setFileNamePattern(
+                directory + File.separator + file + ".%i.zip");
         rolling.setParent(appender);
         rolling.start();
 
