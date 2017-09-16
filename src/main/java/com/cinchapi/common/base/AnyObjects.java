@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.annotation.Nullable;
+
 import com.cinchapi.common.base.validate.Check;
 
 /**
@@ -100,6 +102,28 @@ public final class AnyObjects {
             }
         }
         throw new IllegalArgumentException();
+    }
+
+    /**
+     * Return the first of the {@code candidates} that passes the {@code check}.
+     * If none pass, return {@code null}.
+     * 
+     * @param check
+     * @param candidates
+     * @return the first of the {@code candidate} that passes or {@code null}
+     */
+    @SafeVarargs
+    @Nullable
+    public static <T> T firstThat(Check<T> check, T... candidates) {
+        for (T candidate : candidates) {
+            if(check.passes(candidate)) {
+                return candidate;
+            }
+            else {
+                continue;
+            }
+        }
+        return null;
     }
 
     /**
