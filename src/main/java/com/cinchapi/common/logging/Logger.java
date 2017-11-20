@@ -16,6 +16,7 @@
 package com.cinchapi.common.logging;
 
 import java.io.File;
+import java.util.UUID;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -59,6 +60,17 @@ public final class Logger {
     public static Logger console(String name) {
         return builder().name(name).directory(Files.tempDir("logger"))
                 .enableConsoleLogging(true).level(Level.DEBUG).build();
+    }
+
+    /**
+     * Return a {@link Logger} that doesn't log messages to anywhere.
+     * 
+     * @return the fake Logger
+     */
+    public static Logger none() {
+        return builder().name("none")
+                .directory(Files.tempDir(UUID.randomUUID().toString()))
+                .enableConsoleLogging(false).level(Level.ERROR).build();
     }
 
     /**
