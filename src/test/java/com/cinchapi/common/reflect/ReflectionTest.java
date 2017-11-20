@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.io.FileNotFoundException;
 import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -23,7 +24,9 @@ import java.util.List;
 import java.util.Random;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import com.google.common.collect.Lists;
 
@@ -37,26 +40,43 @@ public class ReflectionTest {
 
     private final Random random = new Random();
 
-    @Test
-    public void testInheritedGetValueFromSuperClass() {
-        int expected = random.nextInt();
-        B b = new B(expected);
-        Assert.assertEquals("default", Reflection.get("string", b));
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
+
+    @Test(expected = RuntimeException.class)
+    public void testAttemptToGetValueForNonExistingFieldThrowsException() {
+        A a = new A("" + random.nextInt());
+        Reflection.get("foo", a);
     }
 
     @Test
-    public void testCallSuperClassMethod() {
-        B b = new B(random.nextInt());
-        Assert.assertEquals("default", Reflection.call(b, "string"));
-        Assert.assertEquals("defaultdefaultdefault",
-                Reflection.call(b, "string", 3));
+    public void testCallIf() {
+        A a = new A("not restricted");
+        Reflection.callIf(
+                (method) -> !method.isAnnotationPresent(Restricted.class), a,
+                "string");
     }
 
-    @Test
-    public void testGetValueFromClassA() {
-        String expected = "" + random.nextInt();
-        A a = new A(expected);
-        Assert.assertEquals(expected, Reflection.get("string", a));
+    @Test(expected = RuntimeException.class)
+    public void testCallIfAccessible() {
+        A a = new A("foo");
+        Reflection.callIfAccessible(a, "string");
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testCallIfNotAnnotated() {
+        A a = new A("restricted");
+        Reflection.callIf(
+                (method) -> !method.isAnnotationPresent(Restricted.class), a,
+                "restricted");
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testCallIfNotPrivate() {
+        A a = new A("not restricted");
+        Reflection.callIf(
+                (method) -> !Modifier.isPrivate(method.getModifiers()), a,
+                "string");
     }
 
     @Test
@@ -78,55 +98,19 @@ public class ReflectionTest {
     }
 
     @Test
-    public void testGetValueFromClassB() {
-        int expected = random.nextInt();
-        B b = new B(expected);
-        Assert.assertEquals(expected, (int) Reflection.get("integer", b));
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testAttemptToGetValueForNonExistingFieldThrowsException() {
-        A a = new A("" + random.nextInt());
-        Reflection.get("foo", a);
+    public void testCallMethodSuperClassParameterType() {
+        A a = new A("foo");
+        List<String> list = Lists.newArrayList("1");
+        List<String> listlist = Reflection.call(a, "list", list, list);
+        Assert.assertEquals(2, listlist.size());
     }
 
     @Test
-    public void testConstructorAutoboxingSupport() {
-        Integer integer = random.nextInt();
-        B b = Reflection.newInstance(B.class, integer);
-        Assert.assertNotNull(b);
-    }
-
-    @Test
-    public void testMethodAutoboxingSupport() {
-        int integer = random.nextInt();
-        B b = new B(2);
-        Reflection.call(b, "bigInteger", integer);
-        Assert.assertTrue(true); // lack of exception means we passed...
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void testCallIfNotAnnotated() {
-        A a = new A("restricted");
-        Reflection.callIf(
-                (method) -> !method.isAnnotationPresent(Restricted.class), a,
-                "restricted");
-    }
-
-    @Test
-    public void testCallIf() {
-        A a = new A("not restricted");
-        Reflection.callIf(
-                (method) -> !method.isAnnotationPresent(Restricted.class), a,
-                "string");
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void testCallIfNotPrivate() {
-        A a = new A("not restricted");
-        Reflection.callIf(
-                (method) -> !Modifier.isPrivate(method.getModifiers()), a,
-                "string");
+    public void testCallMethodSuperClassParameterTypeOneIsNull() {
+        A a = new A("foo");
+        List<String> list = Lists.newArrayList("1");
+        List<String> listlist = Reflection.call(a, "list", list, null);
+        Assert.assertEquals(1, listlist.size());
     }
 
     @Test
@@ -146,44 +130,53 @@ public class ReflectionTest {
     }
 
     @Test
-    public void testCallMethodSuperClassParameterType() {
-        A a = new A("foo");
-        List<String> list = Lists.newArrayList("1");
-        List<String> listlist = Reflection.call(a, "list", list, list);
-        Assert.assertEquals(2, listlist.size());
-    }
-
-    @Test
-    public void testCallMethodSuperClassParameterTypeOneIsNull() {
-        A a = new A("foo");
-        List<String> list = Lists.newArrayList("1");
-        List<String> listlist = Reflection.call(a, "list", list, null);
-        Assert.assertEquals(1, listlist.size());
-    }
-
-    @Test(expected = RuntimeException.class)
-    public void testCallIfAccessible() {
-        A a = new A("foo");
-        Reflection.callIfAccessible(a, "string");
-    }
-
-    @Test
     public void testCallRedeclaredMethod() {
         B b = new B(1);
         Reflection.call(b, "redeclare");
     }
 
     @Test
-    public void testIntegerAndLongInterchangeable() {
-        A a = new A("foo");
-        Reflection.call(a, "tryLong", 1);
+    public void testCallSuperClassMethod() {
+        B b = new B(random.nextInt());
+        Assert.assertEquals("default", Reflection.call(b, "string"));
+        Assert.assertEquals("defaultdefaultdefault",
+                Reflection.call(b, "string", 3));
     }
-    
+
+    @Test
+    public void testCheckedExceptionIsPreserved() {  
+        expectedException.expect(RuntimeException.class);
+        String message = "This is the message I want to see";
+        expectedException.expectMessage(message);
+        A a = new A("foo"); 
+        Reflection.call(a, "throwCheckedException", message);
+    }
+
+    @Test
+    public void testConstructorAutoboxingSupport() {
+        Integer integer = random.nextInt();
+        B b = Reflection.newInstance(B.class, integer);
+        Assert.assertNotNull(b);
+    }
+
+    @Test
+    public void testGetClosestCommonAncestor() {
+        abstract class D {}
+        class DA extends D {}
+        class DB extends D {}
+        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DA.class, DB.class));
+        @SuppressWarnings("serial")
+        class DBA extends DB implements Serializable {}
+        Assert.assertEquals(Serializable.class, Reflection.getClosestCommonAncestor(DBA.class, String.class));
+        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class));
+        Assert.assertEquals(Object.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class, C.class));
+    }
+
     @Test
     public void testGetEnumValueByName(){
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, "BAZ"));
     }
-    
+
     @Test
     public void testGetEnumValueByOrdinal(){
         Assert.assertEquals(C.FOO, Reflection.getEnumValue(C.class, 0));
@@ -203,20 +196,39 @@ public class ReflectionTest {
     }
     
     @Test
-    public void testGetClosestCommonAncestor() {
-        abstract class D {}
-        class DA extends D {}
-        class DB extends D {}
-        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DA.class, DB.class));
-        @SuppressWarnings("serial")
-        class DBA extends DB implements Serializable {}
-        Assert.assertEquals(Serializable.class, Reflection.getClosestCommonAncestor(DBA.class, String.class));
-        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class));
-        Assert.assertEquals(Object.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class, C.class));
+    public void testGetValueFromClassA() {
+        String expected = "" + random.nextInt();
+        A a = new A(expected);
+        Assert.assertEquals(expected, Reflection.get("string", a));
     }
-
-    @Retention(RetentionPolicy.RUNTIME)
-    private @interface Restricted {}
+    
+    @Test
+    public void testGetValueFromClassB() {
+        int expected = random.nextInt();
+        B b = new B(expected);
+        Assert.assertEquals(expected, (int) Reflection.get("integer", b));
+    }
+    
+    @Test
+    public void testInheritedGetValueFromSuperClass() {
+        int expected = random.nextInt();
+        B b = new B(expected);
+        Assert.assertEquals("default", Reflection.get("string", b));
+    }
+        
+    @Test
+    public void testIntegerAndLongInterchangeable() {
+        A a = new A("foo");
+        Reflection.call(a, "tryLong", 1);
+    }
+    
+    @Test
+    public void testMethodAutoboxingSupport() {
+        int integer = random.nextInt();
+        B b = new B(2);
+        Reflection.call(b, "bigInteger", integer);
+        Assert.assertTrue(true); // lack of exception means we passed...
+    }
 
     private static class A {
 
@@ -224,6 +236,22 @@ public class ReflectionTest {
 
         public A(String string) {
             this.string = string;
+        }
+
+        public List<String> list(List<String> list, List<String> list2) {
+            if(list2 != null) {
+                list.addAll(list2);
+            }
+            return list;
+        }
+
+        public String redeclare() {
+            return string;
+        }
+
+        @Restricted
+        public String restricted() {
+            return string;
         }
 
         public long tryLong(long l) {
@@ -234,28 +262,16 @@ public class ReflectionTest {
             return string;
         }
 
-        @Restricted
-        public String restricted() {
-            return string;
-        }
-
-        public String redeclare() {
-            return string;
-        }
-
-        public List<String> list(List<String> list, List<String> list2) {
-            if(list2 != null) {
-                list.addAll(list2);
-            }
-            return list;
-        }
-
         private String string(int count) {
             String result = "";
             for (int i = 0; i < count; i++) {
                 result += string;
             }
             return result;
+        }
+        
+        private void throwCheckedException(String message) throws FileNotFoundException {
+            throw new FileNotFoundException(message);
         }
     }
 
@@ -268,12 +284,12 @@ public class ReflectionTest {
             this.integer = integer;
         }
 
-        private long integer(int multiple) {
-            return multiple * integer;
+        public void foo(int integer) {
+
         }
 
-        private long bigInteger(Integer multiple) {
-            return multiple * integer;
+        public void foo(String string) {
+
         }
 
         @Override
@@ -281,19 +297,22 @@ public class ReflectionTest {
             return "" + integer;
         }
 
-        public void foo(String string) {
-
+        private long bigInteger(Integer multiple) {
+            return multiple * integer;
         }
 
-        public void foo(int integer) {
-
+        private long integer(int multiple) {
+            return multiple * integer;
         }
 
         private void nullOkay(String object) {}
     }
-    
+
     private static enum C {
         FOO, BAR, BAZ;
     }
+    
+    @Retention(RetentionPolicy.RUNTIME)
+    private @interface Restricted {}
 
 }
