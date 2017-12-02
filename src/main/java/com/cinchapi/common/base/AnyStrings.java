@@ -152,6 +152,43 @@ public class AnyStrings {
     }
 
     /**
+     * Return {@code true} if {@code string} both starts and ends with single or
+     * double quotes.
+     * 
+     * @param string
+     * @return {@code true} if the string is between quotes
+     */
+    public static boolean isWithinQuotes(String string) {
+        if(string.length() > 2) {
+            char first = string.charAt(0);
+            if(first == '"' || first == '\'') {
+                char last = string.charAt(string.length() - 1);
+                return first == last;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Similar to the {@link String#valueOf(char)} method, but this one will
+     * return a cached copy of the string for frequently used characters.
+     * 
+     * @param c the character to convert
+     * @return a string of length 1 containing the input char
+     */
+    public static String valueOfCached(char c) {
+        if(c == '(') {
+            return "(";
+        }
+        else if(c == ')') {
+            return ")";
+        }
+        else {
+            return String.valueOf(c);
+        }
+    }
+
+    /**
      * Execute the rules for formatting {@code args} with no corresponding
      * placeholders in the original template.
      * 
