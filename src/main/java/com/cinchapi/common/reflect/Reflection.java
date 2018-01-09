@@ -403,30 +403,7 @@ public final class Reflection {
      */
     public static Method getMethodUnboxed(Class<?> clazz, String method,
             Class<?>... paramTypes) {
-        Class<?>[] altParamTypes = new Class<?>[paramTypes.length];
-        for (int i = 0; i < altParamTypes.length; ++i) {
-            altParamTypes[i] = unbox(paramTypes[i]);
-        }
-        try {
-            Method m = clazz.getDeclaredMethod(method, paramTypes);
-            m.setAccessible(true);
-            return m;
-        }
-        catch (NoSuchMethodException e) {
-            try {
-                // Attempt to find a method using the alt param types.
-                // This will usually bear fruit in cases where a method
-                // has a primitive type parameter and Java autoboxing
-                // causes the passed in parameters to have a wrapper
-                // type instead of the appropriate primitive type.
-                Method m = clazz.getDeclaredMethod(method, altParamTypes);
-                m.setAccessible(true);
-                return m;
-            }
-            catch (NoSuchMethodException e2) {
-                throw CheckedExceptions.throwAsRuntimeException(e);
-            }
-        }
+        return getMethod(null, true, method, clazz, paramTypes);
     }
 
     @Nullable
@@ -805,20 +782,43 @@ public final class Reflection {
      */
     private static Method getMethod(boolean setAccessible, String name,
             Class<?> clazz, Object... args) {
+        Class<?>[] paramTypes = new Class<?>[args.length];
+        for (int i = 0; i < paramTypes.length; ++i) {
+            Object arg = args[i];
+            paramTypes[i] = arg == null ? null : arg.getClass();
+        }
+        return getMethod(args, setAccessible, name, clazz, paramTypes);
+    }
+
+    /**
+     * Return the {@link Method} object called {@code name} in {@code clazz}
+     * that accepts the specified {@code args} and optionally ignore the native
+     * java language access rules.
+     * 
+     * @param args (optional) args to plug into the params
+     * @param setAccessible a flag that indicates whether the native java
+     *            language access rules should be ignored
+     * @param name the method name
+     * @param clazz the {@link Class} in which the method is defined
+     * @param paramType the parameters defined in the method's signature
+     * @return the associated {@link Method} object
+     */
+    private static Method getMethod(@Nullable Object[] args,
+            boolean setAccessible, String name, Class<?> clazz,
+            Class<?>... paramTypes) {
         // TODO cache method instances
         try {
             List<Method> potential = Lists.newArrayListWithCapacity(1);
             while (clazz != null) {
                 outer: for (Method method : clazz.getDeclaredMethods()) {
-                    if(method.getParameterCount() == args.length
+                    if(method.getParameterCount() == paramTypes.length
                             && method.getName().equals(name)) {
                         Class<?>[] expectedParamTypes = method
                                 .getParameterTypes();
-                        for (int i = 0; i < args.length; ++i) {
-                            Object arg = args[i];
-                            if(arg != null) {
+                        for (int i = 0; i < paramTypes.length; ++i) {
+                            Class<?> actual = paramTypes[i];
+                            if(actual != null) {
                                 Class<?> expected = expectedParamTypes[i];
-                                Class<?> actual = arg.getClass();
                                 if(expected == actual
                                         || expected == unbox(actual)
                                         || expected.isAssignableFrom(actual)
@@ -850,12 +850,13 @@ public final class Reflection {
             int matches = potential.size();
             if(matches < 1) {
                 throw new NoSuchMethodException("Could not find method '" + name
-                        + "' that is invokable with args: "
-                        + Arrays.asList(args));
+                        + "' that is invokable with: "
+                        + Arrays.asList(args != null ? args : paramTypes));
             }
             else if(matches > 1) {
                 throw new IllegalArgumentException("Trying to invoke method "
-                        + "'" + name + "' with args " + Arrays.asList(args)
+                        + "'" + name + "' with "
+                        + Arrays.asList(args != null ? args : paramTypes)
                         + " isn't possible because there are too many null "
                         + "values and it is impossible to decide which "
                         + "method is desired");

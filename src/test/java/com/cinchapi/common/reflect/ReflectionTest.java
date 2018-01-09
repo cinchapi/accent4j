@@ -20,6 +20,7 @@ import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -144,11 +145,11 @@ public class ReflectionTest {
     }
 
     @Test
-    public void testCheckedExceptionIsPreserved() {  
+    public void testCheckedExceptionIsPreserved() {
         expectedException.expect(RuntimeException.class);
         String message = "This is the message I want to see";
         expectedException.expectMessage(message);
-        A a = new A("foo"); 
+        A a = new A("foo");
         Reflection.call(a, "throwCheckedException", message);
     }
 
@@ -164,64 +165,74 @@ public class ReflectionTest {
         abstract class D {}
         class DA extends D {}
         class DB extends D {}
-        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DA.class, DB.class));
+        Assert.assertEquals(D.class,
+                Reflection.getClosestCommonAncestor(DA.class, DB.class));
         @SuppressWarnings("serial")
         class DBA extends DB implements Serializable {}
-        Assert.assertEquals(Serializable.class, Reflection.getClosestCommonAncestor(DBA.class, String.class));
-        Assert.assertEquals(D.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class));
-        Assert.assertEquals(Object.class, Reflection.getClosestCommonAncestor(DBA.class, DA.class, C.class));
+        Assert.assertEquals(Serializable.class,
+                Reflection.getClosestCommonAncestor(DBA.class, String.class));
+        Assert.assertEquals(D.class,
+                Reflection.getClosestCommonAncestor(DBA.class, DA.class));
+        Assert.assertEquals(Object.class, Reflection
+                .getClosestCommonAncestor(DBA.class, DA.class, C.class));
     }
 
     @Test
-    public void testGetEnumValueByName(){
+    public void testGetEnumValueByName() {
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, "BAZ"));
     }
 
     @Test
-    public void testGetEnumValueByOrdinal(){
+    public void testGetEnumValueByOrdinal() {
         Assert.assertEquals(C.FOO, Reflection.getEnumValue(C.class, 0));
         Assert.assertEquals(C.BAR, Reflection.getEnumValue(C.class, 1));
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 2));
     }
-    
+
     @Test
-    public void testGetEnumValueByOrdinalGeneric(){
+    public void testGetEnumValueByOrdinalGeneric() {
         Object ordinal = 0;
         Assert.assertEquals(C.FOO, Reflection.getEnumValue(C.class, ordinal));
     }
-    
+
     @Test(expected = IllegalArgumentException.class)
-    public void testGetEnumValueByOrdinalOutOfBounds(){
+    public void testGetEnumValueByOrdinalOutOfBounds() {
         Assert.assertEquals(C.BAZ, Reflection.getEnumValue(C.class, 3));
     }
-    
+
     @Test
     public void testGetValueFromClassA() {
         String expected = "" + random.nextInt();
         A a = new A(expected);
         Assert.assertEquals(expected, Reflection.get("string", a));
     }
-    
+
     @Test
     public void testGetValueFromClassB() {
         int expected = random.nextInt();
         B b = new B(expected);
         Assert.assertEquals(expected, (int) Reflection.get("integer", b));
     }
-    
+
     @Test
     public void testInheritedGetValueFromSuperClass() {
         int expected = random.nextInt();
         B b = new B(expected);
         Assert.assertEquals("default", Reflection.get("string", b));
     }
-        
+
     @Test
     public void testIntegerAndLongInterchangeable() {
         A a = new A("foo");
         Reflection.call(a, "tryLong", 1);
     }
-    
+
+    @Test
+    public void testGetMethodUnboxedCollections() {
+        Reflection.getMethodUnboxed(A.class, "hasCollection", ArrayList.class);
+        Assert.assertTrue(true); // lack of exception means we passed...
+    }
+
     @Test
     public void testMethodAutoboxingSupport() {
         int integer = random.nextInt();
@@ -269,8 +280,11 @@ public class ReflectionTest {
             }
             return result;
         }
-        
-        private void throwCheckedException(String message) throws FileNotFoundException {
+
+        private void hasCollection(List<String> foo) {}
+
+        private void throwCheckedException(String message)
+                throws FileNotFoundException {
             throw new FileNotFoundException(message);
         }
     }
@@ -311,7 +325,7 @@ public class ReflectionTest {
     private static enum C {
         FOO, BAR, BAZ;
     }
-    
+
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
 
