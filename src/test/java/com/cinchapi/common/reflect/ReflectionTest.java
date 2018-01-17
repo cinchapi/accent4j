@@ -161,6 +161,12 @@ public class ReflectionTest {
     }
 
     @Test
+    public void testGetMethodUnboxedDoesNotAcceptObjectAsBaseClass() {
+        Reflection.getMethodUnboxed(E.class, "oneArg", String.class);
+        Assert.assertTrue(true); // lack of Exception means test passes
+    }
+
+    @Test
     public void testGetClosestCommonAncestor() {
         abstract class D {}
         class DA extends D {}
@@ -324,6 +330,17 @@ public class ReflectionTest {
 
     private static enum C {
         FOO, BAR, BAZ;
+    }
+
+    private class E {
+
+        public void oneArg(String arg) {
+
+        }
+
+        public void oneArg(Object arg) {
+
+        }
     }
 
     @Retention(RetentionPolicy.RUNTIME)

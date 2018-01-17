@@ -821,7 +821,8 @@ public final class Reflection {
                                 Class<?> expected = expectedParamTypes[i];
                                 if(expected == actual
                                         || expected == unbox(actual)
-                                        || expected.isAssignableFrom(actual)
+                                        || (expected != Object.class && expected
+                                                .isAssignableFrom(actual))
                                         || getInterchangeableClasses(actual)
                                                 .contains(expected)) {
                                     continue;
