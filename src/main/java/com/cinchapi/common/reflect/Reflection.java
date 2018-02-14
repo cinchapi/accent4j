@@ -809,8 +809,10 @@ public final class Reflection {
         // TODO cache method instances
         try {
             List<Method> potential = Lists.newArrayListWithCapacity(1);
+            List<Method> deferred = Lists.newArrayListWithCapacity(1);
             while (clazz != null) {
                 outer: for (Method method : clazz.getDeclaredMethods()) {
+                    List<Method> container = potential;
                     if(method.getParameterCount() == paramTypes.length
                             && method.getName().equals(name)) {
                         Class<?>[] expectedParamTypes = method
@@ -827,6 +829,15 @@ public final class Reflection {
                                                 .contains(expected)) {
                                     continue;
                                 }
+                                else if(expected == Object.class) {
+                                    // Defer this method as a potential one
+                                    // since it is using a highly
+                                    // generic/ambiguous arg. If no specific
+                                    // matches are found, the deferred matches
+                                    // will be considered.
+                                    container = deferred;
+                                    continue;
+                                }
                                 else {
                                     continue outer;
                                 }
@@ -835,7 +846,7 @@ public final class Reflection {
                                 continue;
                             }
                         }
-                        potential.add(method);
+                        container.add(method);
                     }
                     else {
                         continue;
@@ -849,10 +860,16 @@ public final class Reflection {
                 }
             }
             int matches = potential.size();
+            Method method;
             if(matches < 1) {
-                throw new NoSuchMethodException("Could not find method '" + name
-                        + "' that is invokable with: "
-                        + Arrays.asList(args != null ? args : paramTypes));
+                if(deferred.size() == 1) {
+                    method = deferred.get(0);
+                }
+                else {
+                    throw new NoSuchMethodException("Could not find method '"
+                            + name + "' that is invokable with: "
+                            + Arrays.asList(args != null ? args : paramTypes));
+                }
             }
             else if(matches > 1) {
                 throw new IllegalArgumentException("Trying to invoke method "
@@ -863,10 +880,10 @@ public final class Reflection {
                         + "method is desired");
             }
             else {
-                Method method = potential.get(0);
-                method.setAccessible(setAccessible);
-                return method;
+                method = potential.get(0);
             }
+            method.setAccessible(setAccessible);
+            return method;
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);

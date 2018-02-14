@@ -246,6 +246,20 @@ public class ReflectionTest {
         Reflection.call(b, "bigInteger", integer);
         Assert.assertTrue(true); // lack of exception means we passed...
     }
+    
+    @Test
+    public void testCallGenericArg() {
+        E e = new E();
+        Assert.assertEquals("Foo", Reflection.call(e, "genericArg", "foo", "Foo"));
+        Assert.assertEquals(17L, (long) Reflection.call(e, "genericArg", "foo", 17L));
+    }
+    
+    @Test
+    public void testCallObjectArgInChildClass() {
+        B b = new B(1);
+        Assert.assertEquals(b.generic(1), Reflection.call(b, "generic", 1));
+        Assert.assertEquals(b.generic("foo"), Reflection.call(b, "generic", "foo"));
+    }
 
     private static class A {
 
@@ -293,6 +307,10 @@ public class ReflectionTest {
                 throws FileNotFoundException {
             throw new FileNotFoundException(message);
         }
+        
+        public String generic(String foo) {
+            return "parent";
+        }
     }
 
     private static class B extends A {
@@ -326,6 +344,10 @@ public class ReflectionTest {
         }
 
         private void nullOkay(String object) {}
+        
+        public String generic(Object foo) {
+            return "child";
+        }
     }
 
     private static enum C {
@@ -340,6 +362,10 @@ public class ReflectionTest {
 
         public void oneArg(Object arg) {
 
+        }
+        
+        public <T> T genericArg(String name, T arg) {
+            return arg;
         }
     }
 
