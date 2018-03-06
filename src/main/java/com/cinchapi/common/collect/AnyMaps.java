@@ -43,4 +43,25 @@ public final class AnyMaps {
         return new LinkedHashMap<K, V>(capacity);
     }
 
+    /**
+     * Rename {@code key} to {@code newKey} within the {@code map} using the
+     * concurrency guarantees of the {@code map}'s type.
+     * 
+     * @param key
+     * @param newKey
+     * @param map
+     */
+    public static <T> void rename(String key, String newKey,
+            Map<String, T> map) {
+        if(map.containsKey(key)) {
+            T value = map.get(key);
+            if(map.remove(key, value)) {
+                map.put(newKey, value);
+            }
+            else {
+                rename(key, newKey, map);
+            }
+        }
+    }
+
 }
