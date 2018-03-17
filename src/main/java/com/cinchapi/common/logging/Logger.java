@@ -55,11 +55,23 @@ public final class Logger {
      * instead of a specific directory.
      * 
      * @param name the name of the Logger
+     * @param level the log level
+     * @return the configured Logger
+     */
+    public static Logger console(String name, Level level) {
+        return builder().name(name).directory(Files.tempDir("logger"))
+                .enableConsoleLogging(true).level(level).build();
+    }
+
+    /**
+     * Return a {@link Logger} that is configured to only log to the console
+     * instead of a specific directory.
+     * 
+     * @param name the name of the Logger
      * @return the configured Logger
      */
     public static Logger console(String name) {
-        return builder().name(name).directory(Files.tempDir("logger"))
-                .enableConsoleLogging(true).level(Level.DEBUG).build();
+        return console(name, Level.DEBUG);
     }
 
     /**
