@@ -18,6 +18,9 @@ package com.cinchapi.common.base;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.text.MessageFormat;
+import java.util.Set;
+
+import com.google.common.collect.Sets;
 
 /**
  * A collection of functions that efficiently operate on {@link String strings}.
@@ -41,6 +44,78 @@ public class AnyStrings {
      * {@link #format(String, Object...)} method.
      */
     private static final char PLACEHOLDER_END = '}';
+
+    /**
+     * Wrap {@code string} within quotes if it is necessary to do so. Otherwise,
+     * return the original {@code string}.
+     * 
+     * <p>
+     * The original {@code string} will be wrapped in quotes and returned as
+     * such if:
+     * <ul>
+     * <li>it is not already wrapped {@link #isWithinQuotes(String) within
+     * quotes}, and</li>
+     * <li>{@code delimiter} appears at least once</li>
+     * </ul>
+     * If those conditions are met, the original string will be wrapped in
+     * either
+     * <ul>
+     * <li>double quotes if a single quote appears in the original string,
+     * or</li>
+     * <li>single quotes if a double quote appears in the original string,
+     * or</li>
+     * <li>double quotes if both a single and double quote appear in the
+     * original string; furthermore, all instances of double quotes within the
+     * original string will be escaped</li>
+     * </ul>
+     * </p>
+     * 
+     * @param string the string to potentially quote
+     * @param delimiters the delimiters that determines whether quoting should
+     *            happen
+     * @return the original {@code string} or a properly quoted alternative
+     */
+    public static String ensureWithinQuotesIfNeeded(String string,
+            Character... delimiters) {
+        Set<Character> _delimiters = Sets.newHashSet(delimiters);
+        _delimiters.remove('\'');
+        _delimiters.remove('"');
+        boolean foundDouble = false;
+        boolean foundSingle = false;
+        boolean foundDelimiter = false;
+        StringBuilder escaped = new StringBuilder();
+        escaped.append('"');
+        if(!isWithinQuotes(string)) {
+            char[] chars = string.toCharArray();
+            for (int i = 0; i < chars.length; ++i) {
+                char c = chars[i];
+                if(_delimiters.contains(c)) {
+                    foundDelimiter = true;
+                }
+                else if(c == '"') {
+                    foundDouble = true;
+                    escaped.append('\\');
+                }
+                else if(c == '\'') {
+                    foundSingle = true;
+                }
+                escaped.append(c);
+            }
+            escaped.append('"');
+            if(foundDelimiter) {
+                if(foundDouble && foundSingle) {
+                    return escaped.toString();
+                }
+                else if(foundDouble) {
+                    return "'" + string + "'";
+                }
+                else { // foundSingle or found no quotes
+                    return "\"" + string + "\"";
+                }
+            }
+        }
+        return string;
+    }
 
     /**
      * <em>Inspired by the SLF4J logging framework!</em>
