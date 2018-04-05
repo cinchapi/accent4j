@@ -264,6 +264,30 @@ public class AnyStrings {
     }
 
     /**
+     * Add the {@code wrapper} character to the beginning and end of the
+     * {@code string} and escape any instance of the {@code wrapper} within the
+     * {@code string} with the specified {@code escape} character.
+     * 
+     * @param string
+     * @param wrapper
+     * @param escape
+     * @return the wrapped (and escaped, if necessary) string
+     */
+    public static String wrap(String string, char wrapper, char escape) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(wrapper);
+        char[] chars = string.toCharArray();
+        for (char c : chars) {
+            if(c == wrapper) {
+                sb.append(escape);
+            }
+            sb.append(c);
+        }
+        sb.append(wrapper);
+        return sb.toString();
+    }
+
+    /**
      * Execute the rules for formatting {@code args} with no corresponding
      * placeholders in the original template.
      * 
