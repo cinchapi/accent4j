@@ -16,7 +16,10 @@
 package com.cinchapi.common.collect;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+
+import com.google.common.primitives.Ints;
 
 /**
  * A collection of functions that efficiently operate on {@link Map maps}.
@@ -62,6 +65,37 @@ public final class AnyMaps {
                 rename(key, newKey, map);
             }
         }
+    }
+
+    /**
+     * Return a possibly nested value in a {@link Map} that contains other maps
+     * and collections as values.
+     * 
+     * @param path a navigable path key (e.g. foo.bar.1.baz)
+     * @return the value
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T navigate(String path,
+            Map<String, ? extends Object> map) {
+        T value = null;
+        String[] components = path.split("\\.");
+        Object lookup = map;
+        for (String component : components) {
+            Integer index;
+            if(lookup == null) {
+                break;
+            }
+            else if((index = Ints.tryParse(component)) != null) {
+                lookup = ((List<?>) lookup).get(index);
+            }
+            else {
+                lookup = ((Map<String, Object>) lookup).get(component);
+            }
+        }
+        if(lookup != null) {
+            value = (T) lookup;
+        }
+        return value;
     }
 
 }
