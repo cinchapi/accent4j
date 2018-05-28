@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -415,6 +416,52 @@ public final class Reflection {
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return {@code true} if the {@code method} has an {@link Annotation
+     * annotation} of {@code annotationClass} declared in its hierarchy.
+     * <p>
+     * Technically, annotations on elements other than classes cannot be
+     * inherited in Java. However, there are some cases when it is useful to
+     * know whether a version of a method, either in a child or super class,
+     * does have an annotation, which this method will indicate.
+     * </p>
+     * <p>
+     * A return type of {@code true} doesn't necessarily mean that the
+     * {@code method} was directly annotated with an annotation of the specified
+     * class. It simply means, that a version of the method was at some point in
+     * the hierarchy. If necessary, the caller must do further inspection to
+     * retrieve the exact annotation state.
+     * </p>
+     * 
+     * @param method
+     * @param annotationClass
+     * @return {@code true} if a version of the method in the hierarchy was
+     *         annotated
+     */
+    public static boolean isDeclaredAnnotationPresentInHierarchy(Method method,
+            Class<? extends Annotation> annotationClass) {
+        if(method.isAnnotationPresent(annotationClass)) {
+            return true;
+        }
+        else {
+            Class<?> clazz = method.getDeclaringClass().getSuperclass();
+            if(clazz != null) {
+                try {
+                    method = getMethod(null, false, method.getName(), clazz,
+                            method.getParameterTypes());
+                    return isDeclaredAnnotationPresentInHierarchy(method,
+                            annotationClass);
+                }
+                catch (Exception e) {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
         }
     }
 
