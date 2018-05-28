@@ -252,4 +252,13 @@ public class ArrayBuilder<T> {
         }
     }
 
+    /**
+     * Return the the number of items that have been added.
+     * 
+     * @return the length of the array that will be {@link #build() built}
+     */
+    public int length() {
+        return length;
+    }
+
 }
