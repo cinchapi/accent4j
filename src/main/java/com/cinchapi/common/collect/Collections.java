@@ -15,11 +15,14 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.AbstractList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 /**
@@ -73,6 +76,28 @@ public final class Collections {
             return Sets.newLinkedHashSet(collection);
         }
 
+    }
+
+    /**
+     * Return a {@link List} that is a read-only view to the {@code collection}.
+     * 
+     * @param collection
+     * @return the {@link List} view
+     */
+    public static <T> List<T> viewOf(Collection<T> collection) {
+        return new AbstractList<T>() {
+
+            @Override
+            public T get(int index) {
+                return Iterables.get(collection, index);
+            }
+
+            @Override
+            public int size() {
+                return collection.size();
+            }
+
+        };
     }
 
     private Collections() {/* no-init */}
