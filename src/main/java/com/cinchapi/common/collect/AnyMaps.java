@@ -19,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 
 /**
@@ -65,6 +67,46 @@ public final class AnyMaps {
                 rename(key, newKey, map);
             }
         }
+    }
+
+    /**
+     * Put or update the value associated with the {@code path} within a
+     * possibly nested {@link Map} that contains other maps and collections as values.
+     * 
+     * @param path a navigable path key (e.g. foo.bar.1.baz)
+     * @param value
+     * @param map
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Object upsert(String path, Object value,
+            Map<String, ? extends Object> map) {
+        List<String> components = Lists.newArrayList(path.split("\\."));
+        Map<String, Object> source = (Map<String, Object>) map;
+        String key;
+        do {
+            key = components.remove(0);
+            //TODO: handle case where the key is a Number
+            if(!components.isEmpty()) {
+                try {
+                    Map<String, Object> next = (Map<String, Object>) source
+                            .get(key);
+                    if(next == null) {
+                        next = Maps.newHashMap();
+                        source.put(key, next);
+                    }
+                    source = next;
+
+                }
+                catch (ClassCastException e) {
+                    throw new IllegalArgumentException("Illegal path " + path
+                            + ". The component mapped from " + key
+                            + " is not an Map");
+                }
+            }
+        }
+        while (!components.isEmpty());
+        return source.put(key, value);
     }
 
     /**
