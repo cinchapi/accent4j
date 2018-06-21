@@ -16,9 +16,9 @@
 package com.cinchapi.common.collect;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 /**
@@ -77,23 +77,30 @@ public final class AnyMaps {
     @SuppressWarnings("unchecked")
     public static <T> T navigate(String path,
             Map<String, ? extends Object> map) {
-        T value = null;
-        String[] components = path.split("\\.");
-        Object lookup = map;
-        for (String component : components) {
-            Integer index;
-            if(lookup == null) {
-                break;
+        T value = (T) map.get(path); // First, see if the path has been directly
+                                     // added to the map
+        if(value == null) {
+            String[] components = path.split("\\.");
+            Object lookup = map;
+            for (String component : components) {
+                Integer index;
+                if(lookup == null) {
+                    break;
+                }
+                else if((index = Ints.tryParse(component)) != null) {
+                    lookup = lookup instanceof Iterable
+                            ? Iterables.get((Iterable<T>) lookup, index)
+                            : null;
+                }
+                else {
+                    lookup = lookup instanceof Map
+                            ? ((Map<String, Object>) lookup).get(component)
+                            : null;
+                }
             }
-            else if((index = Ints.tryParse(component)) != null) {
-                lookup = ((List<?>) lookup).get(index);
+            if(lookup != null) {
+                value = (T) lookup;
             }
-            else {
-                lookup = ((Map<String, Object>) lookup).get(component);
-            }
-        }
-        if(lookup != null) {
-            value = (T) lookup;
         }
         return value;
     }

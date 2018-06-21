@@ -20,6 +20,7 @@ import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 /**
@@ -39,5 +40,17 @@ public class AnyMapsTest {
         Assert.assertNull(map.get("foo"));
         Assert.assertTrue(map.containsKey("bar"));
         Assert.assertEquals(value, map.get("bar"));
+    }
+    
+    @Test
+    public void testNavigateWhenKeyPresent() {
+        Map<String, Object> map = Maps.newHashMap();
+        map.put("foo", ImmutableMap.of("bar", ImmutableMap.of("baz", 1)));
+        map.put("foo.bar.baz.car.bang", 2);
+        Assert.assertEquals(1, (int) AnyMaps.navigate("foo.bar.baz", map));
+        Assert.assertEquals(2, (int) AnyMaps.navigate("foo.bar.baz.car.bang", map));
+        Assert.assertNull(AnyMaps.navigate("foo.bar.baz.car", map));
+        Assert.assertNull(AnyMaps.navigate("foo.bar.baz.1", map));
+        Assert.assertEquals(ImmutableMap.of("baz", 1), AnyMaps.navigate("foo.bar", map));
     }
 }
