@@ -15,10 +15,17 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.cinchapi.common.base.AnyStrings;
+import com.cinchapi.common.base.Array;
+import com.cinchapi.common.base.Verify;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 
 /**
@@ -27,6 +34,80 @@ import com.google.common.primitives.Ints;
  * @author Jeff Nelson
  */
 public final class AnyMaps {
+
+    /**
+     * Explode a "flat" map that contains navigable keys to a nested structure
+     * that can be traversed using the {@link #navigate(String, Map)} method.
+     * <p>
+     * For example, if the provided {@code map} has a key {@code foo.bar.0} that
+     * maps to the value "baz", this method will return a map that contains a
+     * mapping from {@code foo} to a mapping from {@code bar} to a list that
+     * contains the value "baz" at position 0.
+     * <p>
+     * <p>
+     * The map returned from this method is navigable such that a query for any
+     * of the keys in the original {@code map} will return the same associated
+     * value from the {@link #navigate(String, Map)} method. The advantage of
+     * exploding a map is that it makes it possible to fetch nested inner
+     * structures from a navigable query on one of the parent keys (e.g. the
+     * example above would return a map if one were to navigate for "foo")
+     * </p>
+     * 
+     * @param map
+     * @return a nested map
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static Map<String, Object> explode(Map<String, Object> map) {
+        Map<String, Object> exploded = Maps.newLinkedHashMap();
+        map.forEach((key, value) -> {
+            String[] components = key.split("\\.");
+            String[] reversed = Array.reverse(components);
+            Verify.thatArgument(Ints.tryParse(components[0]) == null,
+                    "The map cannot contain keys that start with a numeric component. "
+                            + "'{}' is an invalid key.",
+                    key);
+            String originalKey = key;
+            try {
+                for (String component : reversed) {
+                    key = component;
+                    components = Arrays.copyOf(components,
+                            components.length - 1);
+                    String path = String.join(".", components);
+                    Object container;
+                    Integer index;
+                    if((index = Ints.tryParse(component)) != null) {
+                        container = navigate(path, exploded);
+                        if(container == null) {
+                            container = Lists.newArrayList();
+                        }
+                        List list = (List) container;
+                        for (int i = list.size(); i < index; ++i) { // Pad the
+                                                                    // list, if
+                                                                    // necessary
+                            list.add(null);
+                        }
+                        list.add(index, value);
+                    }
+                    else {
+                        container = navigate(path, exploded);
+                        if(container == null) {
+                            container = Maps.newLinkedHashMap();
+                        }
+                        ((Map) container).put(component, value);
+                    }
+                    value = container;
+                }
+                exploded.putAll((Map) value);
+            }
+            catch (ClassCastException e) {
+                throw new IllegalArgumentException(AnyStrings.format(
+                        "Cannot explode '{}' because the path leads to a different "
+                                + "type tree than a previously exploded key.",
+                        originalKey));
+            }
+        });
+        return exploded;
+    }
 
     /**
      * Return a <em>mutable</em>, insertion-ordered {@link LinkedHashMap}
