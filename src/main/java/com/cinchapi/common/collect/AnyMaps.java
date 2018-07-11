@@ -86,7 +86,15 @@ public final class AnyMaps {
                                                                     // necessary
                             list.add(null);
                         }
-                        list.add(index, value);
+                        if(index < list.size()) {
+                            // This means we are modifying an existing item in
+                            // the list, so we must be sure to upsert instead of
+                            // adding and shifting elements around.
+                            list.set(index, value);
+                        }
+                        else {
+                            list.add(index, value);
+                        }
                     }
                     else {
                         container = navigate(path, exploded);

@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -114,5 +115,12 @@ public class AnyMapsTest {
     @Test(expected = IllegalArgumentException.class)
     public void testCannotChangeParentComponentType() {
         AnyMaps.explode(ImmutableMap.of("a.b", 1, "a.1", 2));
+    }
+    
+    @Test
+    public void testExplodeDuplicateBugReproA() {
+        Map<String, Object> map = ImmutableMap.of("AUTHORIZED_KEYS.0.KEY", "a", "AUTHORIZED_KEYS.0.TAG", "b");
+        Map<String, Object> exploded = AnyMaps.explode(map);
+        Assert.assertEquals(1, ((List<?>) exploded.get("AUTHORIZED_KEYS")).size());
     }
 }
