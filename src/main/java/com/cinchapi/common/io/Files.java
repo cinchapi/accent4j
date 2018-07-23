@@ -39,6 +39,7 @@ import com.cinchapi.common.process.Processes;
 import com.cinchapi.common.process.Processes.ProcessResult;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.hash.Hashing;
 
 /**
@@ -383,6 +384,34 @@ public final class Files {
         }
         catch (IOException e) {
             throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Implementation of {@link java.nio.file.Files#newDirectoryStream(Path)}
+     * that returns an empty stream if {@code dir} does not exist.
+     * 
+     * @param dir
+     * @return the {@link DirectoryStream}
+     * @throws IOException
+     */
+    public static DirectoryStream<Path> newDirectoryStreamNotExistsSafe(
+            Path dir) throws IOException {
+        if(dir.toFile().exists()) {
+            return java.nio.file.Files.newDirectoryStream(dir);
+        }
+        else {
+            return new DirectoryStream<Path>() {
+
+                @Override
+                public void close() throws IOException {}
+
+                @Override
+                public Iterator<Path> iterator() {
+                    return Iterators.forArray();
+                }
+
+            };
         }
     }
 
