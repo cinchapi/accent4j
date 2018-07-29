@@ -75,8 +75,8 @@ public final class AnyMaps {
                     String path = String.join(".", components);
                     Object container;
                     Integer index;
+                    container = navigate(path, exploded);
                     if((index = Ints.tryParse(component)) != null) {
-                        container = navigate(path, exploded);
                         if(container == null) {
                             container = Lists.newArrayList();
                         }
@@ -97,7 +97,6 @@ public final class AnyMaps {
                         }
                     }
                     else {
-                        container = navigate(path, exploded);
                         if(container == null) {
                             container = Maps.newLinkedHashMap();
                         }
