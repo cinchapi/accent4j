@@ -22,8 +22,8 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
+import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.io.ByteBuffers;
-import com.google.common.base.Throwables;
 
 /**
  * Functions for compressing and decompressing data.
@@ -72,7 +72,7 @@ public final class Compression {
             return compressed;
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -97,7 +97,7 @@ public final class Compression {
             return decompressed;
         }
         catch (IOException | DataFormatException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -133,7 +133,7 @@ public final class Compression {
         DEFAULT(Deflater.DEFAULT_STRATEGY),
         FILTERED(Deflater.FILTERED),
         HUFFMAN_ONLY(Deflater.HUFFMAN_ONLY);
-        
+
         int technique;
 
         Technique(int level) {

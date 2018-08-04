@@ -57,13 +57,13 @@ public final class CheckedExceptions {
      *         above)
      * @throws RuntimeException
      */
-    public static RuntimeException throwAsRuntimeException(Exception e) {
+    public static RuntimeException throwAsRuntimeException(Throwable e) {
         if(e instanceof RuntimeException) {
             throw (RuntimeException) e;
         }
         else {
-            RuntimeException re = new RuntimeException(AnyStrings.format(
-                    "{} {}", e.getClass().getName(), e.getMessage()));
+            RuntimeException re = new RuntimeException(AnyStrings
+                    .format("{} {}", e.getClass().getName(), e.getMessage()));
             re.setStackTrace(e.getStackTrace());
             throw re;
         }
@@ -84,7 +84,8 @@ public final class CheckedExceptions {
      *     methodThatThrowsException();
      * }
      * catch (Exception e) {
-     *     throw Exceptions.throwAsRuntimeException(e, IllegalArgumentException.class);
+     *     throw Exceptions.throwAsRuntimeException(e,
+     *             IllegalArgumentException.class);
      * }
      * </pre>
      * 
@@ -98,7 +99,7 @@ public final class CheckedExceptions {
      */
     @SuppressWarnings("unchecked")
     public static <T extends RuntimeException> T throwAsRuntimeException(
-            Exception e, Class<T> desiredType) {
+            Throwable e, Class<T> desiredType) {
         if(e.getClass() == desiredType) {
             throw (T) e;
         }
@@ -134,7 +135,7 @@ public final class CheckedExceptions {
      *         above)
      * @throws RuntimeException
      */
-    public static RuntimeException wrapAsRuntimeException(Exception e) {
+    public static RuntimeException wrapAsRuntimeException(Throwable e) {
         if(e instanceof RuntimeException) {
             throw (RuntimeException) e;
         }
@@ -172,7 +173,7 @@ public final class CheckedExceptions {
      */
     @SuppressWarnings("unchecked")
     public static <T extends RuntimeException> T wrapAsRuntimeException(
-            Exception e, Class<T> desiredType) {
+            Throwable e, Class<T> desiredType) {
         if(e.getClass() == desiredType) {
             throw (T) e;
         }

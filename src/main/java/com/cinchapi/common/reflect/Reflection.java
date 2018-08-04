@@ -135,7 +135,7 @@ public final class Reflection {
                 else {
                     ex = Throwables.getRootCause(ex);
                 }
-                throw Throwables.propagate(ex);
+                throw CheckedExceptions.wrapAsRuntimeException(ex);
             }
         }
         else {
@@ -210,7 +210,7 @@ public final class Reflection {
             return (T) field.get(obj);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -268,7 +268,7 @@ public final class Reflection {
             return (T) field.get(object);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -285,7 +285,7 @@ public final class Reflection {
             return (Class<T>) Class.forName(name);
         }
         catch (ClassNotFoundException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -415,7 +415,7 @@ public final class Reflection {
             return (T) field.get(null);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -513,11 +513,11 @@ public final class Reflection {
             }
         }
         catch (InvocationTargetException e) {
-            throw CheckedExceptions.throwAsRuntimeException(
-                    (Exception) e.getTargetException());
+            throw CheckedExceptions
+                    .wrapAsRuntimeException((Exception) e.getTargetException());
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -536,7 +536,7 @@ public final class Reflection {
             return constructor.newInstance(args);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -554,7 +554,7 @@ public final class Reflection {
             return (T) newInstance(Class.forName(clazz), args);
         }
         catch (ReflectiveOperationException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -601,7 +601,7 @@ public final class Reflection {
             field.set(obj, value);
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -633,7 +633,7 @@ public final class Reflection {
             else {
                 ex = Throwables.getRootCause(ex);
             }
-            throw Throwables.propagate(ex);
+            throw CheckedExceptions.wrapAsRuntimeException(ex);
         }
     }
 
@@ -665,7 +665,7 @@ public final class Reflection {
             else {
                 ex = Throwables.getRootCause(ex);
             }
-            throw Throwables.propagate(ex);
+            throw CheckedExceptions.wrapAsRuntimeException(ex);
         }
     }
 
@@ -769,7 +769,7 @@ public final class Reflection {
             }
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -933,7 +933,7 @@ public final class Reflection {
             return method;
         }
         catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

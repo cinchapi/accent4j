@@ -19,11 +19,13 @@ import java.util.AbstractList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 
 /**
  * Utils for Collections.
@@ -58,6 +60,19 @@ public final class Collections {
         if(item != null) {
             collection.add(item);
         }
+    }
+
+    /**
+     * Concatenate two collections.
+     * 
+     * @param c1
+     * @param c2
+     * @return a collection containing all the values in {@code c1} and
+     *         {@code c2}.
+     */
+    public static <T> Collection<T> concat(Collection<T> c1, Collection<T> c2) {
+        return Streams.concat(c1.stream(), c2.stream())
+                .collect(Collectors.toList());
     }
 
     /**
