@@ -16,16 +16,20 @@
 package com.cinchapi.common.collect;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.Verify;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import com.google.common.primitives.Ints;
 
 /**
@@ -117,42 +121,33 @@ public final class AnyMaps {
     }
 
     /**
-     * Return a <em>mutable</em>, insertion-ordered {@link LinkedHashMap}
-     * instance with enough room to fit {@code capacity} items.
+     * Merge the data {@code from} one {@link Map} {@code into} another one.
      * 
-     * <p>
-     * Use this method over
-     * {@link com.google.common.collect.Maps#newLinkedHashMap()} when the size
-     * of the map is known in advance and we are being careful to not oversize
-     * collections.
-     * </p>
-     * 
-     * @param capacity the initial capacity
-     * @return a new, empty {@link LinkedHashMap}
+     * @param into the Map to merge into
+     * @param from the Map to merge from
+     * @return the merged {@link Map}
      */
-    public static <K, V> Map<K, V> newLinkedHashMapWithCapacity(int capacity) {
-        return new LinkedHashMap<K, V>(capacity);
-    }
-
-    /**
-     * Rename {@code key} to {@code newKey} within the {@code map} using the
-     * concurrency guarantees of the {@code map}'s type.
-     * 
-     * @param key
-     * @param newKey
-     * @param map
-     */
-    public static <T> void rename(String key, String newKey,
-            Map<String, T> map) {
-        if(map.containsKey(key)) {
-            T value = map.get(key);
-            if(map.remove(key, value)) {
-                map.put(newKey, value);
-            }
-            else {
-                rename(key, newKey, map);
-            }
-        }
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> merge(Map<String, Object> into,
+            Map<String, Object> from) {
+        return Streams
+                .concat(into.entrySet().stream(), from.entrySet().stream())
+                .collect(Collectors.toMap(entry -> entry.getKey(),
+                        entry -> entry.getValue(), (v1, v2) -> {
+                            if(v1 instanceof Collection
+                                    && v2 instanceof Collection) {
+                                return Collections.concat(
+                                        (Collection<Object>) v1,
+                                        (Collection<Object>) v2);
+                            }
+                            else if(v1 instanceof Map && v2 instanceof Map) {
+                                return merge((Map<String, Object>) v1,
+                                        (Map<String, Object>) v2);
+                            }
+                            else {
+                                return ImmutableList.of(v1, v2);
+                            }
+                        }));
     }
 
     /**
@@ -191,6 +186,45 @@ public final class AnyMaps {
             }
         }
         return value;
+    }
+
+    /**
+     * Return a <em>mutable</em>, insertion-ordered {@link LinkedHashMap}
+     * instance with enough room to fit {@code capacity} items.
+     * 
+     * <p>
+     * Use this method over
+     * {@link com.google.common.collect.Maps#newLinkedHashMap()} when the size
+     * of the map is known in advance and we are being careful to not oversize
+     * collections.
+     * </p>
+     * 
+     * @param capacity the initial capacity
+     * @return a new, empty {@link LinkedHashMap}
+     */
+    public static <K, V> Map<K, V> newLinkedHashMapWithCapacity(int capacity) {
+        return new LinkedHashMap<K, V>(capacity);
+    }
+
+    /**
+     * Rename {@code key} to {@code newKey} within the {@code map} using the
+     * concurrency guarantees of the {@code map}'s type.
+     * 
+     * @param key
+     * @param newKey
+     * @param map
+     */
+    public static <T> void rename(String key, String newKey,
+            Map<String, T> map) {
+        if(map.containsKey(key)) {
+            T value = map.get(key);
+            if(map.remove(key, value)) {
+                map.put(newKey, value);
+            }
+            else {
+                rename(key, newKey, map);
+            }
+        }
     }
 
 }
