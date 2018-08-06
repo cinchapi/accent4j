@@ -127,27 +127,26 @@ public final class AnyMaps {
      * @param from the Map to merge from
      * @return the merged {@link Map}
      */
-    @SuppressWarnings("unchecked")
     public static Map<String, Object> merge(Map<String, Object> into,
             Map<String, Object> from) {
         return Streams
                 .concat(into.entrySet().stream(), from.entrySet().stream())
                 .collect(Collectors.toMap(entry -> entry.getKey(),
-                        entry -> entry.getValue(), (v1, v2) -> {
-                            if(v1 instanceof Collection
-                                    && v2 instanceof Collection) {
-                                return Collections.concat(
-                                        (Collection<Object>) v1,
-                                        (Collection<Object>) v2);
-                            }
-                            else if(v1 instanceof Map && v2 instanceof Map) {
-                                return merge((Map<String, Object>) v1,
-                                        (Map<String, Object>) v2);
-                            }
-                            else {
-                                return ImmutableList.of(v1, v2);
-                            }
-                        }));
+                        entry -> entry.getValue(), AnyMaps::mergeObject));
+    }
+    
+    /**
+     * Perform the {@link #merge(Map, Map)} of the data {@code from} the first
+     * map {@code into} the second one in-place.
+     * 
+     * @param into
+     * @param from
+     */
+    public static void mergeInPlace(Map<String, Object> into,
+            Map<String, Object> from) {
+        from.forEach((key, value) -> {
+            into.merge(key, value, AnyMaps::mergeObject);
+        });
     }
 
     /**
@@ -224,6 +223,27 @@ public final class AnyMaps {
             else {
                 rename(key, newKey, map);
             }
+        }
+    }
+
+    /**
+     * Merge two objects together.
+     * @param v1
+     * @param v2
+     * @return The "merged" object product.
+     */
+    @SuppressWarnings("unchecked")
+    private static Object mergeObject(Object v1, Object v2) {
+        if(v1 instanceof Collection && v2 instanceof Collection) {
+            return Collections.concat((Collection<Object>) v1,
+                    (Collection<Object>) v2);
+        }
+        else if(v1 instanceof Map && v2 instanceof Map) {
+            return merge((Map<String, Object>) v1,
+                    (Map<String, Object>) v2);
+        }
+        else {
+            return ImmutableList.of(v1, v2);
         }
     }
 
