@@ -21,7 +21,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
 /**
  * A Collective is a {@link Collection} of {@link Object objects} that can
@@ -32,38 +36,72 @@ import com.google.common.collect.ImmutableList;
 public final class Collectives {
 
     /**
-     * Return a {@link Map} containing all the data in the original {@code map}
-     * where each value is wrapped in a {@link Collection}.
-     * <p>
-     * NOTE: This method will recursively extract collectives from the original
-     * values, where possible
-     * </p>
+     * Intelligently merged collectives {@code a} and {@code b}.
      * 
-     * @param map
-     * @return a {@link Map} where each value is a {@link Collection}
+     * @param a
+     * @param b
+     * @return the merged collection
      */
-    public static Map<String, Collection<Object>> within(
-            Map<String, Object> map) {
-        return map.entrySet().stream().map(Collectives::within)
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+    public static Collection<Object> merge(Collection<Object> a,
+            Collection<Object> b) {
+        int i = 0;
+        int asize = a.size();
+        int bsize = b.size();
+        Collection<Object> merged = Lists
+                .newArrayListWithCapacity(Math.max(asize, bsize));
+        for (; i < Math.min(asize, bsize); ++i) {
+            Object ai = Iterables.get(a, i);
+            Object bi = Iterables.get(b, i);
+            Object merger = merge(ai, bi);
+            if(merger != null) {
+                merged.add(merger);
+            }
+            else {
+                if(ai != null) {
+                    merged.add(ai);
+                }
+                if(bi != null) {
+                    merged.add(bi);
+                }
+            }
+        }
+        for (; i < a.size(); ++i) {
+            merged.add(Iterables.get(a, i));
+        }
+        for (; i < b.size(); ++i) {
+            merged.add(Iterables.get(b, i));
+        }
+        return merged;
     }
 
     /**
-     * Return an {@link Entry} where the original {@code entry} value is wrapped
-     * in a {@link Collection}.
-     * <p>
-     * NOTE: This method will recursively extract collectives from the original
-     * values, where possible
-     * </p>
+     * Merge {@code a} and {@code b}, if possible. If the objects cannot be
+     * merged, this method returns {@code null}.
      * 
-     * @param entry
-     * @return an {@link Entry} whose value is a {@link Collection}
+     * @param a
+     * @param b
+     * @return the merged object or {@code null} if merging isn't possible
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static Entry<String, Collection<Object>> within(
-            Entry<String, Object> entry) {
-        return new AbstractMap.SimpleImmutableEntry(entry.getKey(),
-                over(entry.getValue()));
+    @SuppressWarnings("unchecked")
+    @Nullable
+    public static Object merge(@Nullable Object a, @Nullable Object b) {
+        if(a != null && b == null) {
+            return a;
+        }
+        else if(a == null && b != null) {
+            return b;
+        }
+        else if(a instanceof Map && b instanceof Map) {
+            return AnyMaps.merge((Map<String, Object>) a,
+                    (Map<String, Object>) b);
+        }
+        else if(a instanceof Collection && b instanceof Collection) {
+            return Collections.concat((Collection<Object>) a,
+                    (Collection<Object>) b);
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -93,6 +131,41 @@ public final class Collectives {
             return ImmutableList.of(object);
         }
 
+    }
+
+    /**
+     * Return an {@link Entry} where the original {@code entry} value is wrapped
+     * in a {@link Collection}.
+     * <p>
+     * NOTE: This method will recursively extract collectives from the original
+     * values, where possible
+     * </p>
+     * 
+     * @param entry
+     * @return an {@link Entry} whose value is a {@link Collection}
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static Entry<String, Collection<Object>> within(
+            Entry<String, Object> entry) {
+        return new AbstractMap.SimpleImmutableEntry(entry.getKey(),
+                over(entry.getValue()));
+    }
+
+    /**
+     * Return a {@link Map} containing all the data in the original {@code map}
+     * where each value is wrapped in a {@link Collection}.
+     * <p>
+     * NOTE: This method will recursively extract collectives from the original
+     * values, where possible
+     * </p>
+     * 
+     * @param map
+     * @return a {@link Map} where each value is a {@link Collection}
+     */
+    public static Map<String, Collection<Object>> within(
+            Map<String, Object> map) {
+        return map.entrySet().stream().map(Collectives::within)
+                .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
     }
 
     private Collectives() {/* no-init */}

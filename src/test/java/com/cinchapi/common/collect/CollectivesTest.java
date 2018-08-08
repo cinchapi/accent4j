@@ -30,9 +30,9 @@ import com.google.common.collect.ImmutableMap;
  * @author Jeff Nelson
  */
 public class CollectivesTest {
-    
+
     @Test
-    public void testToMultimap() {
+    public void testCollectivize() {
         Map<String, Object> map = ImmutableMap.of("a",
                 ImmutableMap.of("b", ImmutableMap.of("c",
                         ImmutableList.of(ImmutableMap.of("d", "foo")))));
@@ -40,7 +40,16 @@ public class CollectivesTest {
         mmap.forEach((key, value) -> {
             Assert.assertTrue(value instanceof Collection);
         });
-        System.out.println(mmap);
+    }
+
+    @Test
+    public void testMergeMap() {
+        Collection<Object> merged = Collectives.merge(
+                ImmutableList.of(ImmutableMap.of("name", "Bar")),
+                ImmutableList.of(ImmutableMap.of("description", "Bar Bar")));
+        Assert.assertEquals(
+                ImmutableMap.of("name", "Bar", "description", "Bar Bar"),
+                merged);
     }
 
 }
