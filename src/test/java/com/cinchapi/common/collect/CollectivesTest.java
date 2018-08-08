@@ -47,8 +47,8 @@ public class CollectivesTest {
         Collection<Object> merged = Collectives.merge(
                 ImmutableList.of(ImmutableMap.of("name", "Bar")),
                 ImmutableList.of(ImmutableMap.of("description", "Bar Bar")));
-        Assert.assertEquals(
-                ImmutableMap.of("name", "Bar", "description", "Bar Bar"),
+        Assert.assertEquals(ImmutableList
+                .of(ImmutableMap.of("name", "Bar", "description", "Bar Bar")),
                 merged);
     }
 
