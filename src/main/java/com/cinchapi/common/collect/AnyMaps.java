@@ -25,12 +25,10 @@ import java.util.stream.Collectors;
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.Verify;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Streams;
 import com.google.common.primitives.Ints;
 
@@ -226,26 +224,6 @@ public final class AnyMaps {
                 rename(key, newKey, map);
             }
         }
-    }
-
-    /**
-     * Add all the data in {@code map} to another {@link Map} where each value
-     * is a {@link Collection}.
-     * 
-     * @param map
-     * @return a {@link Map} where each value is a {@link Collection}
-     */
-    @SuppressWarnings("unchecked")
-    public static Map<String, Collection<Object>> toMultimap(
-            Map<String, Object> map) {
-        Multimap<String, Object> mmap = ArrayListMultimap.create();
-        map.forEach((key, value) -> {
-            if(value instanceof Map) {
-                value = toMultimap((Map<String, Object>) value);
-            }
-            mmap.put(key, value);
-        });
-        return mmap.asMap();
     }
 
     /**
