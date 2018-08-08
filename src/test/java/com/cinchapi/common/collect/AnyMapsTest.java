@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -122,5 +123,14 @@ public class AnyMapsTest {
         Map<String, Object> map = ImmutableMap.of("AUTHORIZED_KEYS.0.KEY", "a", "AUTHORIZED_KEYS.0.TAG", "b");
         Map<String, Object> exploded = AnyMaps.explode(map);
         Assert.assertEquals(1, ((List<?>) exploded.get("AUTHORIZED_KEYS")).size());
+    }
+    
+    @Test
+    public void testToMultimap() {
+        Map<String, Object> map = ImmutableMap.of("foo", "bar", "baz", ImmutableMap.of("baz", 1));
+        Map<String, Collection<Object>> mmap = AnyMaps.toMultimap(map);
+        mmap.forEach((key, value) -> {
+            Assert.assertTrue(value instanceof Collection);
+        });
     }
 }
