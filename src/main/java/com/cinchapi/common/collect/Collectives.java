@@ -37,22 +37,6 @@ import com.google.common.collect.Streams;
 public final class Collectives {
 
     /**
-     * Intelligently merge two collective maps.
-     * 
-     * @param into
-     * @param from
-     * @return the merged map
-     */
-    public static Map<String, Collection<Object>> merge(
-            Map<String, Collection<Object>> into,
-            Map<String, Collection<Object>> from) {
-        return Streams
-                .concat(into.entrySet().stream(), from.entrySet().stream())
-                .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
-                        Collectives::merge));
-    }
-
-    /**
      * Intelligently merged collectives {@code a} and {@code b}.
      * 
      * @param a
@@ -92,6 +76,22 @@ public final class Collectives {
     }
 
     /**
+     * Intelligently merge two collective maps.
+     * 
+     * @param into
+     * @param from
+     * @return the merged map
+     */
+    public static Map<String, Collection<Object>> merge(
+            Map<String, Collection<Object>> into,
+            Map<String, Collection<Object>> from) {
+        return Streams
+                .concat(into.entrySet().stream(), from.entrySet().stream())
+                .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
+                        Collectives::merge));
+    }
+
+    /**
      * Merge {@code a} and {@code b}, if possible. If the objects cannot be
      * merged, this method returns {@code null}.
      * 
@@ -119,6 +119,18 @@ public final class Collectives {
         else {
             return null;
         }
+    }
+
+    /**
+     * Intelligently merge the {@code from} collective {@code into} the other
+     * one, in place.
+     * 
+     * @param into
+     * @param from
+     */
+    public static void mergeInPlace(Map<String, Collection<Object>> into,
+            Map<String, Collection<Object>> from) {
+        into = merge(into, from);
     }
 
     /**
