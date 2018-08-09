@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Streams;
 
 /**
  * A Collective is a {@link Collection} of {@link Object objects} that can
@@ -34,6 +35,22 @@ import com.google.common.collect.Lists;
  * @author Jeff Nelson
  */
 public final class Collectives {
+
+    /**
+     * Intelligently merge two collective maps.
+     * 
+     * @param into
+     * @param from
+     * @return the merged map
+     */
+    public static Map<String, Collection<Object>> merge(
+            Map<String, Collection<Object>> into,
+            Map<String, Collection<Object>> from) {
+        return Streams
+                .concat(into.entrySet().stream(), from.entrySet().stream())
+                .collect(Collectors.toMap(Entry::getKey, Entry::getValue,
+                        Collectives::merge));
+    }
 
     /**
      * Intelligently merged collectives {@code a} and {@code b}.
