@@ -22,14 +22,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 /**
@@ -281,6 +285,23 @@ public class ReflectionTest {
                 method, Restricted.class));
     }
 
+    @Test
+    public void testGetTypeArguments() {
+        Assert.assertEquals(ImmutableSet.of(String.class), Reflection
+                .getTypeArguments("listOfString", ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableSet.of(A.class),
+                Reflection.getTypeArguments("setOfA", ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableSet.of(Integer.class, Boolean.class),
+                Reflection.getTypeArguments("mapIntegerToBoolean",
+                        ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableSet.of(), Reflection
+                .getTypeArguments("noGenerics", ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableSet.of(), Reflection.getTypeArguments(
+                "noGenericsCollection", ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableSet.of(B.class), Reflection
+                .getTypeArguments("collectionOfB", ClassWithGenerics.class));
+    }
+
     private static class A {
 
         private final String string;
@@ -405,5 +426,15 @@ public class ReflectionTest {
 
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Restricted {}
+
+    private class ClassWithGenerics {
+
+        private List<String> listOfString;
+        private Set<A> setOfA;
+        public Map<Integer, Boolean> mapIntegerToBoolean;
+        public Long noGenerics;
+        public Collection<?> noGenericsCollection;
+        protected Collection<B> collectionOfB;
+    }
 
 }

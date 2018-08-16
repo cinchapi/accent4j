@@ -21,8 +21,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.cinchapi.common.base.AnyObjects;
@@ -37,6 +41,7 @@ import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Verify;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -417,6 +422,60 @@ public final class Reflection {
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.wrapAsRuntimeException(e);
         }
+    }
+
+    /**
+     * Return a collection containing the type arguments for the provided
+     * {@code field}. If there are no type arguments, the collection that is
+     * returned is empty.
+     * 
+     * @param field
+     * @return the type arguments
+     */
+    @Nonnull
+    public static Collection<Class<?>> getTypeArguments(Field field) {
+        try {
+            ParameterizedType parameterized = (ParameterizedType) field
+                    .getGenericType();
+            Type[] types = parameterized.getActualTypeArguments();
+            Set<Class<?>> typeArgs = Sets
+                    .newLinkedHashSetWithExpectedSize(types.length);
+            for (Type type : types) {
+                typeArgs.add((Class<?>) type);
+            }
+            return typeArgs;
+        }
+        catch (ClassCastException e) {
+            return ImmutableSet.of();
+        }
+    }
+
+    /**
+     * Return a collection containing the type arguments for the provided
+     * {@code field} in {@code clazz}. If there are no type arguments, the
+     * collection that is returned is empty.
+     * 
+     * @param field
+     * @param clazz
+     * @return the type arguments
+     */
+    public static Collection<Class<?>> getTypeArguments(String field,
+            Class<?> clazz) {
+        return getTypeArguments(getDeclaredField(field, clazz));
+    }
+
+    /**
+     * Return a collection containing the type arguments for the provided
+     * {@code field} of the {@code object}'s class. If there are no type
+     * arguments, the collection that is returned is empty.
+     * 
+     * @param field
+     * @param object
+     * @return the type arguments
+     */
+    public static Collection<Class<?>> getTypeArguments(String field,
+            Object object) {
+        return getTypeArguments(getDeclaredField(field, object));
     }
 
     /**
