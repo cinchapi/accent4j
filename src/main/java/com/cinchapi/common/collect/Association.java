@@ -197,7 +197,7 @@ public abstract class Association extends AbstractMap<String, Object> {
             return value;
         }
     }
-    
+
     /**
      * Return a one-dimensional map where the keys in this {@link Association}
      * are flattened into paths and mapped to the values at the destination.
@@ -211,8 +211,13 @@ public abstract class Association extends AbstractMap<String, Object> {
         return flattened;
     }
 
+    /**
+     * Merge the contents of the {@code map} into this {@link Association}.
+     * 
+     * @param map
+     */
     public void merge(Map<String, Object> map) {
-
+        Associations.forEachFlattened(map, (key, value) -> set(key, value));
     }
 
     @Override
