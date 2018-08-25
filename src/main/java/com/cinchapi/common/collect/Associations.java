@@ -26,22 +26,6 @@ import java.util.function.BiConsumer;
  */
 public final class Associations {
 
-    private Associations() {/* no-init */}
-
-    /**
-     * Consume the flattened entries in the {@code map} using the
-     * {@code consumer}.
-     * 
-     * @param map
-     * @param consumer
-     */
-    public static void forEachFlattened(Map<String, Object> map,
-            BiConsumer<String, Object> consumer) {
-        map.forEach((key, value) -> {
-            flattenAndConsume(key, value, consumer);
-        });
-    }
-
     /**
      * Flatten the {@code value} using the {@code key} as an entrypoint and
      * consume the result using the {@code consumer}.
@@ -70,6 +54,22 @@ public final class Associations {
             consumer.accept(key, value);
         }
     }
+
+    /**
+     * Consume the flattened entries in the {@code map} using the
+     * {@code consumer}.
+     * 
+     * @param map
+     * @param consumer
+     */
+    public static void forEachFlattened(Map<String, Object> map,
+            BiConsumer<String, Object> consumer) {
+        map.forEach((key, value) -> {
+            flattenAndConsume(key, value, consumer);
+        });
+    }
+
+    private Associations() {/* no-init */}
 
     
 
