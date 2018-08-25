@@ -30,6 +30,7 @@ import com.google.common.collect.Maps;
  *
  * @author Jeff Nelson
  */
+@SuppressWarnings("deprecation")
 public class AnyMapsTest {
 
     @Test

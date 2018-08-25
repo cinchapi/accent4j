@@ -29,9 +29,9 @@ import com.google.common.collect.ImmutableMap;
  *
  * @author Jeff Nelson
  */
+@SuppressWarnings("deprecation")
 public class CollectivesTest {
 
-    @SuppressWarnings("deprecation")
     @Test
     public void testCollectivize() {
         Map<String, Object> map = ImmutableMap.of("a",
@@ -43,7 +43,6 @@ public class CollectivesTest {
         });
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void testMergeMap() {
         Collection<Object> merged = Collectives.merge(
