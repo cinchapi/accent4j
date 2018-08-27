@@ -127,13 +127,13 @@ public abstract class Association extends AbstractMap<String, Object> {
             // the same is returned.
             ((Map<String, Object>) from).forEach((key, value) -> {
                 ((Map<String, Object>) into).merge(key, value, (v1, v2) -> {
-                    return upsert(v1, v2);
+                    return upsert(v2, v1);
                 });
             });
             return into;
         }
         else {
-            return into != null ? into : from;
+            return from != null ? from : into;
         }
     }
 

@@ -22,6 +22,7 @@ import org.junit.Test;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 
 /**
  *
@@ -29,17 +30,18 @@ import com.google.common.collect.ImmutableMap;
  * @author Jeff Nelson
  */
 public class AssociationTest {
-    
+
     @Test
     public void testCreateAssociation() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
-                ImmutableMap.of("f",
-                        ImmutableMap.of("g", ImmutableList.of("foo"))), "f",
-                        ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
-                                ImmutableList.of(ImmutableMap.of("i",
-                                        ImmutableList.of("bar", "baz")))));
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
         Association assoc = Association.of(map);
         Assert.assertEquals(map.entrySet(), assoc.entrySet());
     }
@@ -49,17 +51,120 @@ public class AssociationTest {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
-                ImmutableMap.of("f",
-                        ImmutableMap.of("g", ImmutableList.of("foo"))), "f",
-                        ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
-                                ImmutableList.of(ImmutableMap.of("i",
-                                        ImmutableList.of("bar", "baz")))));
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
         Association assoc = Association.of(map);
         assoc.set("a", "bar");
-        assoc.set("e.f.g.1", "bar");
         Assert.assertEquals("bar", assoc.fetch("a"));
-        System.out.println(assoc);
-        System.out.println(assoc.flatten());
+    }
+
+    @Test
+    public void testSetB() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("b.1.e", "bar");
+        Assert.assertEquals(ImmutableMap.of("e", "bar"), assoc.fetch("b.1"));
+        Assert.assertEquals(
+                Lists.newArrayList("c", ImmutableMap.of("e", "bar")),
+                assoc.fetch("b"));
+    }
+
+    @Test
+    public void testSetC() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("c.1.e", "bar");
+        Assert.assertEquals("bar", assoc.fetch("c.1.e"));
+        Assert.assertNull(assoc.fetch("c.0"));
+        Assert.assertEquals(
+                Lists.newArrayList(null, ImmutableMap.of("e", "bar")),
+                assoc.fetch("c"));
+    }
+
+    @Test
+    public void testSetD() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("d.e", "bar");
+        Assert.assertEquals("bar", assoc.fetch("d.e"));
+    }
+
+    @Test
+    public void testSetE() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("d.1.e", "bar");
+        Assert.assertNull(assoc.fetch("d.e"));
+    }
+
+    @Test
+    public void testSetObjectValue() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("d.e", "bar");
+        Assert.assertEquals("bar", assoc.fetch("d.e"));
+        Assert.assertEquals(ImmutableMap.of("e", "bar"), assoc.fetch("d"));
+    }
+    
+    @Test
+    public void testSetObjectObject() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        assoc.set("d", ImmutableMap.of("e", "bar"));
+        Assert.assertEquals("bar", assoc.fetch("d.e"));
+        Assert.assertEquals(ImmutableMap.of("e", "bar"), assoc.fetch("d"));
     }
 
 }
