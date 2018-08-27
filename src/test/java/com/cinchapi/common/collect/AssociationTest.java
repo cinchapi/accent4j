@@ -47,7 +47,7 @@ public class AssociationTest {
     }
 
     @Test
-    public void testSetA() {
+    public void testSetValue() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
@@ -63,7 +63,7 @@ public class AssociationTest {
     }
 
     @Test
-    public void testSetB() {
+    public void testSetObjectCollectionValue() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
@@ -82,7 +82,7 @@ public class AssociationTest {
     }
 
     @Test
-    public void testSetC() {
+    public void testSetObjectCollectionValue2() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
@@ -102,7 +102,7 @@ public class AssociationTest {
     }
 
     @Test
-    public void testSetD() {
+    public void testSetObjectCollectionValue3() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
@@ -118,7 +118,7 @@ public class AssociationTest {
     }
 
     @Test
-    public void testSetE() {
+    public void testSetObjectCollectionValue4() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
                 ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
                 "e",
