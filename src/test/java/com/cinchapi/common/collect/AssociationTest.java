@@ -149,7 +149,7 @@ public class AssociationTest {
         Assert.assertEquals("bar", assoc.fetch("d.e"));
         Assert.assertEquals(ImmutableMap.of("e", "bar"), assoc.fetch("d"));
     }
-    
+
     @Test
     public void testSetObjectObject() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
@@ -165,6 +165,31 @@ public class AssociationTest {
         assoc.set("d", ImmutableMap.of("e", "bar"));
         Assert.assertEquals("bar", assoc.fetch("d.e"));
         Assert.assertEquals(ImmutableMap.of("e", "bar"), assoc.fetch("d"));
+    }
+
+    @Test
+    public void testPutIsSameAsSet() {
+        Association assoc1 = Association.of();
+        Association assoc2 = Association.of();
+        assoc1.put("a.1.b", ImmutableMap.of("c", "d"));
+        assoc2.set("a.1.b", ImmutableMap.of("c", "d"));
+        Assert.assertEquals("d", assoc1.fetch("a.1.b.c"));
+        Assert.assertEquals("d", assoc2.fetch("a.1.b.c"));
+    }
+
+    @Test
+    public void testPaths() {
+        Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
+                ImmutableList.of("c", "d"), "d", ImmutableMap.of("e", "foo"),
+                "e",
+                ImmutableMap
+                        .of("f", ImmutableMap.of("g", ImmutableList.of("foo"))),
+                "f",
+                ImmutableList.of(ImmutableMap.of("h", "foo", "i", "z"),
+                        ImmutableList.of(ImmutableMap.of("i",
+                                ImmutableList.of("bar", "baz")))));
+        Association assoc = Association.of(map);
+        System.out.println(assoc.paths());
     }
 
 }

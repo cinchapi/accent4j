@@ -152,6 +152,22 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     @Override
+    public boolean containsKey(Object key) {
+        return get(key) != null;
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        for(String path : paths()) {
+            Object stored = fetch(path);
+            if(stored.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public Set<Entry<String, Object>> entrySet() {
         return exploded.entrySet();
     }
@@ -211,6 +227,11 @@ public abstract class Association extends AbstractMap<String, Object> {
         return flattened;
     }
 
+    @Override
+    public Object get(Object key) {
+        return key instanceof String ? fetch((String) key) : null;
+    }
+
     /**
      * Merge the contents of the {@code map} into this {@link Association}.
      * 
@@ -218,6 +239,30 @@ public abstract class Association extends AbstractMap<String, Object> {
      */
     public void merge(Map<String, Object> map) {
         Associations.forEachFlattened(map, (key, value) -> set(key, value));
+    }
+    
+    /**
+     * Return a Set that contains all the fetchable paths in this
+     * {@link Association}.
+     * <p>
+     * The returned {@link Set} does not "read-through" to the underlying
+     * {@link Association} for subsequent changes.
+     * </p>
+     * 
+     * @return the paths
+     */
+    public Set<String> paths() {
+        Set<String> paths = Sets.newLinkedHashSet();
+        flatten().keySet().forEach(key -> {
+            String[] parts = key.split("\\.");
+            StringBuilder sb = new StringBuilder();
+            for (String path : parts) {
+                sb.append(path);
+                paths.add(sb.toString());
+                sb.append(".");
+            }
+        });
+        return paths;
     }
 
     @Override
