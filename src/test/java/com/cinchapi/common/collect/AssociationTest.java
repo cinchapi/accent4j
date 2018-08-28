@@ -192,4 +192,11 @@ public class AssociationTest {
         System.out.println(assoc.paths());
     }
 
+    @Test
+    public void testSetNullValue() {
+        Association assoc = Association.of();
+        assoc.set("foo", null);
+        Assert.assertTrue(true); // lack of Exception means we pass
+    }
+
 }

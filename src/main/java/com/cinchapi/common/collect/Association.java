@@ -126,9 +126,17 @@ public abstract class Association extends AbstractMap<String, Object> {
             // Note the #upsert #into the destination map, happens in-place and
             // the same is returned.
             ((Map<String, Object>) from).forEach((key, value) -> {
-                ((Map<String, Object>) into).merge(key, value, (v1, v2) -> {
-                    return upsert(v2, v1);
-                });
+                if(value == null) {
+                    // The merge function prevents upserting a null value, so
+                    // perform an explicit put as a workaround.
+                    ((Map<String, Object>) into).put(key, value);
+                }
+                else {
+                    ((Map<String, Object>) into).merge(key, value,
+                            (oldValue, newValue) -> {
+                                return upsert(newValue, oldValue);
+                            });
+                }
             });
             return into;
         }
@@ -158,7 +166,7 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public boolean containsValue(Object value) {
-        for(String path : paths()) {
+        for (String path : paths()) {
             Object stored = fetch(path);
             if(stored.equals(value)) {
                 return true;
@@ -240,7 +248,7 @@ public abstract class Association extends AbstractMap<String, Object> {
     public void merge(Map<String, Object> map) {
         Associations.forEachFlattened(map, (key, value) -> set(key, value));
     }
-    
+
     /**
      * Return a Set that contains all the fetchable paths in this
      * {@link Association}.
