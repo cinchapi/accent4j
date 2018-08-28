@@ -34,6 +34,7 @@ import com.google.common.collect.Streams;
  *
  * @author Jeff Nelson
  */
+@Deprecated
 public final class Collectives {
 
     /**

@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
  *
  * @author Jeff Nelson
  */
+@SuppressWarnings("deprecation")
 public class CollectivesTest {
 
     @Test

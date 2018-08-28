@@ -59,8 +59,15 @@ public final class AnyMaps {
      * 
      * @param map
      * @return a nested map
+     * @deprecated in favor of the {@link Association} framework. Create an
+     *             {@link Association} using {@link Association#of(Map)} with a
+     *             "flat" map. The map will be exploded, implicitly and
+     *             traversable using the {@link Association#fetch(String)}
+     *             method in a manner that is similar to the way the
+     *             {@link #navigate(String, Map)} method worked.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Deprecated
     public static Map<String, Object> explode(Map<String, Object> map) {
         Map<String, Object> exploded = Maps.newLinkedHashMap();
         map.forEach((key, value) -> {
@@ -155,8 +162,13 @@ public final class AnyMaps {
      * 
      * @param path a navigable path key (e.g. foo.bar.1.baz)
      * @return the value
+     * @deprecated in favor if the {@link Association} framework. Use
+     *             {@link Association#of(Map)} to create an {@link Association}
+     *             followed by {@link Association#fetch(String)} to query the
+     *             {@code path}
      */
     @SuppressWarnings("unchecked")
+    @Deprecated
     public static <T> T navigate(String path,
             Map<String, ? extends Object> map) {
         T value = (T) map.get(path); // First, see if the path has been directly
