@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -197,6 +198,16 @@ public class AssociationTest {
         Association assoc = Association.of();
         assoc.set("foo", null);
         Assert.assertTrue(true); // lack of Exception means we pass
+    }
+
+    @Test
+    public void testMergeConcatStrategy() {
+        Association assoc = Association.of();
+        List<String> values = ImmutableList.of("a", "b", "c", "d", "e");
+        values.forEach(value -> assoc.merge(ImmutableMap.of("foo", value),
+                MergeStrategies::concat));
+        Assert.assertEquals(ImmutableMap.of("foo",
+                ImmutableList.of("a", "b", "c", "d", "e")), assoc);
     }
 
 }

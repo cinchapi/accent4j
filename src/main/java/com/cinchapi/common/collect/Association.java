@@ -23,9 +23,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
 
 import com.cinchapi.common.base.Verify;
 import com.google.common.collect.Iterables;
@@ -43,6 +45,7 @@ import com.google.common.primitives.Ints;
  *
  * @author Jeff Nelson
  */
+@NotThreadSafe
 public abstract class Association extends AbstractMap<String, Object> {
 
     /**
@@ -241,12 +244,30 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
-     * Merge the contents of the {@code map} into this {@link Association}.
+     * Merge the contents of the {@code map} into this {@link Association} using
+     * the {@link MergeStrategies#theirs() theirs} merge strategy.
      * 
      * @param map
      */
     public void merge(Map<String, Object> map) {
-        Associations.forEachFlattened(map, (key, value) -> set(key, value));
+        merge(map, MergeStrategies::theirs);
+    }
+
+    /**
+     * Merge the contents of the {@code map} into this {@link Association} using
+     * the provided merge {@code strategy}.
+     * 
+     * @param map
+     * @param strategy
+     */
+    public void merge(Map<String, Object> map,
+            BiFunction<Object, Object, Object> strategy) {
+        Associations.forEachFlattened(map, (key, value) -> {
+            Object stored = get(key);
+            Object computed = stored == null ? value
+                    : strategy.apply(stored, value);
+            set(key, computed);
+        });
     }
 
     /**
