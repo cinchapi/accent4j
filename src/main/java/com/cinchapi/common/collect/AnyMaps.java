@@ -16,20 +16,16 @@
 package com.cinchapi.common.collect;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-
+import java.util.function.BiFunction;
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.Verify;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Streams;
 import com.google.common.primitives.Ints;
 
 /**
@@ -136,10 +132,23 @@ public final class AnyMaps {
      */
     public static Map<String, Object> merge(Map<String, Object> into,
             Map<String, Object> from) {
-        return Streams
-                .concat(into.entrySet().stream(), from.entrySet().stream())
-                .collect(Collectors.toMap(entry -> entry.getKey(),
-                        entry -> entry.getValue(), AnyMaps::mergeObject));
+        return merge(into, from, MergeStrategies::concat);
+    }
+
+    /**
+     * Merge the data {@code from} one {@link Map} {@code into} another one
+     * using the provided merge {@code strategy}.
+     * 
+     * @param into the Map to merge into
+     * @param from the Map to merge from
+     * @return the merged {@link Map}
+     */
+    public static Map<String, Object> merge(Map<String, Object> into,
+            Map<String, Object> from,
+            BiFunction<Object, Object, Object> strategy) {
+        Map<String, Object> merged = Maps.newHashMap(into);
+        mergeInPlace(merged, from, strategy);
+        return merged;
     }
 
     /**
@@ -151,8 +160,22 @@ public final class AnyMaps {
      */
     public static void mergeInPlace(Map<String, Object> into,
             Map<String, Object> from) {
+        mergeInPlace(into, from, MergeStrategies::concat);
+    }
+
+    /**
+     * Perform the {@link #merge(Map, Map)} of the data {@code from} the first
+     * map {@code into} the second one in-place using the provided merge
+     * {@code strategy}.
+     * 
+     * @param into
+     * @param from
+     */
+    public static void mergeInPlace(Map<String, Object> into,
+            Map<String, Object> from,
+            BiFunction<Object, Object, Object> strategy) {
         from.forEach((key, value) -> {
-            into.merge(key, value, AnyMaps::mergeObject);
+            into.merge(key, value, strategy);
         });
     }
 
@@ -235,27 +258,6 @@ public final class AnyMaps {
             else {
                 rename(key, newKey, map);
             }
-        }
-    }
-
-    /**
-     * Merge two objects together.
-     * 
-     * @param v1
-     * @param v2
-     * @return The "merged" object product.
-     */
-    @SuppressWarnings("unchecked")
-    private static Object mergeObject(Object v1, Object v2) {
-        if(v1 instanceof Collection && v2 instanceof Collection) {
-            return Collections.concat((Collection<Object>) v1,
-                    (Collection<Object>) v2);
-        }
-        else if(v1 instanceof Map && v2 instanceof Map) {
-            return merge((Map<String, Object>) v1, (Map<String, Object>) v2);
-        }
-        else {
-            return ImmutableList.of(v1, v2);
         }
     }
 
