@@ -18,7 +18,6 @@ package com.cinchapi.common.collect;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +30,6 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import com.cinchapi.common.base.Verify;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
@@ -68,84 +66,6 @@ public abstract class Association extends AbstractMap<String, Object> {
         Associations.forEachFlattened(map,
                 (key, value) -> association.set(key, value));
         return association;
-    }
-
-    /**
-     * "Upsert" {@code from} one object {@code into} another one. The nature of
-     * the implementation changes depending on the types of the two objects. In
-     * general, this method attempts to "merge" objects (depending upon a
-     * definition of merging that makes sense for the object type) in a manner
-     * that prefers {@code into} data if there's ever a conflict with
-     * {@code from} data. The rules of upsertion within this method are that
-     * <ul>
-     * <li>If the two objects don't have the same type, then {@code #into} is
-     * returned if it is not null; otherwise {@code from} is not
-     * {@code null}.</li>
-     * <li>If both objects are {@link Collection collections}, the items from
-     * {@code into} are preferred if there is a corresponding item in the same
-     * position in {@code from}. If the item at a position in {@code into} is
-     * {@code null}, but there is a non-null item in the corresponding position
-     * in {@code from}, the item in {@code from} is preferred.</li>
-     * <li>If both objects are {@link Map maps}, this function will perform a
-     * {@link Map#merge(String, Object, BiFunction} of the data in {@code from}
-     * to {@code into} with a merge function that recursively calls this
-     * method.</li>
-     * </ul>
-     * 
-     * 
-     * @param from
-     * @param into
-     * @return the object after the upset or {@code null} if both {@code from}
-     *         and {@code into} are null
-     */
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static Object upsert(Object from, Object into) {
-        if(from instanceof Collection && into instanceof Collection) {
-            Iterator<Object> fit = ((Collection<Object>) from).iterator();
-            Iterator<Object> iit = ((Collection<Object>) into).iterator();
-            Collection<Object> collection = from instanceof Set
-                    ? Sets.newLinkedHashSet()
-                    : Lists.newArrayList();
-            while (fit.hasNext()) {
-                if(iit.hasNext()) {
-                    Object f = fit.next();
-                    Object i = iit.next();
-                    collection.add(upsert(f, i));
-                }
-                else {
-                    break;
-                }
-            }
-            while (iit.hasNext()) {
-                collection.add(iit.next());
-            }
-            while (fit.hasNext()) {
-                collection.add(fit.next());
-            }
-            return collection;
-        }
-        else if(from instanceof Map && into instanceof Map) {
-            // Note the #upsert #into the destination map, happens in-place and
-            // the same is returned.
-            ((Map<String, Object>) from).forEach((key, value) -> {
-                if(value == null) {
-                    // The merge function prevents upserting a null value, so
-                    // perform an explicit put as a workaround.
-                    ((Map<String, Object>) into).put(key, value);
-                }
-                else {
-                    ((Map<String, Object>) into).merge(key, value,
-                            (oldValue, newValue) -> {
-                                return upsert(newValue, oldValue);
-                            });
-                }
-            });
-            return into;
-        }
-        else {
-            return from != null ? from : into;
-        }
     }
 
     /**
@@ -356,8 +276,8 @@ public abstract class Association extends AbstractMap<String, Object> {
                                                                  // itself is
                                                                  // begins with
                                                                  // a map.
-            upsert(map, exploded); // Upsert the #val into the exploded
-                                   // collection
+            MergeStrategies.upsert(exploded, map); // Upsert the #val into the
+                                                   // exploded collection
             return prev;
         }
         else {
