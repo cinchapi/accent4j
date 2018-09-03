@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -32,6 +33,20 @@ import com.cinchapi.common.base.validate.Check;
  * @author Jeff Nelson
  */
 public final class AnyObjects {
+
+    /**
+     * The custom {@link EmptyDefinition empty definitions} that are provided
+     * for classes.
+     */
+    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
+
+    static {
+        registerEmptyDefinition(String.class, string -> string.isEmpty());
+        registerEmptyDefinition(Iterable.class,
+                iterable -> !iterable.iterator().hasNext());
+        registerEmptyDefinition(Map.class, map -> map.isEmpty());
+        registerEmptyDefinition(Object[].class, object -> object.length == 0);
+    }
 
     /**
      * Check if {@code value} is {@code null} or semantically
@@ -135,7 +150,7 @@ public final class AnyObjects {
      * </p>
      * 
      * @param value the value to check for {@code null} or emptiness
-     * @return {@code true} if
+     * @return {@code true} if the value is considered null or empty
      */
     @SuppressWarnings("unchecked")
     public static <T> boolean isNullOrEmpty(T value) {
@@ -159,6 +174,62 @@ public final class AnyObjects {
                 }
                 return false;
             }
+        }
+    }
+
+    /**
+     * Return {@code true} if the possible nested {@code value} is not
+     * considered empty.
+     * <p>
+     * If the {@code value} is a {@link Collection}, it is considered to be not
+     * null or empty if at least one of its possibly nested items is not null or
+     * empty.
+     * </p>
+     * <p>
+     * If the {@code value} is a {@link Map}, it is considered to be not
+     * null or empty if at least one of its possibly nested values is not null
+     * or
+     * empty.
+     * </p>
+     * <p>
+     * Otherwise, the rules of {@link #isNullOrEmpty(Object)} apply.
+     * </p>
+     * 
+     * @param value
+     * @return {@code true} if the possibly nested value is considered null or
+     *         empty
+     */
+    @SuppressWarnings("rawtypes")
+    public static <T> boolean isNullOrEmptyNested(T value) {
+        if(value == null) {
+            return true;
+        }
+        else if(value instanceof Map) {
+            Map<?, ?> map = (Map) value;
+            for (Entry<?, ?> entry : map.entrySet()) {
+                if(!isNullOrEmptyNested(entry.getValue())) {
+                    return false;
+                }
+                else {
+                    continue;
+                }
+            }
+            return true;
+        }
+        else if(value instanceof Collection) {
+            Collection<?> collection = (Collection) value;
+            for (Object item : collection) {
+                if(!isNullOrEmptyNested(item)) {
+                    return false;
+                }
+                else {
+                    continue;
+                }
+            }
+            return true;
+        }
+        else {
+            return isNullOrEmpty(value);
         }
     }
 
@@ -191,20 +262,6 @@ public final class AnyObjects {
     public static <T> void registerEmptyDefinition(Class<T> clazz,
             EmptyDefinition<T> def) {
         defs.put(clazz, def);
-    }
-
-    /**
-     * The custom {@link EmptyDefinition empty definitions} that are provided
-     * for classes.
-     */
-    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
-
-    static {
-        registerEmptyDefinition(String.class, string -> string.isEmpty());
-        registerEmptyDefinition(Iterable.class,
-                iterable -> !iterable.iterator().hasNext());
-        registerEmptyDefinition(Map.class, map -> map.isEmpty());
-        registerEmptyDefinition(Object[].class, object -> object.length == 0);
     }
 
     private AnyObjects() {/* noinit */}
