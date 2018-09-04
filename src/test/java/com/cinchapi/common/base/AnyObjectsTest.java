@@ -25,7 +25,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.cinchapi.common.base.AnyObjects;
-import com.google.common.collect.ImmutableList;
 
 /**
  * Unit tests for {@link AnyObjects} functions.
@@ -56,11 +55,6 @@ public class AnyObjectsTest {
     public void testIsNullOrEmptySet() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(new HashSet<Object>()));
         Assert.assertTrue(AnyObjects.isNullOrEmpty(new TreeSet<Object>()));
-    }
-    
-    @Test
-    public void testIsNullOrEmptyNestedSet() {
-        Assert.assertTrue(AnyObjects.isNullOrEmptyNested(new HashSet<Object>(ImmutableList.of(""))));
     }
 
     @Test
