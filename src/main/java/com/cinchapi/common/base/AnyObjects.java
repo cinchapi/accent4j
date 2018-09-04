@@ -15,13 +15,10 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-
 import javax.annotation.Nullable;
 
 import com.cinchapi.common.base.validate.Check;
+import com.cinchapi.common.describe.Empty;
 
 /**
  * Helper functions
@@ -32,6 +29,11 @@ import com.cinchapi.common.base.validate.Check;
  * @author Jeff Nelson
  */
 public final class AnyObjects {
+
+    /**
+     * An {@link Empty} instance to implement empty checking methods.
+     */
+    private static Empty EMPTY = Empty.is();
 
     /**
      * Check if {@code value} is {@code null} or semantically
@@ -136,30 +138,12 @@ public final class AnyObjects {
      * 
      * @param value the value to check for {@code null} or emptiness
      * @return {@code true} if
+     * @deprecated use the {@link com.cinchapi.common.describe.Empty} framework
+     *             instead
      */
-    @SuppressWarnings("unchecked")
+    @Deprecated
     public static <T> boolean isNullOrEmpty(T value) {
-        if(value == null) {
-            return true;
-        }
-        else {
-            Class<T> clazz = (Class<T>) value.getClass();
-            EmptyDefinition<T> def = (EmptyDefinition<T>) defs.get(clazz);
-            if(def != null) {
-                return def.metBy(value);
-            }
-            else {
-                for (Entry<Class<?>, EmptyDefinition<?>> entry : defs
-                        .entrySet()) {
-                    Class<?> clz = entry.getKey();
-                    if(clz.isAssignableFrom(clazz)) {
-                        def = (EmptyDefinition<T>) entry.getValue();
-                        return def.metBy(value);
-                    }
-                }
-                return false;
-            }
-        }
+        return EMPTY.describes(value);
     }
 
     /**
@@ -187,24 +171,13 @@ public final class AnyObjects {
      * 
      * @param clazz the {@link Class} to register
      * @param def the {@link EmptyDefinition} to associate with {@code clazz}
+     * @deprecated use the {@link com.cinchapi.common.describe.Empty} framework
+     *             instead
      */
+    @Deprecated
     public static <T> void registerEmptyDefinition(Class<T> clazz,
             EmptyDefinition<T> def) {
-        defs.put(clazz, def);
-    }
-
-    /**
-     * The custom {@link EmptyDefinition empty definitions} that are provided
-     * for classes.
-     */
-    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
-
-    static {
-        registerEmptyDefinition(String.class, string -> string.isEmpty());
-        registerEmptyDefinition(Iterable.class,
-                iterable -> !iterable.iterator().hasNext());
-        registerEmptyDefinition(Map.class, map -> map.isEmpty());
-        registerEmptyDefinition(Object[].class, object -> object.length == 0);
+        EMPTY.define(clazz, object -> def.metBy(object));
     }
 
     private AnyObjects() {/* noinit */}

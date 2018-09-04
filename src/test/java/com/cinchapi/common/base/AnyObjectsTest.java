@@ -31,6 +31,7 @@ import com.cinchapi.common.base.AnyObjects;
  * 
  * @author Jeff Nelson
  */
+@SuppressWarnings("deprecation")
 public class AnyObjectsTest {
 
     @Test
