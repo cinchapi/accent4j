@@ -146,6 +146,25 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
+     * Return a possibly nested value from with the {@link Associaiton}, if it
+     * is present. Otherwise, return the {@code defaultValue}.
+     * <p>
+     * NOTE: The returned value may be {@code null} if this {@link Associaiton}
+     * permits the storage of {@code null} values.
+     * </p>
+     * 
+     * @param path a navigable path key (e.g. foo.bar.1.baz)
+     * @param defaultValue
+     * @return the associated value, if it exists or the {@code defaultValue}
+     */
+    @Nullable
+    public <T> T fetchOrDefault(String path, T defaultValue) {
+        T value;
+        return ((value = fetch(path)) != null || containsKey(path)) ? value
+                : null;
+    }
+
+    /**
      * Return a one-dimensional map where the keys in this {@link Association}
      * are flattened into paths and mapped to the values at the destination.
      * 
