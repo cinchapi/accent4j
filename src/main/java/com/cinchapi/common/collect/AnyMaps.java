@@ -141,6 +141,9 @@ public final class AnyMaps {
      * 
      * @param into the Map to merge into
      * @param from the Map to merge from
+     * @param strategy a {@link MergeStrategies merge strategy} to use when a
+     *            key in the {@code from} map already exists in the the
+     *            {@code into} map
      * @return the merged {@link Map}
      */
     public static Map<String, Object> merge(Map<String, Object> into,
