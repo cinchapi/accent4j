@@ -55,247 +55,17 @@ public class AnyStrings {
     private static final char PLACEHOLDER_END = '}';
 
     /**
-     * Wrap {@code string} within quotes if it is necessary to do so. Otherwise,
-     * return the original {@code string}.
+     * Perform a {@link String#compareToIgnoreCase(String) case insensitive
+     * comparison} between {@code s1} and {@code s2}.
      * 
-     * <p>
-     * The original {@code string} will be wrapped in quotes and returned as
-     * such if:
-     * <ul>
-     * <li>it is not already wrapped {@link #isWithinQuotes(String) within
-     * quotes}, and</li>
-     * <li>{@code delimiter} appears at least once</li>
-     * </ul>
-     * If those conditions are met, the original string will be wrapped in
-     * either
-     * <ul>
-     * <li>double quotes if a single quote appears in the original string,
-     * or</li>
-     * <li>single quotes if a double quote appears in the original string,
-     * or</li>
-     * <li>double quotes if both a single and double quote appear in the
-     * original string; furthermore, all instances of double quotes within the
-     * original string will be escaped</li>
-     * </ul>
-     * </p>
-     * 
-     * @param string the string to potentially quote
-     * @param delimiters the delimiters that determines whether quoting should
-     *            happen
-     * @return the original {@code string} or a properly quoted alternative
+     * @param s1
+     * @param s2
+     * @return the result of the comparison
      */
-    public static String ensureWithinQuotesIfNeeded(String string,
-            Character... delimiters) {
-        Set<Character> _delimiters = Sets.newHashSet(delimiters);
-        _delimiters.remove('\'');
-        _delimiters.remove('"');
-        boolean foundDouble = false;
-        boolean foundSingle = false;
-        boolean foundDelimiter = false;
-        StringBuilder escaped = new StringBuilder();
-        escaped.append('"');
-        if(!isWithinQuotes(string)) {
-            char[] chars = string.toCharArray();
-            for (int i = 0; i < chars.length; ++i) {
-                char c = chars[i];
-                if(_delimiters.contains(c)) {
-                    foundDelimiter = true;
-                }
-                else if(c == '"') {
-                    foundDouble = true;
-                    escaped.append('\\');
-                }
-                else if(c == '\'') {
-                    foundSingle = true;
-                }
-                escaped.append(c);
-            }
-            escaped.append('"');
-            if(foundDelimiter) {
-                if(foundDouble && foundSingle) {
-                    return escaped.toString();
-                }
-                else if(foundDouble) {
-                    return "'" + string + "'";
-                }
-                else { // foundSingle or found no quotes
-                    return "\"" + string + "\"";
-                }
-            }
-        }
-        return string;
+    public static int compareToIgnoreCase(String s1, String s2) {
+        return s1.compareToIgnoreCase(s2);
     }
 
-    /**
-     * <em>Inspired by the SLF4J logging framework!</em>
-     * <p>
-     * Take a {@code template} string that contains placeholders ({}) and inject
-     * each of the {@code args} in their place, respectively.
-     * </p>
-     * <p>
-     * This method behaves similarly to {@link MessageFormat#format(Object)}
-     * except the placeholders do not need to be numbered (i.e. "foo {} bar" vs
-     * "foo {0} bar"). In most cases, the implementation of this method is also
-     * much more efficient.
-     * </p>
-     * <p>
-     * If there are more placeholders than {@code args}, the extra placeholders
-     * will be retained formatted string.
-     * </p>
-     * <p>
-     * If there are more {@code args} than placeholders, the extra {@code args}
-     * will be placed at the end of the formatted string.
-     * </p>
-     * <p>
-     * If an {@link Exception} is included in the injected {@code args}, only
-     * the Exception's message will be included in the formatted. If you want to
-     * include the full stack trace of an Exception, place it as the last of the
-     * {@code args} and make sure that there is no correspond placeholder.
-     * <h2>Example (borrowed from the SLf4J docs)</h2>
-     * 
-     * <pre>
-     * String s = &quot;Hello world&quot;;
-     * try {
-     *     Integer i = Integer.valueOf(s);
-     * }
-     * catch (NumberFormatException e) {
-     *     System.out.println(AnyStrings.format(&quot;Failed to format {}&quot;, s, e));
-     * }
-     * </pre>
-     * 
-     * </p>
-     * 
-     * @param template a template that may or may not contain placeholders for
-     *            variable {@code args}
-     * @param args the values to inject in the {@code template} placeholders,
-     *            respectively
-     * @return the formatted string
-     */
-    public static String format(String template, Object... args) {
-        if(args == null || args.length == 0) {
-            return template;
-        }
-        else if(template.isEmpty()) {
-            return formatExtraArgs(new StringBuilder(), args, 0, args.length)
-                    .toString();
-        }
-        else {
-            StringBuilder sb = new StringBuilder();
-            char[] chars = template.toCharArray();
-            int templateLength = chars.length;
-            int argsLength = args.length;
-            int templateIndex = 0;
-            int argsIndex = 0;
-            int copyOffset = 0;
-            int copyLength = 0;
-            while (templateIndex < templateLength) {
-                char c = chars[templateIndex];
-                int next = templateIndex + 1;
-                char nextc = next < templateLength ? chars[next]
-                        : Characters.NULL;
-                if(c == Characters.ESCAPE && nextc == PLACEHOLDER_BEGIN) {
-                    // When escaping the placeholder, simply append any
-                    // characters that are currently buffered (see copyLength)
-                    // and then skip the escape character before proceeding
-                    if(copyLength > 0) {
-                        sb.append(chars, copyOffset, copyLength);
-                    }
-                    sb.append(chars, templateIndex + 1, 1); // append
-                                                            // PLACEHOLDER_BEGIN
-                                                            // so that we don't
-                                                            // execute the block
-                                                            // below on the next
-                                                            // loop
-                    templateIndex += 2;
-                    copyOffset = templateIndex;
-                    copyLength = 0;
-                }
-                else if(c == PLACEHOLDER_BEGIN && nextc == PLACEHOLDER_END
-                        && argsIndex < argsLength) {
-                    sb.append(chars, copyOffset, copyLength);
-                    sb.append(String.valueOf(args[argsIndex]));
-                    templateIndex = next + 1;
-                    ++argsIndex;
-                    copyOffset = templateIndex;
-                    copyLength = 0;
-                }
-                else {
-                    ++templateIndex;
-                    ++copyLength;
-                }
-            }
-            sb.append(chars, copyOffset, copyLength);
-            if(argsIndex < argsLength) {
-                // If there are remaining args that weren't represented in the
-                // template with variable markers, simply append them as a list
-                sb.append(": ");
-                formatExtraArgs(sb, args, argsIndex, argsLength);
-            }
-            return sb.toString();
-        }
-    }
-
-    /**
-     * Return {@code true} if {@code string} both starts and ends with single or
-     * double quotes.
-     * 
-     * @param string
-     * @return {@code true} if the string is between quotes
-     */
-    public static boolean isWithinQuotes(String string) {
-        if(string.length() > 2) {
-            char first = string.charAt(0);
-            if(first == '"' || first == '\'') {
-                char last = string.charAt(string.length() - 1);
-                return first == last;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Similar to the {@link String#valueOf(char)} method, but this one will
-     * return a cached copy of the string for frequently used characters.
-     * 
-     * @param c the character to convert
-     * @return a string of length 1 containing the input char
-     */
-    public static String valueOfCached(char c) {
-        if(c == '(') {
-            return "(";
-        }
-        else if(c == ')') {
-            return ")";
-        }
-        else {
-            return String.valueOf(c);
-        }
-    }
-
-    /**
-     * Add the {@code wrapper} character to the beginning and end of the
-     * {@code string} and escape any instance of the {@code wrapper} within the
-     * {@code string} with the specified {@code escape} character.
-     * 
-     * @param string
-     * @param wrapper
-     * @param escape
-     * @return the wrapped (and escaped, if necessary) string
-     */
-    public static String wrap(String string, char wrapper, char escape) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(wrapper);
-        char[] chars = string.toCharArray();
-        for (char c : chars) {
-            if(c == wrapper) {
-                sb.append(escape);
-            }
-            sb.append(c);
-        }
-        sb.append(wrapper);
-        return sb.toString();
-    }
-    
     /**
      * Ensure that {@code string} ends with {@code suffix} by appending it to
      * {@code string} if and only if it is not already the last sequence of
@@ -425,6 +195,78 @@ public class AnyStrings {
     }
 
     /**
+     * Wrap {@code string} within quotes if it is necessary to do so. Otherwise,
+     * return the original {@code string}.
+     * 
+     * <p>
+     * The original {@code string} will be wrapped in quotes and returned as
+     * such if:
+     * <ul>
+     * <li>it is not already wrapped {@link #isWithinQuotes(String) within
+     * quotes}, and</li>
+     * <li>{@code delimiter} appears at least once</li>
+     * </ul>
+     * If those conditions are met, the original string will be wrapped in
+     * either
+     * <ul>
+     * <li>double quotes if a single quote appears in the original string,
+     * or</li>
+     * <li>single quotes if a double quote appears in the original string,
+     * or</li>
+     * <li>double quotes if both a single and double quote appear in the
+     * original string; furthermore, all instances of double quotes within the
+     * original string will be escaped</li>
+     * </ul>
+     * </p>
+     * 
+     * @param string the string to potentially quote
+     * @param delimiters the delimiters that determines whether quoting should
+     *            happen
+     * @return the original {@code string} or a properly quoted alternative
+     */
+    public static String ensureWithinQuotesIfNeeded(String string,
+            Character... delimiters) {
+        Set<Character> _delimiters = Sets.newHashSet(delimiters);
+        _delimiters.remove('\'');
+        _delimiters.remove('"');
+        boolean foundDouble = false;
+        boolean foundSingle = false;
+        boolean foundDelimiter = false;
+        StringBuilder escaped = new StringBuilder();
+        escaped.append('"');
+        if(!isWithinQuotes(string)) {
+            char[] chars = string.toCharArray();
+            for (int i = 0; i < chars.length; ++i) {
+                char c = chars[i];
+                if(_delimiters.contains(c)) {
+                    foundDelimiter = true;
+                }
+                else if(c == '"') {
+                    foundDouble = true;
+                    escaped.append('\\');
+                }
+                else if(c == '\'') {
+                    foundSingle = true;
+                }
+                escaped.append(c);
+            }
+            escaped.append('"');
+            if(foundDelimiter) {
+                if(foundDouble && foundSingle) {
+                    return escaped.toString();
+                }
+                else if(foundDouble) {
+                    return "'" + string + "'";
+                }
+                else { // foundSingle or found no quotes
+                    return "\"" + string + "\"";
+                }
+            }
+        }
+        return string;
+    }
+
+    /**
      * Efficiently escape inner occurrences of each of the {@code characters}
      * within the {@code string}, if necessary.
      * <p>
@@ -488,44 +330,112 @@ public class AnyStrings {
     }
 
     /**
-     * Replace all instances of "confusable" unicode characters with a
-     * canoncial/normalized character.
+     * <em>Inspired by the SLF4J logging framework!</em>
      * <p>
-     * See <a href=
-     * "http://www.unicode.org/Public/security/revision-03/confusablesSummary.txt"
-     * >http://www.unicode.org/Public/security/revision-03/confusablesSummary.
-     * txt</a> for a list of characters that are considered to be confusable.
+     * Take a {@code template} string that contains placeholders ({}) and inject
+     * each of the {@code args} in their place, respectively.
+     * </p>
+     * <p>
+     * This method behaves similarly to {@link MessageFormat#format(Object)}
+     * except the placeholders do not need to be numbered (i.e. "foo {} bar" vs
+     * "foo {0} bar"). In most cases, the implementation of this method is also
+     * much more efficient.
+     * </p>
+     * <p>
+     * If there are more placeholders than {@code args}, the extra placeholders
+     * will be retained formatted string.
+     * </p>
+     * <p>
+     * If there are more {@code args} than placeholders, the extra {@code args}
+     * will be placed at the end of the formatted string.
+     * </p>
+     * <p>
+     * If an {@link Exception} is included in the injected {@code args}, only
+     * the Exception's message will be included in the formatted. If you want to
+     * include the full stack trace of an Exception, place it as the last of the
+     * {@code args} and make sure that there is no correspond placeholder.
+     * <h2>Example (borrowed from the SLf4J docs)</h2>
+     * 
+     * <pre>
+     * String s = &quot;Hello world&quot;;
+     * try {
+     *     Integer i = Integer.valueOf(s);
+     * }
+     * catch (NumberFormatException e) {
+     *     System.out.println(AnyStrings.format(&quot;Failed to format {}&quot;, s, e));
+     * }
+     * </pre>
+     * 
      * </p>
      * 
-     * @param string the {@link String} in which the replacements should occur
-     * @return a {@link String} free of confusable unicode characters
+     * @param template a template that may or may not contain placeholders for
+     *            variable {@code args}
+     * @param args the values to inject in the {@code template} placeholders,
+     *            respectively
+     * @return the formatted string
      */
-    public static String replaceUnicodeConfusables(String string) {
-        char[] chars = string.toCharArray();
-        for (int i = 0; i < chars.length; ++i) {
-            char c = chars[i];
-            switch (c) {
-            default:
-                break;
-            case 'ʺ':
-            case '˝':
-            case 'ˮ':
-            case '˶':
-            case 'ײ':
-            case '״':
-            case '“':
-            case '”':
-            case '‟':
-            case '″':
-            case '‶':
-            case '〃':
-            case '＂':
-                c = '"';
-                break;
-            }
-            chars[i] = c;
+    public static String format(String template, Object... args) {
+        if(args == null || args.length == 0) {
+            return template;
         }
-        return String.valueOf(chars);
+        else if(template.isEmpty()) {
+            return formatExtraArgs(new StringBuilder(), args, 0, args.length)
+                    .toString();
+        }
+        else {
+            StringBuilder sb = new StringBuilder();
+            char[] chars = template.toCharArray();
+            int templateLength = chars.length;
+            int argsLength = args.length;
+            int templateIndex = 0;
+            int argsIndex = 0;
+            int copyOffset = 0;
+            int copyLength = 0;
+            while (templateIndex < templateLength) {
+                char c = chars[templateIndex];
+                int next = templateIndex + 1;
+                char nextc = next < templateLength ? chars[next]
+                        : Characters.NULL;
+                if(c == Characters.ESCAPE && nextc == PLACEHOLDER_BEGIN) {
+                    // When escaping the placeholder, simply append any
+                    // characters that are currently buffered (see copyLength)
+                    // and then skip the escape character before proceeding
+                    if(copyLength > 0) {
+                        sb.append(chars, copyOffset, copyLength);
+                    }
+                    sb.append(chars, templateIndex + 1, 1); // append
+                                                            // PLACEHOLDER_BEGIN
+                                                            // so that we don't
+                                                            // execute the block
+                                                            // below on the next
+                                                            // loop
+                    templateIndex += 2;
+                    copyOffset = templateIndex;
+                    copyLength = 0;
+                }
+                else if(c == PLACEHOLDER_BEGIN && nextc == PLACEHOLDER_END
+                        && argsIndex < argsLength) {
+                    sb.append(chars, copyOffset, copyLength);
+                    sb.append(String.valueOf(args[argsIndex]));
+                    templateIndex = next + 1;
+                    ++argsIndex;
+                    copyOffset = templateIndex;
+                    copyLength = 0;
+                }
+                else {
+                    ++templateIndex;
+                    ++copyLength;
+                }
+            }
+            sb.append(chars, copyOffset, copyLength);
+            if(argsIndex < argsLength) {
+                // If there are remaining args that weren't represented in the
+                // template with variable markers, simply append them as a list
+                sb.append(": ");
+                formatExtraArgs(sb, args, argsIndex, argsLength);
+            }
+            return sb.toString();
+        }
     }
 
     /**
@@ -599,6 +509,24 @@ public class AnyStrings {
     }
 
     /**
+     * Return {@code true} if {@code string} both starts and ends with single or
+     * double quotes.
+     * 
+     * @param string
+     * @return {@code true} if the string is between quotes
+     */
+    public static boolean isWithinQuotes(String string) {
+        if(string.length() > 2) {
+            char first = string.charAt(0);
+            if(first == '"' || first == '\'') {
+                char last = string.charAt(string.length() - 1);
+                return first == last;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Concatenates the {@link Object#toString string} representation of all the
      * {@code args}, separated by the {@code separator} char in an efficient
      * manner.
@@ -660,6 +588,47 @@ public class AnyStrings {
      */
     public static String joinWithSpace(Object... args) {
         return join(' ', args);
+    }
+
+    /**
+     * Replace all instances of "confusable" unicode characters with a
+     * canoncial/normalized character.
+     * <p>
+     * See <a href=
+     * "http://www.unicode.org/Public/security/revision-03/confusablesSummary.txt"
+     * >http://www.unicode.org/Public/security/revision-03/confusablesSummary.
+     * txt</a> for a list of characters that are considered to be confusable.
+     * </p>
+     * 
+     * @param string the {@link String} in which the replacements should occur
+     * @return a {@link String} free of confusable unicode characters
+     */
+    public static String replaceUnicodeConfusables(String string) {
+        char[] chars = string.toCharArray();
+        for (int i = 0; i < chars.length; ++i) {
+            char c = chars[i];
+            switch (c) {
+            default:
+                break;
+            case 'ʺ':
+            case '˝':
+            case 'ˮ':
+            case '˶':
+            case 'ײ':
+            case '״':
+            case '“':
+            case '”':
+            case '‟':
+            case '″':
+            case '‶':
+            case '〃':
+            case '＂':
+                c = '"';
+                break;
+            }
+            chars[i] = c;
+        }
+        return String.valueOf(chars);
     }
 
     /**
@@ -876,6 +845,49 @@ public class AnyStrings {
         else {
             return null;
         }
+    }
+
+    /**
+     * Similar to the {@link String#valueOf(char)} method, but this one will
+     * return a cached copy of the string for frequently used characters.
+     * 
+     * @param c the character to convert
+     * @return a string of length 1 containing the input char
+     */
+    public static String valueOfCached(char c) {
+        if(c == '(') {
+            return "(";
+        }
+        else if(c == ')') {
+            return ")";
+        }
+        else {
+            return String.valueOf(c);
+        }
+    }
+
+    /**
+     * Add the {@code wrapper} character to the beginning and end of the
+     * {@code string} and escape any instance of the {@code wrapper} within the
+     * {@code string} with the specified {@code escape} character.
+     * 
+     * @param string
+     * @param wrapper
+     * @param escape
+     * @return the wrapped (and escaped, if necessary) string
+     */
+    public static String wrap(String string, char wrapper, char escape) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(wrapper);
+        char[] chars = string.toCharArray();
+        for (char c : chars) {
+            if(c == wrapper) {
+                sb.append(escape);
+            }
+            sb.append(c);
+        }
+        sb.append(wrapper);
+        return sb.toString();
     }
 
     /**
