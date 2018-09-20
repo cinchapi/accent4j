@@ -573,7 +573,7 @@ public final class Reflection {
         }
         catch (InvocationTargetException e) {
             throw CheckedExceptions
-                    .wrapAsRuntimeException((Exception) e.getTargetException());
+                    .wrapAsRuntimeException(e.getTargetException());
         }
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.wrapAsRuntimeException(e);
