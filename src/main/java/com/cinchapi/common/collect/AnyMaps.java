@@ -36,6 +36,20 @@ import com.google.common.primitives.Ints;
 public final class AnyMaps {
 
     /**
+     * Return a {@link Map} that contains the specified
+     * {@code key}/{@code value} pair.
+     * 
+     * @param key
+     * @param value
+     * @return the {@link Map}
+     */
+    public static <K, V> Map<K, V> create(K key, V value) {
+        LinkedHashMap<K, V> map = Maps.newLinkedHashMap();
+        map.put(key, value);
+        return map;
+    }
+
+    /**
      * Explode a "flat" map that contains navigable keys to a nested structure
      * that can be traversed using the {@link #navigate(String, Map)} method.
      * <p>
