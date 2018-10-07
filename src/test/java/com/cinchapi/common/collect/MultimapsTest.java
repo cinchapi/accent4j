@@ -37,6 +37,7 @@ public class MultimapsTest {
         mmap.put("foo", 1);
         mmap.put("bar", 2);
         mmap.put("bar", 3);
+        mmap.put("car", null);
         Map<String, Object> map = Multimaps
                 .asMapWithSingleValueWherePossible(mmap);
         Assert.assertEquals(1, map.get("foo"));

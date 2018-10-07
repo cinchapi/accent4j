@@ -16,10 +16,8 @@
 package com.cinchapi.common.collect;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Collectors;
-
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 
@@ -44,18 +42,22 @@ public final class Multimaps {
     public static <K> Map<K, Object> asMapWithSingleValueWherePossible(
             Multimap<K, Object> multimap) {
         return multimap.asMap().entrySet().stream()
-                .collect(Collectors.toMap(Entry::getKey, e -> {
-                    Collection<Object> value = e.getValue();
-                    if(value.isEmpty()) {
-                        return null;
-                    }
-                    else if(value.size() == 1) {
-                        return Iterables.getOnlyElement(value);
-                    }
-                    else {
-                        return value;
-                    }
-                }));
+                .collect(
+                        LinkedHashMap::new, (map, entry) -> map
+                                .put(entry.getKey(), flatten(entry.getValue())),
+                        Map::putAll);
+    }
+
+    private static Object flatten(Collection<Object> value) {
+        if(value.isEmpty()) {
+            return null;
+        }
+        else if(value.size() == 1) {
+            return Iterables.getOnlyElement(value);
+        }
+        else {
+            return value;
+        }
     }
 
     private Multimaps() {/* no-init */}
