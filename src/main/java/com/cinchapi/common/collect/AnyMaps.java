@@ -192,18 +192,7 @@ public final class AnyMaps {
             Map<String, Object> from,
             BiFunction<Object, Object, Object> strategy) {
         from.forEach((key, value) -> {
-            boolean merged = false;
-            while (!merged) {
-                if(into.containsKey(key)) {
-                    Object ours = into.get(key);
-                    merged = into.replace(key, ours,
-                            strategy.apply(ours, value));
-                }
-                else {
-                    merged = into.putIfAbsent(key,
-                            strategy.apply(null, value)) == null;
-                }
-            }
+            into.merge(key, value, strategy);
         });
     }
 

@@ -90,27 +90,24 @@ public final class MergeStrategies {
     }
 
     /**
-     * "Upsert" from {@code ours} into {@code theirs}.
-     * <p>
-     * The nature of the implementation changes depending on the types of the
-     * two objects. In general, this method attempts to "merge" objects
-     * (depending upon a definition of merging that makes sense for the object
-     * type) in a manner that prefers {@code theirs} if there's ever a
-     * conflict with {@code ours} data. The rules of upsertion within this
-     * method are that
-     * </p>
+     * "Upsert" {@code from} one object {@code into} another one. The nature of
+     * the implementation changes depending on the types of the two objects. In
+     * general, this method attempts to "merge" objects (depending upon a
+     * definition of merging that makes sense for the object type) in a manner
+     * that prefers {@code into} data if there's ever a conflict with
+     * {@code from} data. The rules of upsertion within this method are that
      * <ul>
-     * <li>If the two objects don't have the same type, then {@code #theirs} is
-     * returned if it is not null; otherwise {@code ours} is returned.</li>
+     * <li>If the two objects don't have the same type, then {@code #into} is
+     * returned if it is not null; otherwise {@code from} is not
+     * {@code null}.</li>
      * <li>If both objects are {@link Collection collections}, the items from
-     * {@code theirs} are preferred if there is a corresponding item in the same
-     * position in {@code ours}. If the item at a position in {@code theirs} is
+     * {@code into} are preferred if there is a corresponding item in the same
+     * position in {@code from}. If the item at a position in {@code into} is
      * {@code null}, but there is a non-null item in the corresponding position
-     * in {@code ours}, the item in {@code ours} is preferred.</li>
+     * in {@code from}, the item in {@code from} is preferred.</li>
      * <li>If both objects are {@link Map maps}, this function will perform a
-     * {@link Map#merge(String, Object, BiFunction} of the data in
-     * {@code theirs}
-     * to {@code ours} with a merge function that recursively calls this
+     * {@link Map#merge(String, Object, BiFunction} of the data in {@code from}
+     * to {@code into} with a merge function that recursively calls this
      * method.</li>
      * </ul>
      * 
@@ -118,8 +115,8 @@ public final class MergeStrategies {
      * @param theirs
      * 
      * 
-     * @return the object after the upset or {@code null} if both {@code theirs}
-     *         and {@code ours} are null
+     * @return the object after the upset or {@code null} if both {@code from}
+     *         and {@code into} are null
      */
     @SuppressWarnings("unchecked")
     @Nullable
