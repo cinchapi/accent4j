@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableMap;
@@ -126,7 +127,7 @@ public class AnyMapsTest {
         Assert.assertEquals(1,
                 ((List<?>) exploded.get("AUTHORIZED_KEYS")).size());
     }
-    
+
     @Test
     public void testMergeNullValueTheirs() {
         Map<String, Object> from = AnyMaps.create("foo", null);
@@ -136,7 +137,7 @@ public class AnyMapsTest {
         AnyMaps.mergeInPlace(into, from, MergeStrategies::theirs);
         Assert.assertNull(into.get("foo"));
     }
-    
+
     @Test
     public void testMergeNullValueOurs() {
         Map<String, Object> from = AnyMaps.create("foo", null);
@@ -146,7 +147,7 @@ public class AnyMapsTest {
         AnyMaps.mergeInPlace(into, from, MergeStrategies::ours);
         Assert.assertEquals(1, into.get("foo"));
     }
-    
+
     @Test
     public void testMergeNullValueUpsert() {
         Map<String, Object> from = AnyMaps.create("foo", null);
@@ -154,6 +155,20 @@ public class AnyMapsTest {
         into.put("bar", 1);
         AnyMaps.mergeInPlace(into, from, MergeStrategies::upsert);
         Assert.assertNull(into.get("foo"));
+    }
+
+    @Test
+    @Ignore
+    public void testMergeNullValueConcat() {
+        Map<String, Object> from = AnyMaps.create("foo", null);
+        Map<String, Object> into = Maps.newLinkedHashMap();
+        into.put("bar", 1);
+        AnyMaps.mergeInPlace(into, from, MergeStrategies::concat);
+        // Assert.assertNull(into.get("foo"));
+        System.out.println(into);
+        // TODO: not sure how to handle this case...What's the best approach to
+        // take when an explicit null value is being concatted with an implicit
+        // null value?
     }
 
 }
