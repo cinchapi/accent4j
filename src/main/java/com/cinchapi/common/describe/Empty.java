@@ -49,6 +49,18 @@ public class Empty extends Adjective {
     }
 
     /**
+     * Alias for {@link Empty#is()}.
+     * <p>
+     * Returns the default definition of {@link Empty}.
+     * </p>
+     * 
+     * @return the {@link Empty} instance
+     */
+    public static Empty ness() {
+        return is();
+    }
+
+    /**
      * Create an {@link Empty} instance with the {@code check} for the specified
      * {@code clazz}. More definitions can be added using the
      * {@link #define(Class, Check)} method.
