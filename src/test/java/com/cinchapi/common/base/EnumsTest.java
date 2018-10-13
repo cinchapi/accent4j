@@ -16,7 +16,6 @@
 package com.cinchapi.common.base;
 
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import org.junit.Assert;
 import org.junit.Test;
