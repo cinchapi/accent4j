@@ -5,6 +5,7 @@
 * The `Empty` adjective is provided. By default, `Empty` describes a null value, an empty String, an empty Iterable, or an empty Array.
 * Deprecated the `AnyObjects#isNullOrEmpty`* and `AnyObjects#registerEmptyDefinition` methods in favor of using `Empty` instances when needed. These methods should be avoid because they rely on static state that can cause global conflicts. 
 * Added `Sequences` utility class containing operations for `Iterable` and `Array` objects.
+* Added `Enums` utility class with functions to parse enums from values while ignoring `toString` case and/or using custom logic.
 
 #### Version 1.1.0 (September 3, 2018)
 * Added the `Association` data type. An `Association` is a nested mapping encapsulated within a `Map<String, Object>` that has custom logic for handling navigable traversal paths (e.g. keys that use periods (e.g. `.` to indicate traversing from one level within the Map to a deeper level (e.g. a nested collection or Map))).
