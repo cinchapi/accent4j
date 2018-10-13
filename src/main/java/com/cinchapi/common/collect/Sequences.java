@@ -16,7 +16,15 @@
 package com.cinchapi.common.collect;
 
 import java.lang.reflect.Array;
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Streams;
 
 /**
  * Utility functions for dealing with sequences.
@@ -66,6 +74,41 @@ public final class Sequences {
         else {
             throw new IllegalArgumentException(
                     sequence + "is not a valid sequence");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> boolean contains(Object sequence, T element) {
+        Preconditions.checkArgument(isSequence(sequence),
+                sequence + " is not a valid sequence");
+        if(sequence instanceof Iterable) {
+            return Iterables.contains((Iterable<T>) sequence, element);
+        }
+        else {
+            return stream(sequence).filter(Predicate.isEqual(element))
+                    .count() > 0;
+        }
+    }
+
+    /**
+     * Return a {@link Stream} for the {@code sequence}.
+     * 
+     * @param sequence
+     * @return a stream
+     * @throws IllegalArgumentException if the parameter is not a
+     *             {@link #isSequence(Object) sequence}
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Stream<T> stream(Object sequence) {
+        Preconditions.checkArgument(isSequence(sequence),
+                sequence + " is not a valid sequence");
+        if(sequence instanceof Iterable) {
+            return Streams.stream((Iterable<T>) sequence);
+        }
+        else {
+            List<T> gathered = Lists.newArrayList();
+            forEach(sequence, e -> gathered.add((T) e));
+            return gathered.stream();
         }
     }
 

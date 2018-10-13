@@ -36,6 +36,20 @@ import com.google.common.primitives.Ints;
 public final class AnyMaps {
 
     /**
+     * Return a {@link Map} that contains the specified
+     * {@code key}/{@code value} pair.
+     * 
+     * @param key
+     * @param value
+     * @return the {@link Map}
+     */
+    public static <K, V> Map<K, V> create(K key, V value) {
+        LinkedHashMap<K, V> map = Maps.newLinkedHashMap();
+        map.put(key, value);
+        return map;
+    }
+
+    /**
      * Explode a "flat" map that contains navigable keys to a nested structure
      * that can be traversed using the {@link #navigate(String, Map)} method.
      * <p>
@@ -141,6 +155,9 @@ public final class AnyMaps {
      * 
      * @param into the Map to merge into
      * @param from the Map to merge from
+     * @param strategy a {@link MergeStrategies merge strategy} to use when a
+     *            key in the {@code from} map already exists in the the
+     *            {@code into} map
      * @return the merged {@link Map}
      */
     public static Map<String, Object> merge(Map<String, Object> into,
@@ -175,7 +192,23 @@ public final class AnyMaps {
             Map<String, Object> from,
             BiFunction<Object, Object, Object> strategy) {
         from.forEach((key, value) -> {
-            into.merge(key, value, strategy);
+            if(value == null) {
+                boolean merged = false;
+                while (!merged) {
+                    if(into.containsKey(key)) {
+                        Object ours = into.get(key);
+                        merged = into.replace(key, ours,
+                                strategy.apply(ours, value));
+                    }
+                    else {
+                        merged = into.putIfAbsent(key,
+                                strategy.apply(null, value)) == null;
+                    }
+                }
+            }
+            else {
+                into.merge(key, value, strategy);
+            }
         });
     }
 

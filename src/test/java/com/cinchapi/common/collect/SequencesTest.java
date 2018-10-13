@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.collect;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Assert;
@@ -23,6 +24,7 @@ import org.junit.Test;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
 /**
  * Unit tests for {@link Sequences}
@@ -51,6 +53,21 @@ public class SequencesTest {
         AtomicInteger actual = new AtomicInteger(0);
         Sequences.<Integer> forEach(sequence, item -> actual.addAndGet(item));
         Assert.assertEquals(expected, actual.get());
+    }
+
+    @Test
+    public void testContainsArray() {
+        int[] sequence = { 2, 3, 9, 1, 10, 110, 1 };
+        Assert.assertTrue(Sequences.contains(sequence, 9));
+        Assert.assertFalse(Sequences.contains(sequence, 90));
+    }
+
+    @Test
+    public void testContainsIterable() {
+        Set<Integer> sequence = Sets
+                .newHashSet(new Integer[] { 2, 3, 9, 1, 10, 110, 1 });
+        Assert.assertTrue(Sequences.contains(sequence, 9));
+        Assert.assertFalse(Sequences.contains(sequence, 90));
     }
 
 }

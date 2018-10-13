@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
 import com.cinchapi.common.base.validate.Check;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * A customizable {@link Adjective} that describes emptiness for objects.
@@ -48,6 +49,31 @@ public class Empty extends Adjective {
     }
 
     /**
+     * Alias for {@link Empty#is()}.
+     * <p>
+     * Returns the default definition of {@link Empty}.
+     * </p>
+     * 
+     * @return the {@link Empty} instance
+     */
+    public static Empty ness() {
+        return is();
+    }
+
+    /**
+     * Create an {@link Empty} instance with the {@code check} for the specified
+     * {@code clazz}. More definitions can be added using the
+     * {@link #define(Class, Check)} method.
+     * 
+     * @param clazz
+     * @param check
+     * @return the {@link Empty} instance
+     */
+    public static <T> Empty is(Class<T> clazz, Check<T> check) {
+        return is(ImmutableMap.of(clazz, check));
+    }
+
+    /**
      * Create an {@link Empty} instance with the provided set of
      * {@code definitions}. More definitions can be added using the
      * {@link #define(Class, Check)} method.
@@ -68,7 +94,6 @@ public class Empty extends Adjective {
 
     @Override
     public <T> boolean describes(@Nullable T object) {
-        // Add logic to declare null values and 0-length arrays as empty.
         if(object == null) {
             return true;
         }
