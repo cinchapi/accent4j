@@ -209,5 +209,10 @@ public class AssociationTest {
         Assert.assertEquals(ImmutableMap.of("foo",
                 ImmutableList.of("a", "b", "c", "d", "e")), assoc);
     }
+    
+    @Test
+    public void testFetchOrDefault() {
+        Assert.assertEquals("foo", Association.of().fetchOrDefault("foo.bar.1.baz", "foo"));
+    }
 
 }

@@ -161,7 +161,7 @@ public abstract class Association extends AbstractMap<String, Object> {
     public <T> T fetchOrDefault(String path, T defaultValue) {
         T value;
         return ((value = fetch(path)) != null || containsKey(path)) ? value
-                : null;
+                : defaultValue;
     }
 
     /**
