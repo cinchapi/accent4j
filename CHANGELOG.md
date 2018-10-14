@@ -8,6 +8,7 @@
 * Added `Enums` utility class with functions to parse enums from values while ignoring `toString` case and/or using custom logic.
 * Added the `Association#ensure` static factory method that only creates a new `Association` from a `Map` if the `Map` is not already an `Association`. Otherwise, the input instance is returned.
 * Improved the efficiency of creating a new `Association` instance from an existing instance.
+* Added a `TriFunction` functional interface that is a three-arity specialization of a `Function`.
 
 #### Version 1.1.0 (September 3, 2018)
 * Added the `Association` data type. An `Association` is a nested mapping encapsulated within a `Map<String, Object>` that has custom logic for handling navigable traversal paths (e.g. keys that use periods (e.g. `.` to indicate traversing from one level within the Map to a deeper level (e.g. a nested collection or Map))).
