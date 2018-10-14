@@ -47,6 +47,24 @@ import com.google.common.primitives.Ints;
 public abstract class Association extends AbstractMap<String, Object> {
 
     /**
+     * Ensure that the {@code map} is already an {@link Association} or create a
+     * new {@link Association} that contains all of the contents in {@code map}.
+     * <p>
+     * Unlike the {@link #of(Map)} factory, this one isn't guaranteed to create
+     * a new object that has a distinct state from the input. In particular, if
+     * the input is already an {@link Association}, the value returned from this
+     * factory will be the same instance. Otherwise, a new object is returned.
+     * </p>
+     * 
+     * @param map
+     * @return an {@link Association} containing all of the data in the
+     *         {@code map}
+     */
+    public static Association ensure(Map<String, Object> map) {
+        return map instanceof Association ? (Association) map : of(map);
+    }
+
+    /**
      * Return an empty {@link Association}.
      * 
      * @return the new {@link Association}
@@ -58,13 +76,30 @@ public abstract class Association extends AbstractMap<String, Object> {
     /**
      * Return an {@link Association} that contains the data in the {@code map},
      * to facilitate path traversals.
+     * <p>
+     * NOTE: The returned {@link Association} DOES NOT read through to the
+     * provided {@code map} and the state of both structures will immediately
+     * diverge.
+     * </p>
      * 
-     * @return the new {@link Association}
+     * @return the new {@link Association} containing all of the data in the
+     *         {@code map}
      */
     public static Association of(Map<String, Object> map) {
         LinkedHashAssociation association = new LinkedHashAssociation();
-        Associations.forEachFlattened(map,
-                (key, value) -> association.set(key, value));
+        if(map instanceof Association) {
+            ((Association) association).exploded = new LinkedHashMap<>(
+                    ((Association) map).exploded);
+        }
+        else {
+            // NOTE: The provided #map cannot be directly assigned as the
+            // #exploded member of the created Association because it is
+            // necessary to flatten the input map and go through the #set
+            // routine to ensure that any nested containers are properly
+            // flattened and made mutable.
+            Associations.forEachFlattened(map,
+                    (key, value) -> association.set(key, value));
+        }
         return association;
     }
 
@@ -73,7 +108,7 @@ public abstract class Association extends AbstractMap<String, Object> {
      * maintained in exploded form to support efficient retrieval of partial
      * paths.
      */
-    private final Map<String, Object> exploded;
+    private Map<String, Object> exploded;
 
     /**
      * Construct a new instance.
