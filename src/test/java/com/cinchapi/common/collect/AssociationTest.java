@@ -214,5 +214,21 @@ public class AssociationTest {
     public void testFetchOrDefault() {
         Assert.assertEquals("foo", Association.of().fetchOrDefault("foo.bar.1.baz", "foo"));
     }
+    
+    @Test
+    public void testAssociationOfAssociation() {
+        Association assoc = Association.of();
+        assoc.set("a.b", 1);
+        assoc.set("b", true);
+        assoc.set("a.b.1", false);
+        assoc.set("foo", "bar");
+        Association assoc2 = Association.of(assoc);
+        Assert.assertEquals(assoc, assoc2);
+        int hashCode = assoc2.hashCode();
+        assoc.set("foo", "FOO");
+        Assert.assertNotEquals(assoc, assoc2);
+        Assert.assertEquals(hashCode, assoc2.hashCode());
+        Assert.assertNotEquals(hashCode, assoc.hashCode());
+    }
 
 }

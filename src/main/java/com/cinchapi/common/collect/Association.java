@@ -58,13 +58,29 @@ public abstract class Association extends AbstractMap<String, Object> {
     /**
      * Return an {@link Association} that contains the data in the {@code map},
      * to facilitate path traversals.
+     * <p>
+     * NOTE: The returned {@link Association} DOES NOT read through to the
+     * provided {@code map} and the state of both structures will immediately
+     * diverge.
+     * </p>
      * 
      * @return the new {@link Association}
      */
     public static Association of(Map<String, Object> map) {
         LinkedHashAssociation association = new LinkedHashAssociation();
-        Associations.forEachFlattened(map,
-                (key, value) -> association.set(key, value));
+        if(map instanceof Association) {
+            ((Association) association).exploded = new LinkedHashMap<>(
+                    ((Association) map).exploded);
+        }
+        else {
+            // NOTE: The provided #map cannot be directly assigned as the
+            // #exploded member of the created Association because it is
+            // necessary to flatten the input map and go through the #set
+            // routine to ensure that any nested containers are properly
+            // flattened and made mutable.
+            Associations.forEachFlattened(map,
+                    (key, value) -> association.set(key, value));
+        }
         return association;
     }
 
@@ -73,7 +89,7 @@ public abstract class Association extends AbstractMap<String, Object> {
      * maintained in exploded form to support efficient retrieval of partial
      * paths.
      */
-    private final Map<String, Object> exploded;
+    private Map<String, Object> exploded;
 
     /**
      * Construct a new instance.
