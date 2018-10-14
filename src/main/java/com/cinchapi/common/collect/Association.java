@@ -47,6 +47,24 @@ import com.google.common.primitives.Ints;
 public abstract class Association extends AbstractMap<String, Object> {
 
     /**
+     * Ensure that the {@code map} is already an {@link Association} or create a
+     * new {@link Association} that contains all of the contents in {@code map}.
+     * <p>
+     * Unlike the {@link #of(Map)} factory, this one isn't guaranteed to create
+     * a new object that has a distinct state from the input. In particular, if
+     * the input is already an {@link Association}, the value returned from this
+     * factory will be the same instance. Otherwise, a new object is returned.
+     * </p>
+     * 
+     * @param map
+     * @return an {@link Association} containing all of the data in the
+     *         {@code map}
+     */
+    public static Association ensure(Map<String, Object> map) {
+        return map instanceof Association ? (Association) map : of(map);
+    }
+
+    /**
      * Return an empty {@link Association}.
      * 
      * @return the new {@link Association}
@@ -64,7 +82,8 @@ public abstract class Association extends AbstractMap<String, Object> {
      * diverge.
      * </p>
      * 
-     * @return the new {@link Association}
+     * @return the new {@link Association} containing all of the data in the
+     *         {@code map}
      */
     public static Association of(Map<String, Object> map) {
         LinkedHashAssociation association = new LinkedHashAssociation();

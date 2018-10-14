@@ -230,5 +230,15 @@ public class AssociationTest {
         Assert.assertEquals(hashCode, assoc2.hashCode());
         Assert.assertNotEquals(hashCode, assoc.hashCode());
     }
+    
+    @Test
+    public void testAssociationEnsure() {
+        Association assoc = Association.of();
+        Map<String, Object> map = ImmutableMap.of();
+        Association a = Association.ensure(assoc);
+        Association b = Association.ensure(map);
+        Assert.assertSame(assoc, a);
+        Assert.assertNotSame(assoc, b);
+    }
 
 }
