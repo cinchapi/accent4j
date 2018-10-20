@@ -19,8 +19,10 @@ package com.cinchapi.common.base.validate;
  * A function that determines whether a {@code value} passes some test.
  * 
  * @author Jeff Nelson
+ * @deprecated use {@link Predicate} instead
  */
 @FunctionalInterface
+@Deprecated
 public interface Check<T> {
 
     /**

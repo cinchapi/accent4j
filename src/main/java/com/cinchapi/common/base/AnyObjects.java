@@ -15,9 +15,10 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.function.Predicate;
+
 import javax.annotation.Nullable;
 
-import com.cinchapi.common.base.validate.Check;
 import com.cinchapi.common.describe.Empty;
 
 /**
@@ -78,8 +79,8 @@ public final class AnyObjects {
      * @return {@code theDefault} or {@code preferred} value
      */
     public static <T> T defaultUnless(T theDefault, T preferred,
-            Check<T> preferredCheck) {
-        return preferredCheck.passes(preferred) ? preferred : theDefault;
+            Predicate<T> preferredCheck) {
+        return preferredCheck.test(preferred) ? preferred : theDefault;
     }
 
     /**
@@ -116,9 +117,9 @@ public final class AnyObjects {
      */
     @SafeVarargs
     @Nullable
-    public static <T> T firstThat(Check<T> check, T... candidates) {
+    public static <T> T firstThat(Predicate<T> check, T... candidates) {
         for (T candidate : candidates) {
-            if(check.passes(candidate)) {
+            if(check.test(candidate)) {
                 return candidate;
             }
             else {
@@ -153,8 +154,8 @@ public final class AnyObjects {
      * @param check the {@link Check} to run
      * @return {@code null} or {@code value}
      */
-    public static <T> T nullUnless(T value, Check<T> check) {
-        return check.passes(value) ? value : null;
+    public static <T> T nullUnless(T value, Predicate<T> check) {
+        return check.test(value) ? value : null;
     }
 
     /**

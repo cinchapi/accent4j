@@ -17,10 +17,10 @@ package com.cinchapi.common.describe;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.Predicate;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
-import com.cinchapi.common.base.validate.Check;
 import com.google.common.collect.Maps;
 
 /**
@@ -38,7 +38,7 @@ public abstract class Adjective {
     /**
      * The provided definitions.
      */
-    private Map<Class<?>, Check<?>> definitions = Maps.newHashMap();
+    private Map<Class<?>, Predicate<?>> definitions = Maps.newHashMap();
 
     /**
      * Provide a definition of this {@link Adjective} with respect to objects of
@@ -47,7 +47,7 @@ public abstract class Adjective {
      * @param clazz
      * @param definition
      */
-    public <T> void define(Class<T> clazz, Check<T> definition) {
+    public <T> void define(Class<T> clazz, Predicate<T> definition) {
         definitions.put(clazz, definition);
     }
 
@@ -56,7 +56,7 @@ public abstract class Adjective {
      * {@code object}.
      * <p>
      * An {@link Adjective} describes an object if a
-     * {@link #define(Class, Check) definition} has been provided for the
+     * {@link #define(Class, Predicate) definition} has been provided for the
      * object's class or an ancestor class. If no applicable definition exists,
      * this method returns {@code false}.
      * </p>
@@ -68,20 +68,21 @@ public abstract class Adjective {
     @SuppressWarnings("unchecked")
     public <T> boolean describes(T object) {
         Class<T> clazz = (Class<T>) object.getClass();
-        Check<? super T> definition = (Check<? super T>) definitions.get(clazz);
+        Predicate<? super T> definition = (Predicate<? super T>) definitions
+                .get(clazz);
         if(definition == null) { // See if an ancestor has been defined and pick
                                  // the closest one...
             Class<? super T> ancestor = null;
-            for (Entry<Class<?>, Check<?>> entry : definitions.entrySet()) {
+            for (Entry<Class<?>, Predicate<?>> entry : definitions.entrySet()) {
                 Class<?> cls = entry.getKey();
                 if(cls.isAssignableFrom(clazz) && (ancestor == null
                         || ancestor.isAssignableFrom(cls))) {
                     ancestor = (Class<? super T>) cls;
-                    definition = (Check<? super T>) entry.getValue();
+                    definition = (Predicate<? super T>) entry.getValue();
                 }
             }
         }
-        return definition != null ? definition.passes(object) : false;
+        return definition != null ? definition.test(object) : false;
     }
 
 }

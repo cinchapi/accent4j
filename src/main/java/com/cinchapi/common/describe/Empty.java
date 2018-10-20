@@ -17,11 +17,11 @@ package com.cinchapi.common.describe;
 
 import java.lang.reflect.Array;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
-import com.cinchapi.common.base.validate.Check;
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -69,7 +69,7 @@ public class Empty extends Adjective {
      * @param check
      * @return the {@link Empty} instance
      */
-    public static <T> Empty is(Class<T> clazz, Check<T> check) {
+    public static <T> Empty is(Class<T> clazz, Predicate<T> check) {
         return is(ImmutableMap.of(clazz, check));
     }
 
@@ -82,7 +82,7 @@ public class Empty extends Adjective {
      * @return the {@link Empty} instance
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static Empty is(Map<Class, Check> definitions) {
+    public static Empty is(Map<Class, Predicate> definitions) {
         Empty empty = new Empty();
         definitions.forEach((clazz, definition) -> {
             empty.define(clazz, definition);
