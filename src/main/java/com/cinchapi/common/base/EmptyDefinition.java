@@ -19,8 +19,10 @@ package com.cinchapi.common.base;
  * A semantic definition of "empty" for all objects of a specific type.
  * 
  * @author Jeff Nelson
+ * @deprecated see the {@link com.cinchapi.describe.Empty} construct for preferred usage
  */
 @FunctionalInterface
+@Deprecated
 public interface EmptyDefinition<T> {
 
     /**
