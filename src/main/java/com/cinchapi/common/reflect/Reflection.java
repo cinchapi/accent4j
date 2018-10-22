@@ -479,6 +479,24 @@ public final class Reflection {
     }
 
     /**
+     * Implementation of {@link ClassLoader#loadClass(String)} that throws an
+     * {@link RuntimeException} instead of a checked exception.
+     * 
+     * @param name
+     * @param classLoader
+     * @return the loaded class
+     */
+    public static Class<?> loadClassQuietly(String name,
+            ClassLoader classLoader) {
+        try {
+            return classLoader.loadClass(name);
+        }
+        catch (ClassNotFoundException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
      * Return {@code true} if the {@code method} has an {@link Annotation
      * annotation} of {@code annotationClass} declared in its hierarchy.
      * <p>
