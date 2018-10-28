@@ -41,13 +41,23 @@ import com.google.common.collect.Streams;
 public final class Sequences {
 
     /**
+     * Return {@code true} if the {@link Class cls} is a sequence type.
+     * 
+     * @param cls
+     * @return {@code true} if the class is a sequence type
+     */
+    public static boolean isSequenceType(Class<?> cls) {
+        return Iterable.class.isAssignableFrom(cls) || cls.isArray();
+    }
+
+    /**
      * Return {@code true} if the {@code object} is a sequence.
      * 
      * @param object
      * @return {@code true} if the object is a sequence
      */
     public static boolean isSequence(Object object) {
-        return object instanceof Iterable || object.getClass().isArray();
+        return isSequenceType(object.getClass());
     }
 
     /**
