@@ -2,6 +2,7 @@
 
 #### Version 1.3.0 (TBD)
 * Added the `Continuation` data structure, which is an infinite `List` whose elements are generated on the fly using a `Function` or `Supplier`. When an element at an index is generated, it is always associated with that index for the duration of the continuation's lifetime. Because of these semantics, a `Continuation` is not directly mutable using the `add` or `remove` methods.
+* Added the `CaseFormats` utility class to provide common operations related to the `CaseFormat` enum from Guava.
 
 #### Version 1.2.0 (October 14, 2018)
 * Add the `Adjective` framework. An `Adjective` is a group of class and class-hirearchy specific definitions that describe a trait that may apply to objects. Some adjectives may have built-in definitions, but all of them are intended to be customizable on a per-instance (e.g. no static state) basis using the `define` method. An adjective's applicability for an object can be tested using the `describes` method.
