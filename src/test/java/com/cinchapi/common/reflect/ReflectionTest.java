@@ -301,6 +301,29 @@ public class ReflectionTest {
         Assert.assertEquals(ImmutableSet.of(B.class), Reflection
                 .getTypeArguments("collectionOfB", ClassWithGenerics.class));
     }
+    
+    @Test
+    public void testIsCallableWith() {
+        for(Method method : Foo.class.getDeclaredMethods()) {
+            if(method.getName().equals("noArgs")) {
+                Assert.assertTrue(Reflection.isCallableWith(method));
+                Assert.assertFalse(Reflection.isCallableWith(method, new Object() {}));
+            }
+            else if(method.getName().equals("objectArg")) {
+                Assert.assertFalse(Reflection.isCallableWith(method));
+                Assert.assertTrue(Reflection.isCallableWith(method, new Object() {}));
+                Assert.assertTrue(Reflection.isCallableWith(method, 1));
+            }
+            else if(method.getName().equals("superClassArg")) {
+                Assert.assertTrue(Reflection.isCallableWith(method, 1));
+                Assert.assertFalse(Reflection.isCallableWith(method, new Object() {}));
+            }
+            else if(method.getName().equals("multipleArgs")) {
+                Assert.assertTrue(Reflection.isCallableWith(method, "foo", new Foo()));
+                Assert.assertFalse(Reflection.isCallableWith(method, "foo", new Object() {}));
+            }
+        }
+    }
 
     private static class A {
 
@@ -435,6 +458,18 @@ public class ReflectionTest {
         public Long noGenerics;
         public Collection<?> noGenericsCollection;
         protected Collection<B> collectionOfB;
+    }
+    
+    public class Foo {
+        
+        public void noArgs() {}
+        
+        public void objectArg(Object arg) {}
+        
+        public void superClassArg(Number arg) {}
+        
+        public void multipleArgs(String arg1, Foo arg2) {}
+        
     }
 
 }

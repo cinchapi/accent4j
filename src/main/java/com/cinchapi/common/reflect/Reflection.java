@@ -32,12 +32,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.cinchapi.common.base.AnyObjects;
 import com.cinchapi.common.base.AnyStrings;
+import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Verify;
 import com.google.common.base.Throwables;
@@ -477,22 +479,49 @@ public final class Reflection {
             Object object) {
         return getTypeArguments(getDeclaredField(field, object));
     }
-
+    
     /**
-     * Implementation of {@link ClassLoader#loadClass(String)} that throws an
-     * {@link RuntimeException} instead of a checked exception.
+     * Return {@code true} if the {@code method} is callable with the provided
+     * {@code params}.
      * 
-     * @param name
-     * @param classLoader
-     * @return the loaded class
+     * @param method
+     * @param params
+     * @return {@code true} if the provided {@code params} match the expected
+     *         parameter types of the {@code method}
      */
-    public static Class<?> loadClassQuietly(String name,
-            ClassLoader classLoader) {
-        try {
-            return classLoader.loadClass(name);
+    public static boolean isCallableWith(Method method, Object... params) {
+        Class<?>[] expectedParamTypes = method.getParameterTypes();
+        if(params.length == expectedParamTypes.length) {
+            Class<?>[] paramTypes = Arrays.stream(params).map(Object::getClass)
+                    .collect(Collectors.toList()).toArray(Array.containing());
+            for (int i = 0; i < paramTypes.length; ++i) {
+                Class<?> actual = paramTypes[i];
+                if(actual != null) {
+                    Class<?> expected = expectedParamTypes[i];
+                    if(expected == actual || expected == unbox(actual)
+                            || (expected != Object.class
+                                    && expected.isAssignableFrom(actual))
+                            || getInterchangeableClasses(actual)
+                                    .contains(expected)) {
+                        continue;
+                    }
+                    else if(expected == Object.class) {
+                        // All value types inherit from Object
+                        continue;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                else {
+                    // A null value can be assigned to any object type.
+                    continue;
+                }
+            }
+            return true;
         }
-        catch (ClassNotFoundException e) {
-            throw CheckedExceptions.wrapAsRuntimeException(e);
+        else {
+            return false;
         }
     }
 
@@ -539,6 +568,24 @@ public final class Reflection {
             else {
                 return false;
             }
+        }
+    }
+
+    /**
+     * Implementation of {@link ClassLoader#loadClass(String)} that throws an
+     * {@link RuntimeException} instead of a checked exception.
+     * 
+     * @param name
+     * @param classLoader
+     * @return the loaded class
+     */
+    public static Class<?> loadClassQuietly(String name,
+            ClassLoader classLoader) {
+        try {
+            return classLoader.loadClass(name);
+        }
+        catch (ClassNotFoundException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

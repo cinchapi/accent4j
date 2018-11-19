@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.4.0 (TBD)
+* Added `Reflection#isCallableWith` that tests whether a `Method` is callable with an array of parameters.
+
 #### Version 1.3.0 (October 30, 2018)
 * Added the `Continuation` data structure, which is an infinite `List` whose elements are generated on the fly using a `Function` or `Supplier`. When an element at an index is generated, it is always associated with that index for the duration of the continuation's lifetime. Because of these semantics, a `Continuation` is not directly mutable using the `add` or `remove` methods.
 * Added the `CaseFormats` utility class to provide common operations related to the `CaseFormat` enum from Guava.
