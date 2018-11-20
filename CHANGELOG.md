@@ -2,6 +2,7 @@
 
 #### Version 1.4.0 (TBD)
 * Added `Reflection#isCallableWith` that tests whether a `Method` is callable with an array of parameters.
+* Added `ByteBuffers#getByteArray` and deprecated `ByteBuffers#toByteArray` because the implementation of the latter is incorrect when the `ByteBuffer` is backed by an array.
 
 #### Version 1.3.0 (October 30, 2018)
 * Added the `Continuation` data structure, which is an infinite `List` whose elements are generated on the fly using a `Function` or `Supplier`. When an element at an index is generated, it is always associated with that index for the duration of the continuation's lifetime. Because of these semantics, a `Continuation` is not directly mutable using the `add` or `remove` methods.

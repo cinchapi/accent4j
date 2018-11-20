@@ -38,6 +38,62 @@ import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
 public abstract class ByteBuffers {
 
     /**
+     * The name of the Charset to use for encoding/decoding. We use the name
+     * instead of the charset object because Java caches encoders when
+     * referencing them by name, but creates a new encorder object when
+     * referencing them by Charset object.
+     */
+    private static final String CHARSET = StandardCharsets.UTF_8.name();
+
+    /**
+     * A collection of UTF-8 decoders that can be concurrently used. We use this
+     * to avoid creating a new decoder every time we need to decode a string
+     * while still allowing multi-threaded access.
+     */
+    private static final ConcurrentLinkedQueue<CharsetDecoder> DECODERS = ConcurrentLoadingQueue
+            .create(new Callable<CharsetDecoder>() {
+
+                @Override
+                public CharsetDecoder call() throws Exception {
+                    return StandardCharsets.UTF_8.newDecoder();
+                }
+
+            });
+
+    /**
+     * The number of UTF-8 decoders to create for concurrent access.
+     */
+    private static final int NUM_DECODERS = 10;
+
+    static {
+        try {
+            for (int i = 0; i < NUM_DECODERS; ++i) {
+                DECODERS.add(StandardCharsets.UTF_8.newDecoder());
+            }
+        }
+        catch (Exception e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return a byte array containing all the {@link ByteBuffer#remaining()}
+     * content within the {@code buffer}. The {@code buffer}'s mark is set to
+     * the current position. The {@code buffer}'s limit is preserved.
+     * 
+     * @param buffer
+     * @return a byte array containing the remaining the content in the
+     *         {@code buffer}.
+     */
+    public static byte[] getByteArray(ByteBuffer buffer) {
+        buffer.mark();
+        byte[] array = new byte[buffer.remaining()];
+        buffer.get(array);
+        buffer.reset();
+        return array;
+    }
+
+    /**
      * Return a ByteBuffer that is a new read-only buffer that shares the
      * content of {@code source} and has the same byte order, but maintains a
      * distinct position, mark and limit.
@@ -108,8 +164,8 @@ public abstract class ByteBuffers {
         int len = hex.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character
-                    .digit(hex.charAt(i + 1), 16));
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                    + Character.digit(hex.charAt(i + 1), 16));
         }
         return ByteBuffer.wrap(data);
     }
@@ -158,8 +214,7 @@ public abstract class ByteBuffers {
      * @return a ByteBuffer that has {@code length} bytes from {@code buffer}
      */
     public static ByteBuffer get(ByteBuffer buffer, int length) {
-        Verify.thatArgument(
-                buffer.remaining() >= length,
+        Verify.thatArgument(buffer.remaining() >= length,
                 "The number of bytes remaining in the buffer cannot be less than the desired length");
         byte[] backingArray = new byte[length];
         buffer.get(backingArray);
@@ -188,17 +243,6 @@ public abstract class ByteBuffers {
     public static <T extends Enum<?>> T getEnum(ByteBuffer buffer,
             Class<T> clazz) {
         return clazz.getEnumConstants()[buffer.getInt()];
-    }
-
-    /**
-     * Relative <em>get</em> method. Reads the UTF-8 encoded string at
-     * the current position in {@code buffer}.
-     * 
-     * @param buffer
-     * @return the string value at the current position
-     */
-    public static String getUtf8String(ByteBuffer buffer) {
-        return getString(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -231,6 +275,17 @@ public abstract class ByteBuffers {
                 DECODERS.offer(decoder);
             }
         }
+    }
+
+    /**
+     * Relative <em>get</em> method. Reads the UTF-8 encoded string at
+     * the current position in {@code buffer}.
+     * 
+     * @param buffer
+     * @return the string value at the current position
+     */
+    public static String getUtf8String(ByteBuffer buffer) {
+        return getString(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -303,7 +358,8 @@ public abstract class ByteBuffers {
      * @return the new ByteBuffer slice
      * @see ByteBuffer#slice()
      */
-    public static ByteBuffer slice(ByteBuffer buffer, int position, int length) {
+    public static ByteBuffer slice(ByteBuffer buffer, int position,
+            int length) {
         int oldPosition = buffer.position();
         int oldLimit = buffer.limit();
         buffer.position(position);
@@ -322,7 +378,12 @@ public abstract class ByteBuffers {
      * 
      * @param buffer
      * @return the byte array with the content of {@code buffer}
+     * @deprecated in favor of {@link #array(ByteBuffer)} because this method
+     *             returns the entire backing byte array instead of a byte array
+     *             only containing the remaining content if the buffer is backed
+     *             by a byte array
      */
+    @Deprecated
     public static byte[] toByteArray(ByteBuffer buffer) {
         if(buffer.hasArray()) {
             return buffer.array();
@@ -334,17 +395,6 @@ public abstract class ByteBuffers {
             buffer.reset();
             return array;
         }
-    }
-
-    /**
-     * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
-     * {@code buffer}.
-     * 
-     * @param buffer
-     * @return the char buffer
-     */
-    public static CharBuffer toUtf8CharBuffer(ByteBuffer buffer) {
-        return toCharBuffer(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -361,43 +411,15 @@ public abstract class ByteBuffers {
         buffer.reset();
         return chars;
     }
-
     /**
-     * The name of the Charset to use for encoding/decoding. We use the name
-     * instead of the charset object because Java caches encoders when
-     * referencing them by name, but creates a new encorder object when
-     * referencing them by Charset object.
+     * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
+     * {@code buffer}.
+     * 
+     * @param buffer
+     * @return the char buffer
      */
-    private static final String CHARSET = StandardCharsets.UTF_8.name();
-
-    /**
-     * The number of UTF-8 decoders to create for concurrent access.
-     */
-    private static final int NUM_DECODERS = 10;
-
-    /**
-     * A collection of UTF-8 decoders that can be concurrently used. We use this
-     * to avoid creating a new decoder every time we need to decode a string
-     * while still allowing multi-threaded access.
-     */
-    private static final ConcurrentLinkedQueue<CharsetDecoder> DECODERS = ConcurrentLoadingQueue
-            .create(new Callable<CharsetDecoder>() {
-
-                @Override
-                public CharsetDecoder call() throws Exception {
-                    return StandardCharsets.UTF_8.newDecoder();
-                }
-
-            });
-    static {
-        try {
-            for (int i = 0; i < NUM_DECODERS; ++i) {
-                DECODERS.add(StandardCharsets.UTF_8.newDecoder());
-            }
-        }
-        catch (Exception e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
-        }
+    public static CharBuffer toUtf8CharBuffer(ByteBuffer buffer) {
+        return toCharBuffer(buffer, StandardCharsets.UTF_8);
     }
 
 }
