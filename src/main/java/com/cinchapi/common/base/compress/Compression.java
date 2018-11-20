@@ -59,7 +59,7 @@ public final class Compression {
             Deflater deflater = new Deflater();
             deflater.setLevel(strategy.strategy());
             deflater.setStrategy(technique.technique());
-            deflater.setInput(ByteBuffers.toByteArray(data));
+            deflater.setInput(ByteBuffers.getByteArray(data));
             deflater.finish();
 
             byte[] buffer = new byte[1024];
@@ -86,7 +86,7 @@ public final class Compression {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Inflater inflater = new Inflater();
-            inflater.setInput(ByteBuffers.toByteArray(data));
+            inflater.setInput(ByteBuffers.getByteArray(data));
             byte[] buffer = new byte[1024];
             while (!inflater.finished()) {
                 int count = inflater.inflate(buffer);
