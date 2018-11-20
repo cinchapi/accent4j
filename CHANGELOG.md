@@ -1,5 +1,7 @@
 # Changelog
 
+#### Version 1.5.0 (TBD)
+
 #### Version 1.4.0 (November 20, 2018)
 * Added `Reflection#isCallableWith` that tests whether a `Method` is callable with an array of parameters.
 * Added `ByteBuffers#getByteArray` and deprecated `ByteBuffers#toByteArray` because the implementation of the latter is incorrect when the `ByteBuffer` is backed by an array.
