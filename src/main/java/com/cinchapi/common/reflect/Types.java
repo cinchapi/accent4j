@@ -109,6 +109,9 @@ public final class Types {
             else if(type == double.class) {
                 coerced = Doubles.tryParse(object.toString());
             }
+            else if(type == String.class) {
+                coerced = object.toString();
+            }
             else if(type == char.class || type == Character.class
                     && object.toString().length() == 1) {
                 coerced = object.toString().charAt(0);
