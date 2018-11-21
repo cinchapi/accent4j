@@ -55,6 +55,13 @@ public class TypesTest {
         Assert.assertEquals(ImmutableList.of(1, 2, 3, 4), list);
     }
     
+    @Test
+    public void testAutoboxing() {
+        String object = "1";
+        Integer actual = Types.coerce(object, Integer.class);
+        Assert.assertEquals((Integer) 1, actual);
+    }
+    
 
 
 }
