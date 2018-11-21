@@ -15,10 +15,15 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.util.List;
+import java.util.Map;
+
 import org.junit.Assert;
 import org.junit.Test;
 
 import com.google.common.base.CaseFormat;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Unit tests for {@link Types}.
@@ -28,9 +33,28 @@ import com.google.common.base.CaseFormat;
 public class TypesTest {
     
     @Test
-    public void testCoerceEnum() {
+    public void testEnum() {
         Assert.assertEquals(CaseFormat.values()[2], Types.coerce(2, CaseFormat.class));
         Assert.assertEquals(CaseFormat.UPPER_CAMEL, Types.coerce("upper_camel", CaseFormat.class));
     }
+    
+    @Test
+    public void testJsonObject() {
+        String object = "{\"name\": \"Jeff Nelson\"}";
+        Map<String, String> map = Types.coerce(object, Map.class);
+        Assert.assertEquals(ImmutableMap.of("name", "Jeff Nelson"), map);
+    }
+    
+    @Test
+    public void testJsonArray() {
+        String object = "[1, 2, 3, 4]";
+        int[] array = Types.coerce(object, int[].class);
+        Assert.assertArrayEquals(new int[] {1, 2, 3, 4}, array);
+        
+        List<Integer> list = Types.coerce(object, List.class);
+        Assert.assertEquals(ImmutableList.of(1, 2, 3, 4), list);
+    }
+    
+
 
 }

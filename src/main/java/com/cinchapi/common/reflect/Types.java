@@ -15,12 +15,22 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Enums;
+import com.cinchapi.common.collect.Sequences;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Doubles;
 import com.google.common.primitives.Floats;
 import com.google.common.primitives.Ints;
@@ -34,6 +44,9 @@ import com.google.common.primitives.Longs;
 public final class Types {
 
     private Types() {/* no-init */}
+
+    private static final ScriptEngine nashorn = new ScriptEngineManager()
+            .getEngineByName("javascript");
 
     /**
      * Coerce the {@code object} in{@code to} the provided {@link Type}, if
@@ -118,6 +131,34 @@ public final class Types {
             }
             else if(type == boolean.class || type == Boolean.class) {
                 coerced = AnyStrings.tryParseBoolean(object.toString());
+            }
+            else if(type == Map.class || Sequences.isSequenceType(type)) {
+                // Assume that the String representation contains JSON and use
+                // nashorn to parse.
+                try {
+                    coerced = nashorn.eval(
+                            "Java.asJSONCompatible(" + object.toString() + ")");
+                    if(type.isArray()) {
+                        // If the desired type is an array, we must coerce each
+                        // of the elements to the array's component type.
+                        Class<?> componentType = type.getComponentType();
+                        Object array = Array.newInstance(componentType,
+                                ((Collection) coerced).size());
+                        AtomicInteger index = new AtomicInteger(0);
+                        Sequences.forEach(coerced,
+                                item -> Array.set(array,
+                                        index.getAndIncrement(),
+                                        Types.coerce(item, componentType)));
+                        coerced = array;
+                    }
+                    else if(Map.class.isAssignableFrom(type)) {
+                        coerced = ImmutableMap.copyOf((Map) coerced);
+                    }
+                    else {
+                        coerced = ImmutableList.copyOf((Iterable) coerced);
+                    }
+                }
+                catch (ScriptException e) {}
             }
             else {
                 try {
