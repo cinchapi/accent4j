@@ -45,6 +45,9 @@ public final class Types {
 
     private Types() {/* no-init */}
 
+    /**
+     * Reference to the nashorn script engine, which is used for parsing JSON.
+     */
     private static final ScriptEngine nashorn = new ScriptEngineManager()
             .getEngineByName("javascript");
 
