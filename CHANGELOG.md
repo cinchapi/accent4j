@@ -1,6 +1,7 @@
 # Changelog
 
 #### Version 1.5.0 (TBD)
+* Added the `Types` utility class which contains functions to coerce objects to a specific type.
 
 #### Version 1.4.0 (November 20, 2018)
 * Added `Reflection#isCallableWith` that tests whether a `Method` is callable with an array of parameters.
