@@ -17,6 +17,8 @@ package com.cinchapi.common.reflect;
 
 import java.lang.reflect.Type;
 import java.util.function.BiFunction;
+import java.util.function.Function;
+
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Enums;
 import com.google.common.primitives.Doubles;
@@ -40,13 +42,29 @@ public final class Types {
      * 
      * @param object
      * @param to
-     * @param converter
      * @return an instance of {@link Type} {@code to} that is coerced from the
      *         original {@code object}
      * @throws UnsupportedOperationException
      */
     public static <T> T coerce(Object object, Type to) {
         return coerce(object, to, (type, string) -> null);
+    }
+
+    /**
+     * Coerce the {@code object} in{@code to} the provided {@link Type}, if
+     * possible. If the coercion cannot be done, an
+     * {@link UnsupportedOperationException} is thrown.
+     * 
+     * @param object
+     * @param to
+     * @param converter
+     * @return an instance of {@link Type} {@code to} that is coerced from the
+     *         original {@code object}
+     * @throws UnsupportedOperationException
+     */
+    public static <T> T coerce(Object object, Type to,
+            Function<String, T> converter) {
+        return coerce(object, to, (type, string) -> converter.apply(string));
     }
 
     /**
