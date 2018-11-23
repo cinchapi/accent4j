@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.describe;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Predicate;
@@ -33,8 +34,10 @@ import com.google.common.collect.Maps;
  * @author Jeff Nelson
  */
 @NotThreadSafe
-public abstract class Adjective {
+public abstract class Adjective implements Serializable {
 
+    private static final long serialVersionUID = 1212584192368283645L;
+    
     /**
      * The provided definitions.
      */

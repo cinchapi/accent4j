@@ -32,6 +32,8 @@ import com.google.common.collect.ImmutableMap;
 @NotThreadSafe
 public class Empty extends Adjective {
 
+    private static final long serialVersionUID = -6555666914398367565L;
+
     /**
      * Create an {@link Empty} instance with the default set of definitions.
      * More definitions can be added using the {@link #define(Class, Check)}
