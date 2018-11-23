@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.5.0 (TBD)
+#### Version 1.5.0 (November 23, 2018)
 * Added the `Types` utility class which contains functions to coerce objects to a specific type.
 
 #### Version 1.4.0 (November 20, 2018)
