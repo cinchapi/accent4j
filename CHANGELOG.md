@@ -1,8 +1,5 @@
 # Changelog
 
-#### Version 1.5.1 (TBD)
-* Fixed a bug that causes `Adjective`s to not serialize properly.
-
 #### Version 1.5.0 (November 23, 2018)
 * Added the `Types` utility class which contains functions to coerce objects to a specific type.
 
