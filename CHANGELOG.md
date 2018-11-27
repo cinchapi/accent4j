@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.5.1 (TBD)
+* Fixed a bug that caused an `ArrayBuilder` to fail when adding elements with different types even though those types had a common ancestor type.
+
 #### Version 1.5.0 (November 23, 2018)
 * Added the `Types` utility class which contains functions to coerce objects to a specific type.
 
