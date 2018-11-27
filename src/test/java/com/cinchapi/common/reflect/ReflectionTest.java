@@ -322,7 +322,24 @@ public class ReflectionTest {
                 Assert.assertTrue(Reflection.isCallableWith(method, "foo", new Foo()));
                 Assert.assertFalse(Reflection.isCallableWith(method, "foo", new Object() {}));
             }
+            else if(method.getName().equals("varArgs")) {
+                Assert.assertTrue(Reflection.isCallableWith(method, "foo")); 
+                Assert.assertTrue(Reflection.isCallableWith(method)); 
+            }
+            else if(method.getName().equals("varArgs2")) {
+                Assert.assertTrue(Reflection.isCallableWith(method, "foo")); 
+                Assert.assertTrue(Reflection.isCallableWith(method, "a", "b", "c", "d", "e")); 
+            }
         }
+    }
+    
+    @Test
+    public void testCallMethodWithVarArgs() {
+        Reflection.call(new Foo(), "varArgs", "foo");
+        Reflection.call(new Foo(), "varArgs2", "foo", "foo", "bar");
+        Reflection.call(new Foo(), "varArgs");
+        Reflection.call(new Foo(), "varArgs2", "foo");
+        Assert.assertTrue(true); // lack of exception means we pass
     }
 
     private static class A {
@@ -469,6 +486,10 @@ public class ReflectionTest {
         public void superClassArg(Number arg) {}
         
         public void multipleArgs(String arg1, Foo arg2) {}
+        
+        public void varArgs(String...args) {}
+        
+        public void varArgs2(String arg, String...args) {}
         
     }
 

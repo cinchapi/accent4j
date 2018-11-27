@@ -40,8 +40,11 @@ import javax.annotation.Nullable;
 import com.cinchapi.common.base.AnyObjects;
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
+import com.cinchapi.common.base.ArrayBuilder;
 import com.cinchapi.common.base.CheckedExceptions;
+import com.cinchapi.common.base.TernaryTruth;
 import com.cinchapi.common.base.Verify;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -479,7 +482,7 @@ public final class Reflection {
             Object object) {
         return getTypeArguments(getDeclaredField(field, object));
     }
-    
+
     /**
      * Return {@code true} if the {@code method} is callable with the provided
      * {@code params}.
@@ -490,39 +493,8 @@ public final class Reflection {
      *         parameter types of the {@code method}
      */
     public static boolean isCallableWith(Method method, Object... params) {
-        Class<?>[] expectedParamTypes = method.getParameterTypes();
-        if(params.length == expectedParamTypes.length) {
-            Class<?>[] paramTypes = Arrays.stream(params).map(Object::getClass)
-                    .collect(Collectors.toList()).toArray(Array.containing());
-            for (int i = 0; i < paramTypes.length; ++i) {
-                Class<?> actual = paramTypes[i];
-                if(actual != null) {
-                    Class<?> expected = expectedParamTypes[i];
-                    if(expected == actual || expected == unbox(actual)
-                            || (expected != Object.class
-                                    && expected.isAssignableFrom(actual))
-                            || getInterchangeableClasses(actual)
-                                    .contains(expected)) {
-                        continue;
-                    }
-                    else if(expected == Object.class) {
-                        // All value types inherit from Object
-                        continue;
-                    }
-                    else {
-                        return false;
-                    }
-                }
-                else {
-                    // A null value can be assigned to any object type.
-                    continue;
-                }
-            }
-            return true;
-        }
-        else {
-            return false;
-        }
+        TernaryTruth callable = isDefinitelyCallableWith(method, params);
+        return callable == TernaryTruth.TRUE || callable == TernaryTruth.UNSURE;
     }
 
     /**
@@ -740,25 +712,11 @@ public final class Reflection {
      * @param args
      * @return the result of calling the method
      */
-    @SuppressWarnings("unchecked")
     private static <T> T call(boolean setAccessible, Object obj,
             String methodName, Object... args) {
         Method method = getMethod(setAccessible, methodName, obj.getClass(),
                 args);
-        try {
-            return (T) method.invoke(obj, args);
-        }
-        catch (ReflectiveOperationException e) {
-            Throwable ex = e;
-            if(ex instanceof InvocationTargetException
-                    && e.getCause() != null) {
-                ex = ex.getCause();
-            }
-            else {
-                ex = Throwables.getRootCause(ex);
-            }
-            throw CheckedExceptions.wrapAsRuntimeException(ex);
-        }
+        return invoke(method, obj, args);
     }
 
     /**
@@ -773,24 +731,10 @@ public final class Reflection {
      * @param args the args to pass to the method upon invocation
      * @return the result of the method invocation
      */
-    @SuppressWarnings("unchecked")
     private static <T> T callStatic(boolean setAccessible, Class<?> clazz,
             String methodName, Object... args) {
         Method method = getMethod(setAccessible, methodName, clazz, args);
-        try {
-            return (T) method.invoke(null, args);
-        }
-        catch (ReflectiveOperationException e) {
-            Throwable ex = e;
-            if(ex instanceof InvocationTargetException
-                    && e.getCause() != null) {
-                ex = ex.getCause();
-            }
-            else {
-                ex = Throwables.getRootCause(ex);
-            }
-            throw CheckedExceptions.wrapAsRuntimeException(ex);
-        }
+        return invoke(method, null, args);
     }
 
     /**
@@ -842,6 +786,7 @@ public final class Reflection {
      * @return the ancestors of {@code clazz}
      */
     private static Set<Class<?>> getClassAncestors(Class<?> clazz) {
+        Preconditions.checkArgument(clazz != null);
         Set<Class<?>> classes = Sets.newLinkedHashSet();
         Set<Class<?>> nextLevel = Sets.newLinkedHashSet();
         nextLevel.add(clazz);
@@ -977,50 +922,20 @@ public final class Reflection {
     private static Method getMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
-        // TODO cache method instances
+        List<Method> potential = Lists.newArrayListWithCapacity(1);
+        List<Method> deferred = Lists.newArrayListWithCapacity(1);
         try {
-            List<Method> potential = Lists.newArrayListWithCapacity(1);
-            List<Method> deferred = Lists.newArrayListWithCapacity(1);
             while (clazz != null) {
-                outer: for (Method method : clazz.getDeclaredMethods()) {
-                    List<Method> container = potential;
-                    if(method.getParameterCount() == paramTypes.length
-                            && method.getName().equals(name)) {
-                        Class<?>[] expectedParamTypes = method
-                                .getParameterTypes();
-                        for (int i = 0; i < paramTypes.length; ++i) {
-                            Class<?> actual = paramTypes[i];
-                            if(actual != null) {
-                                Class<?> expected = expectedParamTypes[i];
-                                if(expected == actual
-                                        || expected == unbox(actual)
-                                        || (expected != Object.class && expected
-                                                .isAssignableFrom(actual))
-                                        || getInterchangeableClasses(actual)
-                                                .contains(expected)) {
-                                    continue;
-                                }
-                                else if(expected == Object.class) {
-                                    // Defer this method as a potential one
-                                    // since it is using a highly
-                                    // generic/ambiguous arg. If no specific
-                                    // matches are found, the deferred matches
-                                    // will be considered.
-                                    container = deferred;
-                                    continue;
-                                }
-                                else {
-                                    continue outer;
-                                }
-                            }
-                            else {
-                                continue;
-                            }
-                        }
-                        container.add(method);
+                for (Method method : Arrays.stream(clazz.getDeclaredMethods())
+                        .filter(method -> method.getName().equals(name))
+                        .collect(Collectors.toList())) {
+                    TernaryTruth callable = isDefinitelyCallableWith(method,
+                            paramTypes);
+                    if(callable == TernaryTruth.TRUE) {
+                        potential.add(method);
                     }
-                    else {
-                        continue;
+                    else if(callable == TernaryTruth.UNSURE) {
+                        deferred.add(method);
                     }
                 }
                 if(potential.isEmpty()) {
@@ -1059,6 +974,165 @@ public final class Reflection {
         catch (ReflectiveOperationException e) {
             throw CheckedExceptions.wrapAsRuntimeException(e);
         }
+    }
+
+    /**
+     * Invoke {@code method} with {@code args}. If {@code object} is
+     * {@code null}, this is a static invocation.
+     * 
+     * @param method
+     * @param object
+     * @param args
+     * @return the result of the method invocation
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T invoke(Method method, @Nullable Object object,
+            Object... args) {
+        try {
+            int count;
+            if((count = method.getParameterCount()) > 0
+                    && (args.length >= count - 1)
+                    && method.getParameterTypes()[count - 1].isArray()) {
+                // First, check to see if the last parameter type is a vararg
+                // (e.g. array) and wrap the dangling args accordingly.
+                ArrayBuilder<Object> _args = ArrayBuilder.builder();
+                int i = 0;
+                for (; i < count - 1; ++i) {
+                    _args.add(args[i]);
+                }
+                ArrayBuilder<Object> varargs = ArrayBuilder.builder();
+                for (; i < args.length; ++i) {
+                    varargs.add(args[i]);
+                }
+                _args.add((Object) (varargs.length() > 0 ? varargs.build()
+                        : java.lang.reflect.Array.newInstance(
+                                method.getParameterTypes()[count - 1]
+                                        .getComponentType(),
+                                0)));
+                args = _args.build();
+            }
+            return (T) method.invoke(object, args);
+        }
+        catch (ReflectiveOperationException e) {
+            Throwable ex = e;
+            if(ex instanceof InvocationTargetException
+                    && e.getCause() != null) {
+                ex = ex.getCause();
+            }
+            else {
+                ex = Throwables.getRootCause(ex);
+            }
+            throw CheckedExceptions.wrapAsRuntimeException(ex);
+        }
+    }
+
+    /**
+     * Return a {@link TernaryTruth} value that indicates whether the
+     * {@code method} is definitely callable with the provided
+     * {@code paramTypes}.
+     * <p>
+     * This function is used to determine if the signature of the {@code method}
+     * contains specific parameters types (e.g. not the {@link Object.class}
+     * type}. If any of the parameters types are super generic, this method will
+     * return {@link TernaryTruth#UNSURE} instead of {@link TernaryTruth#TRUE}
+     * if all other factors indicate that the method is callable with the param
+     * types.
+     * </p>
+     * 
+     * @param method
+     * @param paramTypes
+     * @return a ternary truth value that indicates the level of certainty that
+     *         the method is callable with the provided param types.
+     */
+    private static TernaryTruth isDefinitelyCallableWith(Method method,
+            Class<?>... paramTypes) {
+        TernaryTruth callable = TernaryTruth.TRUE;
+        Class<?>[] expectedParamTypes = method.getParameterTypes();
+        if(paramTypes.length == expectedParamTypes.length) {
+            for (int i = 0; i < paramTypes.length; ++i) {
+                Class<?> actual = paramTypes[i];
+                if(actual != null) {
+                    Class<?> expected = expectedParamTypes[i];
+                    if(expected == actual || expected == unbox(actual)
+                            || (expected != Object.class
+                                    && expected.isAssignableFrom(actual))
+                            || getInterchangeableClasses(actual)
+                                    .contains(expected)) {
+                        continue;
+                    }
+                    else if(expected == Object.class) {
+                        // All value types inherit from Object
+                        callable = TernaryTruth.UNSURE;
+                        continue;
+                    }
+                    else {
+                        callable = TernaryTruth.FALSE;
+                        break;
+                    }
+                }
+                else {
+                    // A null value can be assigned to any object type.
+                    continue;
+                }
+            }
+        }
+        else {
+            callable = TernaryTruth.FALSE;
+        }
+        if((callable != TernaryTruth.TRUE && callable != TernaryTruth.UNSURE)
+                && expectedParamTypes.length > 0
+                && expectedParamTypes[expectedParamTypes.length - 1].isArray()
+                && (paramTypes.length >= expectedParamTypes.length - 1)) {
+            Class<?> varArgType = expectedParamTypes[expectedParamTypes.length
+                    - 1].getComponentType();
+            // Check for the corner case where the method has a varargs
+            // parameter. If so, see if all the dangling parameters fit in with
+            // the varargs
+            if(paramTypes.length == expectedParamTypes.length - 1) {
+                callable = TernaryTruth.TRUE;
+            }
+            else {
+                for (int i = expectedParamTypes.length
+                        - 1; i < paramTypes.length; ++i) {
+                    Class<?> paramType = paramTypes[i];
+                    if(paramType == varArgType) {
+                        callable = TernaryTruth.TRUE;
+                    }
+                    else {
+                        callable = TernaryTruth.FALSE;
+                        break;
+                    }
+                }
+            }
+
+        }
+        return callable;
+    }
+
+    /**
+     * Return a {@link TernaryTruth} value that indicates whether the
+     * {@code method} is definitely callable with the provided
+     * {@code paramTypes}.
+     * <p>
+     * This function is used to determine if the signature of the {@code method}
+     * contains specific parameters types (e.g. not the {@link Object.class}
+     * type}. If any of the parameters types are super generic, this method will
+     * return {@link TernaryTruth#UNSURE} instead of {@link TernaryTruth#TRUE}
+     * if all other factors indicate that the method is callable with the param
+     * types.
+     * </p>
+     * 
+     * @param method
+     * @param paramTypes
+     * @return a ternary truth value that indicates the level of certainty that
+     *         the method is callable with the provided param types.
+     */
+    private static TernaryTruth isDefinitelyCallableWith(Method method,
+            Object... params) {
+        return isDefinitelyCallableWith(method,
+                Arrays.stream(params).map(Object::getClass)
+                        .collect(Collectors.toList())
+                        .toArray(Array.containing()));
     }
 
     /**
