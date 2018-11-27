@@ -41,4 +41,14 @@ public class ArrayBuilderTest {
         UUID[] uuids = builder.build();
         Assert.assertEquals(0, uuids.length);
     }
+    
+    @Test
+    public void testBuildArrayWithSubclass() {
+        ArrayBuilder<Number> builder = ArrayBuilder.builder();
+        builder.add(1);
+        builder.add(2L);
+        Number[] nums = builder.build();
+        Assert.assertTrue(nums[0] instanceof Integer);
+        Assert.assertTrue(nums[1] instanceof Long);
+    }
 }
