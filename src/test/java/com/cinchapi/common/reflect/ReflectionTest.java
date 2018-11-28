@@ -33,6 +33,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
@@ -301,38 +303,44 @@ public class ReflectionTest {
         Assert.assertEquals(ImmutableSet.of(B.class), Reflection
                 .getTypeArguments("collectionOfB", ClassWithGenerics.class));
     }
-    
+
     @Test
     public void testIsCallableWith() {
-        for(Method method : Foo.class.getDeclaredMethods()) {
+        for (Method method : Foo.class.getDeclaredMethods()) {
             if(method.getName().equals("noArgs")) {
                 Assert.assertTrue(Reflection.isCallableWith(method));
-                Assert.assertFalse(Reflection.isCallableWith(method, new Object() {}));
+                Assert.assertFalse(
+                        Reflection.isCallableWith(method, new Object() {}));
             }
             else if(method.getName().equals("objectArg")) {
                 Assert.assertFalse(Reflection.isCallableWith(method));
-                Assert.assertTrue(Reflection.isCallableWith(method, new Object() {}));
+                Assert.assertTrue(
+                        Reflection.isCallableWith(method, new Object() {}));
                 Assert.assertTrue(Reflection.isCallableWith(method, 1));
             }
             else if(method.getName().equals("superClassArg")) {
                 Assert.assertTrue(Reflection.isCallableWith(method, 1));
-                Assert.assertFalse(Reflection.isCallableWith(method, new Object() {}));
+                Assert.assertFalse(
+                        Reflection.isCallableWith(method, new Object() {}));
             }
             else if(method.getName().equals("multipleArgs")) {
-                Assert.assertTrue(Reflection.isCallableWith(method, "foo", new Foo()));
-                Assert.assertFalse(Reflection.isCallableWith(method, "foo", new Object() {}));
+                Assert.assertTrue(
+                        Reflection.isCallableWith(method, "foo", new Foo()));
+                Assert.assertFalse(Reflection.isCallableWith(method, "foo",
+                        new Object() {}));
             }
             else if(method.getName().equals("varArgs")) {
-                Assert.assertTrue(Reflection.isCallableWith(method, "foo")); 
-                Assert.assertTrue(Reflection.isCallableWith(method)); 
+                Assert.assertTrue(Reflection.isCallableWith(method, "foo"));
+                Assert.assertTrue(Reflection.isCallableWith(method));
             }
             else if(method.getName().equals("varArgs2")) {
-                Assert.assertTrue(Reflection.isCallableWith(method, "foo")); 
-                Assert.assertTrue(Reflection.isCallableWith(method, "a", "b", "c", "d", "e")); 
+                Assert.assertTrue(Reflection.isCallableWith(method, "foo"));
+                Assert.assertTrue(Reflection.isCallableWith(method, "a", "b",
+                        "c", "d", "e"));
             }
         }
     }
-    
+
     @Test
     public void testCallMethodWithVarArgs() {
         Reflection.call(new Foo(), "varArgs", "foo");
@@ -340,6 +348,15 @@ public class ReflectionTest {
         Reflection.call(new Foo(), "varArgs");
         Reflection.call(new Foo(), "varArgs2", "foo");
         Assert.assertTrue(true); // lack of exception means we pass
+    }
+
+    @Test
+    public void testIsCallableWithReproA() {
+        Assert.assertFalse(
+                Reflection.isCallableWith(
+                        Reflection.getMethodUnboxed(Foo.class, "reproA",
+                                char.class, CaseFormat[].class),
+                        Predicates.alwaysTrue()));
     }
 
     private static class A {
@@ -476,21 +493,23 @@ public class ReflectionTest {
         public Collection<?> noGenericsCollection;
         protected Collection<B> collectionOfB;
     }
-    
+
     public class Foo {
-        
+
         public void noArgs() {}
-        
+
         public void objectArg(Object arg) {}
-        
+
         public void superClassArg(Number arg) {}
-        
+
         public void multipleArgs(String arg1, Foo arg2) {}
-        
-        public void varArgs(String...args) {}
-        
-        public void varArgs2(String arg, String...args) {}
-        
+
+        public void varArgs(String... args) {}
+
+        public void varArgs2(String arg, String... args) {}
+
+        public void reproA(char c, CaseFormat... formats) {}
+
     }
 
 }
