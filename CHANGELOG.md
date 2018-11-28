@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.5.1 (TBD)
+#### Version 1.5.1 (November 28, 2018)
 * Fixed a bug that caused an `ArrayBuilder` to fail when adding elements with different types even though those types had a common ancestor type.
 * Fixed a bug that caused issues when using `Reflection` to determine the callability of or to invoke methods with a varargs parameter.
 
