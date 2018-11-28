@@ -991,9 +991,13 @@ public final class Reflection {
             Object... args) {
         try {
             int count;
-            if((count = method.getParameterCount()) > 0
-                    && (args.length >= count - 1)
-                    && method.getParameterTypes()[count - 1].isArray()) {
+            // @formatter:off
+            if((count = method.getParameterCount()) > 0 // its possible for method to have varags
+                    && (args.length >= count - 1) // the number of arguments provided is at least equal to the number of non vararg parameters 
+                    && (method.getParameterTypes()[count - 1].isArray() // the last paramter expected is an array type
+                            && (args.length == 0 || !args[args.length - 1] // no args were provided OR the last arg provided is NOT an array (meaning its not a vararg invocation literal)
+                                    .getClass().isArray()))) {
+             // @formatter:on
                 // First, check to see if the last parameter type is a vararg
                 // (e.g. array) and wrap the dangling args accordingly.
                 ArrayBuilder<Object> _args = ArrayBuilder.builder();
