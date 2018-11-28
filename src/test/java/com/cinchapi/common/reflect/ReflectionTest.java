@@ -33,6 +33,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import com.cinchapi.common.base.Array;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
@@ -358,6 +359,13 @@ public class ReflectionTest {
                                 char.class, CaseFormat[].class),
                         Predicates.alwaysTrue()));
     }
+    
+    @Test
+    public void testCallOverloadedVarArgsReproA() {
+        Reflection.call(new Foo(), "overloadVarArgs");
+        Reflection.call(new Foo(), "overloadVarArgs", "a");
+        Reflection.call(new Foo(), "overloadVarArgs", "a", "b");
+    }
 
     private static class A {
 
@@ -509,6 +517,10 @@ public class ReflectionTest {
         public void varArgs2(String arg, String... args) {}
 
         public void reproA(char c, CaseFormat... formats) {}
+        
+        public void overloadVarArgs() {}
+        
+        public void overloadVarArgs(String...args) {}
 
     }
 

@@ -931,10 +931,11 @@ public final class Reflection {
                         .collect(Collectors.toList())) {
                     TernaryTruth callable = isDefinitelyCallableWith(method,
                             paramTypes);
-                    if(callable == TernaryTruth.TRUE) {
+                    if(callable == TernaryTruth.TRUE && method
+                            .getParameterCount() == paramTypes.length) {
                         potential.add(method);
                     }
-                    else if(callable == TernaryTruth.UNSURE) {
+                    else if(callable != TernaryTruth.FALSE) {
                         deferred.add(method);
                     }
                 }
@@ -1091,7 +1092,7 @@ public final class Reflection {
             if(paramTypes.length == expectedParamTypes.length - 1) {
                 // Handle corner case where no args are provided for a varargs
                 // parameter
-                return isDefinitelyCallableWith(method,
+                callable = isDefinitelyCallableWith(method,
                         ArrayBuilder.<Class<?>> builder().add(paramTypes)
                                 .add(java.lang.reflect.Array
                                         .newInstance(varArgType, 0).getClass())
