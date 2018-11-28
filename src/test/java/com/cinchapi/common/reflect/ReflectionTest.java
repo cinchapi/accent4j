@@ -36,6 +36,7 @@ import org.junit.rules.ExpectedException;
 import com.cinchapi.common.base.Array;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
@@ -359,12 +360,28 @@ public class ReflectionTest {
                                 char.class, CaseFormat[].class),
                         Predicates.alwaysTrue()));
     }
-    
+
     @Test
     public void testCallOverloadedVarArgsReproA() {
         Reflection.call(new Foo(), "overloadVarArgs");
         Reflection.call(new Foo(), "overloadVarArgs", "a");
         Reflection.call(new Foo(), "overloadVarArgs", "a", "b");
+    }
+
+    @Test
+    public void testIsCallableWithReproB() {
+        Object[] params = (Object[]) java.lang.reflect.Array
+                .newInstance(Object.class, 1);
+        params[0] = "foo";
+        Assert.assertTrue(Reflection.isCallableWith(Reflection.getMethodUnboxed(
+                Foo.class, "varArgs", String[].class), params));
+    }
+
+    @Test
+    public void testCallReproC() {
+        Reflection.call(new Foo(), "varArgs",
+                ImmutableList.of(Array.containing("foo")).toArray());
+        Assert.assertTrue(true); // lack of Exception means we pass
     }
 
     private static class A {
@@ -517,10 +534,10 @@ public class ReflectionTest {
         public void varArgs2(String arg, String... args) {}
 
         public void reproA(char c, CaseFormat... formats) {}
-        
+
         public void overloadVarArgs() {}
-        
-        public void overloadVarArgs(String...args) {}
+
+        public void overloadVarArgs(String... args) {}
 
     }
 
