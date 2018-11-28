@@ -1089,7 +1089,13 @@ public final class Reflection {
             // parameter. If so, see if all the dangling parameters fit in with
             // the varargs
             if(paramTypes.length == expectedParamTypes.length - 1) {
-                callable = TernaryTruth.TRUE;
+                // Handle corner case where no args are provided for a varargs
+                // parameter
+                return isDefinitelyCallableWith(method,
+                        ArrayBuilder.<Class<?>> builder().add(paramTypes)
+                                .add(java.lang.reflect.Array
+                                        .newInstance(varArgType, 0).getClass())
+                                .build());
             }
             else {
                 for (int i = expectedParamTypes.length
