@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.6.0 (TBD)
+* Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
+
 #### Version 1.5.1 (November 28, 2018)
 * Fixed a bug that caused an `ArrayBuilder` to fail when adding elements with different types even though those types had a common ancestor type.
 * Fixed a bug that caused issues when using `Reflection` to determine the callability of or to invoke methods with a varargs parameter.
