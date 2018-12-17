@@ -15,8 +15,8 @@
  */
 package com.cinchapi.script;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import com.cinchapi.common.reflect.Reflection;
@@ -57,8 +57,9 @@ public class ScriptObjectMirrors {
                         .collect(Collectors.toList());
             }
             else {
-                return (T) map.entrySet().stream().collect(Collectors
-                        .toMap(Entry::getKey, e -> javaify(e.getValue())));
+                return (T) map.entrySet().stream().collect(LinkedHashMap::new,
+                        (m, e) -> m.put(e.getKey(), e.getValue()),
+                        LinkedHashMap::putAll);
             }
         }
         else {
