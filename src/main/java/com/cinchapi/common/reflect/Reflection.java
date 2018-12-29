@@ -946,6 +946,19 @@ public final class Reflection {
                     break;
                 }
             }
+            if(potential.size() == 2) {
+                // UTIL-12: Handle a corner case where an overloaded method
+                // takes corresponding boxable parameters
+                List<Class<?>> paramTypesA = Arrays
+                        .stream(potential.get(0).getParameterTypes())
+                        .map(Reflection::unbox).collect(Collectors.toList());
+                List<Class<?>> paramTypesB = Arrays
+                        .stream(potential.get(1).getParameterTypes())
+                        .map(Reflection::unbox).collect(Collectors.toList());
+                if(paramTypesA.equals(paramTypesB)) {
+                    potential.remove(1);
+                }
+            }
             int matches = potential.size();
             Method method;
             if(matches < 1) {

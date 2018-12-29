@@ -3,6 +3,9 @@
 #### Version 1.6.0 (TBD)
 * Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
 
+#### Version 1.5.2 (December 29, 2018)
+* Fixed a bug where the `Reflection#getMethod` and other dependent functions (i.e. `call`, `callStatic`, etc) incorrectly determined an invocation was ambiguous if the invoked method was overloaded with corresponding parameters that are autoboxable (i.e. `long` and `Long`). For example, trying to invoke one of `foo(String arg1, long arg2)` and `foo(String arg1, Long arg2)` would previously fail.
+
 #### Version 1.5.1 (November 28, 2018)
 * Fixed a bug that caused an `ArrayBuilder` to fail when adding elements with different types even though those types had a common ancestor type.
 * Fixed a bug that caused issues when using `Reflection` to determine the callability of or to invoke methods with a varargs parameter.

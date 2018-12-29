@@ -383,6 +383,14 @@ public class ReflectionTest {
                 ImmutableList.of(Array.containing("foo")).toArray());
         Assert.assertTrue(true); // lack of Exception means we pass
     }
+    
+    @Test
+    public void testNoAmbiguityForOverloadedMethodsWithAutoboxedArgs() {
+        Reflection.call(new Foo(), "verA", "foo", 1);
+        Reflection.call(new Foo(), "verA", "foo", 1L);
+        Reflection.call(new Foo(), "verA", "foo", new Long(1));
+        Assert.assertTrue(true); // lack of Exception means we pass
+    }
 
     private static class A {
 
@@ -538,6 +546,10 @@ public class ReflectionTest {
         public void overloadVarArgs() {}
 
         public void overloadVarArgs(String... args) {}
+        
+        public void verA(String arg0, long arg) {}
+        
+        public void verA(String arg0, Long arg) {}
 
     }
 
