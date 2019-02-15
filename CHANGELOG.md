@@ -3,11 +3,13 @@
 #### Version 1.6.0 (TBD)
 * Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
 
-#### Version 1.5.2 (December 29, 2018)
-* Fixed a bug where the `Reflection#getMethod` and other dependent functions (i.e. `call`, `callStatic`, etc) incorrectly determined an invocation was ambiguous if the invoked method was overloaded with corresponding parameters that are autoboxable (i.e. `long` and `Long`). For example, trying to invoke one of `foo(String arg1, long arg2)` and `foo(String arg1, Long arg2)` would previously fail.
+#### Version 1.5.3 (TBD)
 * Fixed a bug in `AnyStrings#isWithinQuotes` that failed to account for all classes of unicode quote characters.
 * Added functionality to `AnyStrings#replaceUnicodeConfusables` to specify characters that should not be replaced, even if they are a confusable.
 * Added functionality to `AnyStrings#isWithinQuotes` to specify characters that should not be treated as quote characters, even if they actually are.
+
+#### Version 1.5.2 (December 29, 2018)
+* Fixed a bug where the `Reflection#getMethod` and other dependent functions (i.e. `call`, `callStatic`, etc) incorrectly determined an invocation was ambiguous if the invoked method was overloaded with corresponding parameters that are autoboxable (i.e. `long` and `Long`). For example, trying to invoke one of `foo(String arg1, long arg2)` and `foo(String arg1, Long arg2)` would previously fail.
 
 #### Version 1.5.1 (November 28, 2018)
 * Fixed a bug that caused an `ArrayBuilder` to fail when adding elements with different types even though those types had a common ancestor type.
