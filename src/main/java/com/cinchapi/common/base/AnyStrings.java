@@ -631,21 +631,23 @@ public class AnyStrings {
      * </p>
      * 
      * @param string the {@link String} in which the replacements should occur
+     * @param a list of characters that should not be replaced, even if they are
+     *            a confusable
      * @return a {@link String} free of confusable unicode characters
      */
     public static String replaceUnicodeConfusables(String string,
-            Character... exclude) {
-        Set<Character> excludedChars = Arrays.stream(exclude)
+            Character... preserve) {
+        Set<Character> preserved = Arrays.stream(preserve)
                 .collect(Collectors.toSet());
         char[] chars = string.toCharArray();
         for (int i = 0; i < chars.length; ++i) {
             char c = chars[i];
             if(DOUBLE_QUOTE_UNICODE_CHARS.contains(c)
-                    && !excludedChars.contains(c)) {
+                    && !preserved.contains(c)) {
                 c = '"';
             }
             else if(SINGLE_QUOTE_UNICODE_CHARS.contains(c)
-                    && !excludedChars.contains(c)) {
+                    && !preserved.contains(c)) {
                 c = '\'';
             }
             chars[i] = c;
