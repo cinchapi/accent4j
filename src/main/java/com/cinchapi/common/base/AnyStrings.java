@@ -542,14 +542,14 @@ public class AnyStrings {
      * double quotes.
      * 
      * @param string
-     * @param forceTreatAsNotQuoteChar a list of characters may be
+     * @param forceTreatAsNonQuoteChar a list of characters may be
      *            technically quotes but should not be considered when checking
      *            if {@code string} is within quotes
      * @return {@code true} if the string is between quotes
      */
     public static boolean isWithinQuotes(String string,
-            Character... forceTreatAsNotQuoteChar) {
-        string = replaceUnicodeConfusables(string, forceTreatAsNotQuoteChar);
+            Character... forceTreatAsNonQuoteChar) {
+        string = replaceUnicodeConfusables(string, forceTreatAsNonQuoteChar);
         if(string.length() > 2) {
             char first = string.charAt(0);
             if(first == '"' || first == '\'') {
