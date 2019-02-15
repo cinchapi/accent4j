@@ -18,12 +18,15 @@ package com.cinchapi.common.base;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Doubles;
@@ -41,6 +44,32 @@ import com.google.common.primitives.Longs;
  * @author Jeff Nelson
  */
 public class AnyStrings {
+
+    /**
+     * The set of all unicode double quotation mark characters
+     *
+     * See <a href=
+     * "http://www.unicode.org/Public/security/revision-03/confusablesSummary.txt"
+     * >http://www.unicode.org/Public/security/revision-03/confusablesSummary.
+     * txt</a> for the list of characters
+     * </p>
+     **/
+    private static final Set<Character> DOUBLE_QUOTE_UNICODE_CHARS = ImmutableSet
+            .of('ʺ', '˝', 'ˮ', '˶', 'ײ', '״', '“', '”', '‟', '″', '‶', '〃',
+                    '＂');
+    /**
+     * The set of all unicode single quotation mark characters
+     *
+     * See <a href=
+     * "http://www.unicode.org/Public/security/revision-03/confusablesSummary.txt"
+     * >http://www.unicode.org/Public/security/revision-03/confusablesSummary.
+     * txt</a> for the list of characters
+     * </p>
+     **/
+    private static final Set<Character> SINGLE_QUOTE_UNICODE_CHARS = ImmutableSet
+            .of('`', 'ꞌ', 'ʻ', 'ʼ', 'י', 'ʹ', 'ʽ', 'ʾ', 'ˊ', 'ˋ', 'ߴ', 'ߵ', 'ʹ',
+                    '׳', '’', '˴', '՚', '՝', '‘', '‛', '′', '‵', '´', '΄', '᾽',
+                    '᾿', '`', '´', '῾', '＇', '｀');
 
     /**
      * The start of a placeholder sequence for the
@@ -513,9 +542,14 @@ public class AnyStrings {
      * double quotes.
      * 
      * @param string
+     * @param forceTreatAsNonQuoteChar a list of characters may be
+     *            technically quotes but should not be considered when checking
+     *            if {@code string} is within quotes
      * @return {@code true} if the string is between quotes
      */
-    public static boolean isWithinQuotes(String string) {
+    public static boolean isWithinQuotes(String string,
+            Character... forceTreatAsNonQuoteChar) {
+        string = replaceUnicodeConfusables(string, forceTreatAsNonQuoteChar);
         if(string.length() > 2) {
             char first = string.charAt(0);
             if(first == '"' || first == '\'') {
@@ -601,30 +635,24 @@ public class AnyStrings {
      * </p>
      * 
      * @param string the {@link String} in which the replacements should occur
+     * @param a list of characters that should not be replaced, even if they are
+     *            a confusable
      * @return a {@link String} free of confusable unicode characters
      */
-    public static String replaceUnicodeConfusables(String string) {
+    public static String replaceUnicodeConfusables(String string,
+            Character... preserve) {
+        Set<Character> preserved = Arrays.stream(preserve)
+                .collect(Collectors.toSet());
         char[] chars = string.toCharArray();
         for (int i = 0; i < chars.length; ++i) {
             char c = chars[i];
-            switch (c) {
-            default:
-                break;
-            case 'ʺ':
-            case '˝':
-            case 'ˮ':
-            case '˶':
-            case 'ײ':
-            case '״':
-            case '“':
-            case '”':
-            case '‟':
-            case '″':
-            case '‶':
-            case '〃':
-            case '＂':
+            if(DOUBLE_QUOTE_UNICODE_CHARS.contains(c)
+                    && !preserved.contains(c)) {
                 c = '"';
-                break;
+            }
+            else if(SINGLE_QUOTE_UNICODE_CHARS.contains(c)
+                    && !preserved.contains(c)) {
+                c = '\'';
             }
             chars[i] = c;
         }
