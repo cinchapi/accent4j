@@ -4,6 +4,7 @@
 * Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
 * Added `com.cinchapi.common.collect.lazy` package which contains collections that facilitate efficient streaming by executing transformation logic on the fly. The package contains
   * `LazyTransformSet` - a `Set` that transforms items from another set using a function. The transformation only happens at the point of consumption.
+* Added `Reflection#getAllDeclaredMethods` to return `Method` objects for all the non-base methods declared in a class hiearchy.
 
 #### Version 1.5.3 (TBD)
 * Fixed a bug in `AnyStrings#isWithinQuotes` that failed to account for all classes of unicode quote characters.
