@@ -802,7 +802,7 @@ public class AnyStrings {
                     return Double.valueOf(value.substring(0, i));
                 }
                 else if((c == 'E' || c == 'e') && i < size - 1) {
-                    // CO-627: Account for valid representations of scientific
+                    // CON-627: Account for valid representations of scientific
                     // notation
                     if(!scientific) {
                         scientific = true;

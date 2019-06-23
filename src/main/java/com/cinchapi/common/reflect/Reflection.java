@@ -261,6 +261,42 @@ public final class Reflection {
     }
 
     /**
+     * Given a {@link Class}, return an array containing all the {@link Method}
+     * objects that represent those declared within the class's entire hierarchy
+     * after the base {@link Object} class.
+     * 
+     * @param clazz the {@link Class} to inspect
+     * @return the array of declared methods
+     */
+    public static Method[] getAllDeclaredMethods(Class<?> clazz) {
+        List<Method> methods = Lists.newArrayList();
+        while (clazz != Object.class) {
+            for (Method method : clazz.getDeclaredMethods()) {
+                if(!method.getName().equalsIgnoreCase("methods0")
+                        && !method.isSynthetic()
+                        && !Modifier.isStatic(method.getModifiers())) {
+                    method.setAccessible(true);
+                    methods.add(method);
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return methods.toArray(Array.containing());
+    }
+
+    /**
+     * Given a {@link Class}, return an array containing all the {@link Method}
+     * objects that represent those declared within {@code obj's} entire class
+     * hierarchy after the base {@link Object}.
+     * 
+     * @param obj the {@link Class} to inspect
+     * @return the array of declared methods
+     */
+    public static Method[] getAllDeclaredMethods(Object obj) {
+        return getAllDeclaredMethods(obj.getClass());
+    }
+
+    /**
      * Reflectively get the value of the {@code field} from the provided
      * {@code object} and attempt an automatic type cast.
      * 

@@ -1,9 +1,12 @@
 # Changelog
 
-#### Version 1.6.0 (TBD)
+#### Version 1.6.0 (June 23, 2019)
 * Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
+* Added `com.cinchapi.common.collect.lazy` package which contains collections that facilitate efficient streaming by executing transformation logic on the fly. The package contains
+  * `LazyTransformSet` - a `Set` that transforms items from another set using a function. The transformation only happens at the point of consumption.
+* Added `Reflection#getAllDeclaredMethods` to return `Method` objects for all the non-base methods declared in a class hiearchy.
 
-#### Version 1.5.3 (TBD)
+#### Version 1.5.3 (February 16, 2019)
 * Fixed a bug in `AnyStrings#isWithinQuotes` that failed to account for all classes of unicode quote characters.
 * Added functionality to `AnyStrings#replaceUnicodeConfusables` to specify characters that should not be replaced, even if they are a confusable.
 * Added functionality to `AnyStrings#isWithinQuotes` to specify characters that should not be treated as quote characters, even if they actually are.
