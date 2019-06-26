@@ -20,9 +20,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.Verify;
+import com.cinchapi.common.collect.lazy.JITFilterValuesMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -160,6 +163,10 @@ public final class AnyMaps {
      *            {@code into} map
      * @return the merged {@link Map}
      */
+
+    public static <T, Q> JITFilterValuesMap<T, Q> filterValuesJustInTime(Map<T, Q> x, BiPredicate<T, Q> check) {
+        return new JITFilterValuesMap<>(x);
+    }
     public static Map<String, Object> merge(Map<String, Object> into,
             Map<String, Object> from,
             BiFunction<Object, Object, Object> strategy) {
