@@ -11,59 +11,103 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 
 public class JITFilterMap<Key, Value> implements Map<Key, Value> {
-    private final AtomicBoolean isOriginal = new AtomicBoolean(true);
     private Map<Key, Value> map;
-    final private Predicate<Value> check;
+    private final Predicate<Value> filter;
+    private final AtomicBoolean isOriginal = new AtomicBoolean(true);
 
-    public JITFilterMap(Map<Key, Value> x, Predicate<Value> check) {
+    public JITFilterMap(Map<Key, Value> x, Predicate<Value> filter) {
         this.map = x;
-        this.check = check;
+        this.filter = filter;
     }
 
-    @Nullable @Override public Value put(Key key, Value value) {
-        executeAndMaybeCreateNewMap(value, () -> map.put(key, value));
-        final Value lastValue = map.get(key);
-        if (isOriginal.get() && !check.test(value))
-            map = new HashMap<>(map);
-        map.put(key, value);
-        return lastValue;
+    @Nullable
+    @Override
+    public Value put(Key key, Value value) {
+        maybeCreateNewMap(value);
+        return map.put(key, value);
     }
 
-    @Override public void putAll(@NotNull Map<? extends Key, ? extends Value> m) {
+    @Override
+    public void putAll(@NotNull Map<? extends Key, ? extends Value> m) {
         m.forEach((k,v) -> {
-            if (isOriginal.get() && !(check.test(v))) {
-                map = new HashMap<>(map);
-                isOriginal.set(false);
-            }
+            maybeCreateNewMap(v);
             map.put(k, v);
         });
     }
 
     @Override
     public boolean replace(Key key, Value oldValue, Value newValue) {
-        AtomicBoolean
+        maybeCreateNewMap(newValue);
         return map.replace(key, oldValue, newValue);
     }
 
     @Nullable
     @Override
-    public Value replace(Key key, Value value) { return map.replace(key, value); }
+    public Value replace(Key key, Value value) {
+        maybeCreateNewMap(value);
+        return map.replace(key, value);
+    }
 
     @Override
-    public void replaceAll(BiFunction<? super Key, ? super Value, ? extends Value> function) {
-        map.replaceAll(function);
+    public void replaceAll(BiFunction<? super Key, ? super Value, ? extends Value> f) {
+        map.forEach((k, v) -> {
+            maybeCreateNewMap(v);
+            f.apply(k, v);
+        });
     }
 
     @Nullable
     @Override
-    public Value putIfAbsent(Key key, Value value) { return map.putIfAbsent(key, value); }
+    public Value putIfAbsent(Key key, Value value) {
+        maybeCreateNewMap(value);
+        return map.putIfAbsent(key, value);
+    }
 
-    private <T> T executeAndMaybeCreateNewMap(Value value, Supplier<T> alwaysRun) {
-        if (isOriginal.get() && !check.test(value)) {
+    @Override
+    public Value computeIfAbsent(Key key, Function<? super Key, ? extends Value> f) {
+        return compute(key, v -> v != null, v -> f.apply(key));
+    }
+
+    @Override
+    public Value computeIfPresent(Key key, BiFunction<? super Key, ? super Value, ? extends Value> f) {
+        return compute(key, v -> v == null, v -> f.apply(key, v));
+    }
+
+    @Override
+    public Value compute(Key key, BiFunction<? super Key, ? super Value, ? extends Value> f) {
+        return compute(key, v -> false, v -> f.apply(key, v));
+    }
+
+    @Override
+    public Value merge(Key key, Value value, BiFunction<? super Value, ? super Value, ? extends Value> f) {
+        Value oldValue = map.get(key);
+        Value newValue = oldValue == null ? value : f.apply(oldValue, value);
+
+        if (newValue == null)
+            map.remove(key);
+        else {
+            maybeCreateNewMap(newValue);
+            map.put(key, newValue);
+        }
+
+        return newValue;
+    }
+
+    private Value compute(Key key, Predicate<Value> check, Function<Value, Value> getNewValue) {
+        final Value oldValue = map.get(key);
+        if (check.test(oldValue))
+            return oldValue;
+        final Value value = getNewValue.apply(oldValue);
+        map.put(key, value);
+        maybeCreateNewMap(value);
+        return value;
+    }
+
+    private void maybeCreateNewMap(Value value) {
+        if (isOriginal.get() && !filter.test(value)) {
             map = new HashMap<>(map);
             isOriginal.set(false);
         }
-        return alwaysRun.get();
     }
     // ~~ Simple method delegation below this line ~~
 
@@ -112,32 +156,10 @@ public class JITFilterMap<Key, Value> implements Map<Key, Value> {
     @Override
     public void forEach(BiConsumer<? super Key, ? super Value> action) { map.forEach(action); }
 
-
     @Override
     public boolean remove(Object key, Object value) { return map.remove(key, value); }
 
 
-
-    @Override
-    public Value computeIfAbsent(Key key, Function<? super Key, ? extends Value> mappingFunction) {
-        return map.computeIfAbsent(key, mappingFunction);
-    }
-
-    @Override
-    public Value computeIfPresent(Key key, BiFunction<? super Key, ? super Value, ? extends Value> remappingFunction) {
-        return map.computeIfPresent(key, remappingFunction);
-    }
-
-    @Override
-    public Value compute(Key key, BiFunction<? super Key, ? super Value, ? extends Value> remappingFunction) {
-        return map.compute(key, remappingFunction);
-    }
-
-    @Override
-    public Value merge(Key key, Value value,
-                       BiFunction<? super Value, ? super Value, ? extends Value> remappingFunction) {
-        return map.merge(key, value, remappingFunction);
-    }
 
 
 }

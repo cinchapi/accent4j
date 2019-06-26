@@ -21,10 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.Array;
 import com.cinchapi.common.base.Verify;
+import com.cinchapi.common.collect.lazy.JITFilterMap;
 import com.cinchapi.common.collect.lazy.JITFilterValuesMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -164,8 +166,8 @@ public final class AnyMaps {
      * @return the merged {@link Map}
      */
 
-    public static <T, Q> JITFilterValuesMap<T, Q> filterValuesJustInTime(Map<T, Q> x, BiPredicate<T, Q> check) {
-        return new JITFilterValuesMap<>(x);
+    public static <T, Q> JITFilterMap<T, Q> filterValuesJustInTime(Map<T, Q> x, Predicate<Q> check) {
+        return new JITFilterMap<>(x, check);
     }
     public static Map<String, Object> merge(Map<String, Object> into,
             Map<String, Object> from,
