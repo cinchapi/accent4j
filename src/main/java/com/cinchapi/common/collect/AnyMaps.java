@@ -166,9 +166,10 @@ public final class AnyMaps {
      * @return the merged {@link Map}
      */
 
-    public static <T, Q> JITFilterMap<T, Q> filterValuesJustInTime(Map<T, Q> x, Predicate<Q> check) {
+    public static <T, Q> Map<T, Q> filterValuesJustInTime(Map<T, Q> x, Predicate<Q> check) {
         return new JITFilterMap<>(x, check);
     }
+
     public static Map<String, Object> merge(Map<String, Object> into,
             Map<String, Object> from,
             BiFunction<Object, Object, Object> strategy) {
