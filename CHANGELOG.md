@@ -1,5 +1,9 @@
 # Changelog
 
+#### Version 1.6.1 (July 15, 2019)
+* Fixed a bug in `Reflection#getTypeArguments` that erroneously returned an empty collection of type arguments when a field was parameterized with a type that itself had a parameterized type (i.e. `List<AtomicReference<Integer>>`)
+* Fixed a bug in `Reflection#getTypeArguments` that caused only a subset of type arguments to be returned in a field contained multiple type arguments, some of which were the same type (i.e. `Map<Integer, Integer>`).
+
 #### Version 1.6.0 (June 23, 2019)
 * Added the `com.cinchapi.script.ScriptObjectMirrors` utility class which contains the `javaify` method for casting script objects to their native Java counterparts.
 * Added `com.cinchapi.common.collect.lazy` package which contains collections that facilitate efficient streaming by executing transformation logic on the fly. The package contains

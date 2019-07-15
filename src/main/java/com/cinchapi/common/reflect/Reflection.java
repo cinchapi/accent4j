@@ -46,10 +46,11 @@ import com.cinchapi.common.base.TernaryTruth;
 import com.cinchapi.common.base.Verify;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.reflect.TypeToken;
 
 /**
  * A collection of tools for using reflection to access or modify objects.
@@ -479,15 +480,22 @@ public final class Reflection {
             ParameterizedType parameterized = (ParameterizedType) field
                     .getGenericType();
             Type[] types = parameterized.getActualTypeArguments();
-            Set<Class<?>> typeArgs = Sets
-                    .newLinkedHashSetWithExpectedSize(types.length);
+            List<Class<?>> typeArgs = Lists
+                    .newArrayListWithCapacity(types.length);
             for (Type type : types) {
-                typeArgs.add((Class<?>) type);
+                Class<?> typeArg;
+                if(type instanceof Class) {
+                    typeArg = (Class<?>) type;
+                }
+                else {
+                    typeArg = TypeToken.of(type).getRawType();
+                }
+                typeArgs.add(typeArg);
             }
             return typeArgs;
         }
         catch (ClassCastException e) {
-            return ImmutableSet.of();
+            return ImmutableList.of();
         }
     }
 
