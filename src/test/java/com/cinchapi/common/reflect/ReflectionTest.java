@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -291,19 +292,26 @@ public class ReflectionTest {
 
     @Test
     public void testGetTypeArguments() {
-        Assert.assertEquals(ImmutableSet.of(String.class), Reflection
+        Assert.assertEquals(ImmutableList.of(String.class), Reflection
                 .getTypeArguments("listOfString", ClassWithGenerics.class));
-        Assert.assertEquals(ImmutableSet.of(A.class),
+        Assert.assertEquals(ImmutableList.of(A.class),
                 Reflection.getTypeArguments("setOfA", ClassWithGenerics.class));
-        Assert.assertEquals(ImmutableSet.of(Integer.class, Boolean.class),
+        Assert.assertEquals(ImmutableList.of(Integer.class, Boolean.class),
                 Reflection.getTypeArguments("mapIntegerToBoolean",
                         ClassWithGenerics.class));
-        Assert.assertEquals(ImmutableSet.of(), Reflection
+        Assert.assertEquals(ImmutableList.of(), Reflection
                 .getTypeArguments("noGenerics", ClassWithGenerics.class));
-        Assert.assertEquals(ImmutableSet.of(), Reflection.getTypeArguments(
-                "noGenericsCollection", ClassWithGenerics.class));
-        Assert.assertEquals(ImmutableSet.of(B.class), Reflection
+        Assert.assertEquals(ImmutableList.of(Object.class),
+                Reflection.getTypeArguments("noGenericsCollection",
+                        ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableList.of(B.class), Reflection
                 .getTypeArguments("collectionOfB", ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableList.of(Integer.class, Integer.class),
+                Reflection.getTypeArguments("mapIntegerToInteger",
+                        ClassWithGenerics.class));
+        Assert.assertEquals(ImmutableList.of(AtomicReference.class),
+                Reflection.getTypeArguments("listAtomicReference",
+                        ClassWithGenerics.class));
     }
 
     @Test
@@ -383,7 +391,7 @@ public class ReflectionTest {
                 ImmutableList.of(Array.containing("foo")).toArray());
         Assert.assertTrue(true); // lack of Exception means we pass
     }
-    
+
     @Test
     public void testNoAmbiguityForOverloadedMethodsWithAutoboxedArgs() {
         Reflection.call(new Foo(), "verA", "foo", 1);
@@ -525,6 +533,9 @@ public class ReflectionTest {
         public Long noGenerics;
         public Collection<?> noGenericsCollection;
         protected Collection<B> collectionOfB;
+        protected Map<Integer, Integer> mapIntegerToInteger;
+        private List<AtomicReference<Integer>> listAtomicReference;
+
     }
 
     public class Foo {
@@ -546,9 +557,9 @@ public class ReflectionTest {
         public void overloadVarArgs() {}
 
         public void overloadVarArgs(String... args) {}
-        
+
         public void verA(String arg0, long arg) {}
-        
+
         public void verA(String arg0, Long arg) {}
 
     }
