@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.7.0 (August 4, 2019)
+* Added a `WrapperAwareStringSplitter` that can be used to split strings on a delimiter except for when that delimiter appears within a character sequence that is wrapped by two specified characters (i.e. beginning and ending parenthesis or left and right brackets).
+
 #### Version 1.6.1 (July 15, 2019)
 * Fixed a bug in `Reflection#getTypeArguments` that erroneously returned an empty collection of type arguments when a field was parameterized with a type that itself had a parameterized type (i.e. `List<AtomicReference<Integer>>`)
 * Fixed a bug in `Reflection#getTypeArguments` that caused only a subset of type arguments to be returned in a field contained multiple type arguments, some of which were the same type (i.e. `Map<Integer, Integer>`).
