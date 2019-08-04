@@ -17,10 +17,7 @@ package com.cinchapi.common.base;
 
 import static com.cinchapi.common.base.SplitOption.*;
 
-import java.util.List;
 import java.util.NoSuchElementException;
-
-import com.google.common.collect.Lists;
 
 /**
  * An in-place utility to traverse and split a string into substring.
@@ -232,11 +229,11 @@ public class StringSplitter {
      * @return the tokens
      */
     public String[] toArray() {
-        List<String> toks = Lists.newArrayList();
+        ArrayBuilder<String> builder = ArrayBuilder.builder();
         while (hasNext()) {
-            toks.add(next());
+            builder.add(next());
         }
-        return toks.toArray(new String[0]);
+        return builder.build();
     }
 
     /**
