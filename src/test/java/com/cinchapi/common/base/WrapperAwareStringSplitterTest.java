@@ -40,5 +40,14 @@ public class WrapperAwareStringSplitterTest {
                 "resume", "offers.address.state");
         Assert.assertEquals(expected, actual);
     }
+    
+    @Test
+    public void testBracketAwareSplitterReproA() {
+        String string = "company.{name, description}";
+        StringSplitter it = WrapperAwareStringSplitter.bracketAware(string, ',',
+                SplitOption.TRIM_WHITESPACE);
+        Set<String> actual = ImmutableSet.copyOf(it.toArray());
+        Assert.assertEquals(ImmutableSet.of(string), actual);
+    }
 
 }
