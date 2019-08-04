@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.7.1 (August 4, 2019)
+* Fix a bug that causes the `WrapperAwareStringSplitter` to incorrectly split a string by a delimiter within a wrapped character sequence if there was no instance of the delimiter character appearing before the wrapped characters.
+
 #### Version 1.7.0 (August 4, 2019)
 * Added a `WrapperAwareStringSplitter` that can be used to split strings on a delimiter except for when that delimiter appears within a character sequence that is wrapped by two specified characters (i.e. beginning and ending parenthesis or left and right brackets).
 

@@ -114,6 +114,7 @@ public class WrapperAwareStringSplitter extends StringSplitter {
         Verify.thatArgument(wrapperStart != wrapperEnd);
         this.wrapperStart = wrapperStart;
         this.wraperEnd = wrapperEnd;
+        reset();
     }
 
     /**
@@ -128,6 +129,7 @@ public class WrapperAwareStringSplitter extends StringSplitter {
         Verify.thatArgument(wrapperStart != wrapperEnd);
         this.wrapperStart = wrapperStart;
         this.wraperEnd = wrapperEnd;
+        reset();
     }
 
     /**
@@ -144,6 +146,7 @@ public class WrapperAwareStringSplitter extends StringSplitter {
         Verify.thatArgument(wrapperStart != wrapperEnd);
         this.wrapperStart = wrapperStart;
         this.wraperEnd = wrapperEnd;
+        reset();
     }
 
     /**
@@ -159,6 +162,7 @@ public class WrapperAwareStringSplitter extends StringSplitter {
         Verify.thatArgument(wrapperStart != wrapperEnd);
         this.wrapperStart = wrapperStart;
         this.wraperEnd = wrapperEnd;
+        reset();
     }
 
     @Override

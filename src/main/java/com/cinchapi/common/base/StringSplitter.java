@@ -220,6 +220,7 @@ public class StringSplitter {
     public void reset() {
         pos = 0;
         start = 0;
+        findNext();
     }
 
     /**
