@@ -46,6 +46,19 @@ public abstract class Benchmark {
         this.unit = unit;
     }
 
+    public abstract void action();
+
+    /**
+     * Return the average run time of the {@link #action()} over the specified
+     * number of run {@code times}.
+     * 
+     * @param times
+     * @return the average run time
+     */
+    public final double average(int times) {
+        return (double) run(times) / times;
+    }
+
     /**
      * Run the {@link #action() action} once and return the elapsed time,
      * expressed in the {@link TimeUnit} that was passed into the constructor.
@@ -75,7 +88,5 @@ public abstract class Benchmark {
         long end = System.nanoTime();
         return unit.convert(end - start, TimeUnit.NANOSECONDS);
     }
-
-    public abstract void action();
 
 }
