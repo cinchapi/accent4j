@@ -22,7 +22,7 @@ import java.io.*;
 import java.util.Map;
 
 public class Displayer {
-    public static void output(Iterable<Map<String, ?>> items,
+    public static <T> void output(Iterable<Map<String, T>> items,
             OutputStream output) {
         PrintStream printer = new PrintStream(output);
 
