@@ -22,18 +22,18 @@ import java.io.*;
 import java.util.Map;
 
 public class Displayer {
-    public static void showRecords(Iterable<Map<String, ?>> records,
+    public static void showItems(Iterable<Map<String, ?>> items,
             OutputStream output) {
         PrintStream printer = new PrintStream(output);
 
-        for(Map<String, ?> record : records) {
-            for(Map.Entry<String, ?> entry : record.entrySet()) {
-                showRecord(printer, entry.getKey(), entry.getValue());
+        for(Map<String, ?> item : items) {
+            for(Map.Entry<String, ?> entry : item.entrySet()) {
+                showItem(printer, entry.getKey(), entry.getValue());
             }
         }
     }
 
-    private static void showRecord(PrintStream printer, String k, Object v) {
+    private static void showItem(PrintStream printer, String k, Object v) {
         if(v instanceof String) {
             v = AnyStrings.ensureWithinQuotesIfNeeded((String) v, ',');
         }

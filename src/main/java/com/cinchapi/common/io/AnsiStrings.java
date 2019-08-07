@@ -29,7 +29,7 @@ import org.fusesource.jansi.Ansi.Color;
  * 
  * @author Jeff Nelson
  */
-public class AnsiStrings {
+public class DAnsiStrings {
 
     /**
      * Return a {@link String} that prints as bold {@code text} on supported
