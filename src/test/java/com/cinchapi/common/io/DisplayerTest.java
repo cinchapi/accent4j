@@ -20,7 +20,7 @@ public class DisplayerTest {
         stuff.add(new HashMap<>());
         stuff.get(1).put("Testing", "Testing Here");
         stuff.get(1).put("Testing2", "Testing,Here");
-        
+
         String result = "One,\"One,Two,Three\"\n"
                 + "One,One,Two,Three\n"
                 + "Two,Two.Two.Three\n"
@@ -35,6 +35,5 @@ public class DisplayerTest {
         Displayer.output(stuff, stream);
 
         assert out.toString().equals(result);
-
     }
 }
