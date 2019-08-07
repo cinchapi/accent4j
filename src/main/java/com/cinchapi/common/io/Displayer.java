@@ -22,20 +22,21 @@ import java.io.*;
 import java.util.Map;
 
 public class Displayer {
-    public static void showItems(Iterable<Map<String, ?>> items,
+    public static <T, Q> void output(Iterable<Map<T, Q>> items,
             OutputStream output) {
         PrintStream printer = new PrintStream(output);
 
-        for(Map<String, ?> item : items) {
-            for(Map.Entry<String, ?> entry : item.entrySet()) {
-                showItem(printer, entry.getKey(), entry.getValue());
+        for(Map<T, Q> item : items) {
+            for(Map.Entry<T, Q> entry : item.entrySet()) {
+                outputItem(printer, entry.getKey(), entry.getValue());
             }
         }
     }
 
-    private static void showItem(PrintStream printer, String k, Object v) {
+    private static <T, Q> void outputItem(PrintStream printer, T k, Q v) {
         if(v instanceof String) {
-            v = AnyStrings.ensureWithinQuotesIfNeeded((String) v, ',');
+            printer.println(k + "," + AnyStrings
+                .ensureWithinQuotesIfNeeded((String) v, ','));
         }
         printer.println(k + "," + v);
     }
