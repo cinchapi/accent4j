@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DisplayerTest {
+public class OutputTest {
     @Test public void outputTest() {
         List<Map<String, String>> stuff = new ArrayList<>();
         stuff.add(new HashMap<>());
@@ -48,7 +48,7 @@ public class DisplayerTest {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         OutputStream stream = new PrintStream(out);
-        Displayer.output(stuff, stream);
+        Output.delimitedLines(stuff, ',');
 
         assert out.toString().equals(result);
     }
