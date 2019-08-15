@@ -15,10 +15,15 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
+import com.cinchapi.common.collect.Sequences;
 import com.cinchapi.common.describe.Empty;
 
 /**
@@ -66,6 +71,51 @@ public final class AnyObjects {
             throw message == null ? new IllegalArgumentException()
                     : new IllegalArgumentException(message.toString());
         }
+    }
+
+    /**
+     * This function takes a generic {@code value} and a character as the
+     * delimiter.
+     *
+     * <p>
+     * Firstly, if the generic is a sequence, then we iterate through each item
+     * and split the string representation, by the delimiter, of each item
+     * individually, trimming any whitespace away. We then convert this new
+     * sequence to a list and return that.
+     * </p>
+     *
+     * <p>
+     * Secondly, if the generic is not a sequence, then we simply convert the
+     * item to a String and split by the delimiter, again trimming the
+     * whitespace, and then we convert that new sequence to a list and return
+     * that.
+     * </p>
+     *
+     * @param value The generic value
+     * @param delimiter The character that we use to specify the boundary
+     *            between different parts of the text.
+     * @param The type of the generic value
+     * @return a list based on the {@code value} being split
+     */
+    public static <T> List<String> split(T value, char delimiter) {
+        Function<Object, String[]> splitter = item -> new StringSplitter(
+                item.toString(), delimiter, SplitOption.TRIM_WHITESPACE)
+                        .toArray();
+        return Sequences.isSequence(value)
+                ? Sequences.stream(value).map(splitter).flatMap(Arrays::stream)
+                        .collect(Collectors.toList())
+                : Arrays.asList(splitter.apply(value));
+    }
+
+    /**
+     * Perform a {@link #split(Object, char)} based on the a comma delimiter.
+     * 
+     * @param value the generic value
+     * @param the type of the generic value
+     * @return a list based on the {@code value} being split
+     */
+    public static <T> List<String> split(T value) {
+        return split(value, ',');
     }
 
     /**
