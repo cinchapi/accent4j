@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -97,13 +98,13 @@ public final class AnyObjects {
      * @return a list based on the {@code value} being split
      */
     public static <T> List<String> split(T value, char delimiter) {
-        Function<Object, List<String>> splitter = item -> new StringSplitter(
+        Function<Object, String[]> splitter = item -> new StringSplitter(
                 item.toString(), delimiter, SplitOption.TRIM_WHITESPACE)
-                        .toList();
+                        .toArray();
         return Sequences.isSequence(value)
-                ? Sequences.stream(value).map(splitter).flatMap(List::stream)
+                ? Sequences.stream(value).map(splitter).flatMap(Arrays::stream)
                         .collect(Collectors.toList())
-                : splitter.apply(value);
+                : Arrays.asList(splitter.apply(value));
     }
 
     /**
