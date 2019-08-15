@@ -16,8 +16,11 @@
 package com.cinchapi.common.collect;
 
 import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -27,6 +30,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 
 /**
+ * TODO: Refactor Sequences to safely wrap arrays/lists instead of
+ * relying on the developer to adhere to the untyped specifications
+ *
  * Utility functions for dealing with sequences.
  * 
  * <p>
@@ -58,6 +64,19 @@ public final class Sequences {
      */
     public static boolean isSequence(Object object) {
         return isSequenceType(object.getClass());
+    }
+
+    public static <T, R> List<R> flatMap(Object sequence, Function<T, List<R>> f) {
+        final List<R> result = new ArrayList<>();
+        map(sequence, f).forEach(result::addAll);
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T, R> List<R> map(Object sequence, Function<T, R> f) {
+        final List<R> result = new ArrayList<>();
+        forEach(sequence, t -> result.add(f.apply((T) t)));
+        return result;
     }
 
     /**

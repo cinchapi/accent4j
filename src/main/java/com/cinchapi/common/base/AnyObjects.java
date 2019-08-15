@@ -15,10 +15,16 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import com.cinchapi.common.collect.Sequences;
 import com.cinchapi.common.describe.Empty;
 
 /**
@@ -66,6 +72,21 @@ public final class AnyObjects {
             throw message == null ? new IllegalArgumentException()
                     : new IllegalArgumentException(message.toString());
         }
+    }
+
+    public static <T> List<String> split(T value, String delimiter) {
+        Function<Object, List<String>> f = x ->
+                Arrays.stream(x.toString().split(delimiter))
+                        .map(String::trim)
+                        .collect(Collectors.toList());
+
+        return Sequences.isSequence(value)
+                ? Sequences.flatMap(value, f)
+                : f.apply(value);
+    }
+
+    public static <T> List<String> split(T value) {
+        return split(value, ",");
     }
 
     /**

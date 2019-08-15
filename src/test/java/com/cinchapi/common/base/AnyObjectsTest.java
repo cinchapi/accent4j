@@ -15,12 +15,9 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -61,6 +58,16 @@ public class AnyObjectsTest {
     @Test
     public void testIsNullOrEmptyNull() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(null));
+    }
+
+    @Test
+    public void split() {
+        final List<String> result = AnyObjects.split(
+                ImmutableList.of("One, Two", "Three", "Four, Five"));
+
+        Assert.assertEquals(result.size(), 5);
+        Assert.assertEquals(result.get(3), "Four");
+        Assert.assertEquals(result.get(4), "Five");
     }
 
     @Test
