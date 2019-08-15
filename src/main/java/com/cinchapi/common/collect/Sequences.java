@@ -30,9 +30,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 
 /**
- * TODO: Refactor Sequences to safely wrap arrays/lists instead of
- * relying on the developer to adhere to the untyped specifications
- *
  * Utility functions for dealing with sequences.
  * 
  * <p>
@@ -45,6 +42,10 @@ import com.google.common.collect.Streams;
  * @author Jeff Nelson
  */
 public final class Sequences {
+    /*
+    TODO: Refactor Sequences to safely wrap arrays/lists instead of
+    relying on the developer to adhere to the untyped specifications
+     */
 
     /**
      * Return {@code true} if the {@link Class cls} is a sequence type.
@@ -66,16 +67,45 @@ public final class Sequences {
         return isSequenceType(object.getClass());
     }
 
-    public static <T, R> List<R> flatMap(Object sequence, Function<T, List<R>> f) {
+    /*
+     * FlatMap (or bind) is a higher order function that applies a function
+     * (of type :: a -> f b) to each element of a monad.
+     *
+     * This specific function is less generic than that because it only
+     * operates on sequences. This function specifically takes a function
+     * of type ` a -> [b]` and flattens the list.
+     *
+     * Java's type system lacks the complexity necessary to allow us to
+     * flatMap or bind monads at a generic level.
+     *
+     * @param sequence: a sequence (iterable or array)
+     * @param function:
+     */
+    public static <T, R> List<R> flatMap(Object sequence,
+            Function<T, List<R>> function) {
         final List<R> result = new ArrayList<>();
-        map(sequence, f).forEach(result::addAll);
+        map(sequence, function).forEach(result::addAll);
         return result;
     }
 
+    /**
+     * Map is a higher order function that applies a function
+     * (of type :: a -> b) to each element of a functor.
+     *
+     * This specific function is less generic than that because it only
+     * operates on sequences.
+     *
+     * Java's type system lacks the complexity necessary to allow us to
+     * map functors at a generic level.
+     *
+     * @param sequence: a sequence (iterable or array)
+     * @param function: a function that takes a T and returns an R
+     */
     @SuppressWarnings("unchecked")
-    public static <T, R> List<R> map(Object sequence, Function<T, R> f) {
+    public static <T, R> List<R> map(Object sequence,
+            Function<T, R> function) {
         final List<R> result = new ArrayList<>();
-        forEach(sequence, t -> result.add(f.apply((T) t)));
+        forEach(sequence, t -> result.add(function.apply((T) t)));
         return result;
     }
 
@@ -86,8 +116,8 @@ public final class Sequences {
      * performed in the order of iteration (if an iteration order is specified).
      * Exceptions thrown by the action are relayed to the caller.
      * 
-     * @param sequence
-     * @param action
+     * @param sequence: a sequence
+     * @param action: a function that takes a T and returns nothing
      */
     @SuppressWarnings("unchecked")
     public static <T> void forEach(Object sequence, Consumer<T> action) {
