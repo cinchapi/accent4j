@@ -16,6 +16,7 @@
 package com.cinchapi.common.collect.lazy;
 
 import java.util.AbstractSet;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Optional;
@@ -50,8 +51,7 @@ import com.cinchapi.common.base.Verify;
  * This {@link Set} allows just-in-time transformation and should be used to
  * transform elements on the fly when said transformation is expensive. This is
  * especially useful in {@link #stream() stream} operations that feature
- * intermediate
- * operations like {@link Stream#skip(long) skipping}.
+ * intermediate operations like {@link Stream#skip(long) skipping}.
  * </p>
  *
  * @author Jeff Nelson
@@ -66,7 +66,7 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
      * @param transformer
      * @return the {@link LazyTransformSet}
      */
-    public static <F, T> LazyTransformSet<F, T> of(Set<F> from,
+    public static <F, T> LazyTransformSet<F, T> of(Collection<F> from,
             Function<F, T> transformer) {
         return new LazyTransformSet<>(from, transformer);
     }
@@ -74,7 +74,7 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
     /**
      * The original {@link Set} whose items will be transformed.
      */
-    private final Set<F> from;
+    private final Collection<F> from;
 
     /**
      * The transforming function.
@@ -87,7 +87,7 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
      * @param from
      * @param transformer
      */
-    private LazyTransformSet(Set<F> from, Function<F, T> transformer) {
+    private LazyTransformSet(Collection<F> from, Function<F, T> transformer) {
         this.from = from;
         this.transformer = transformer;
     }
