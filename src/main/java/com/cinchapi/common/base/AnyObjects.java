@@ -15,13 +15,10 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
@@ -76,42 +73,45 @@ public final class AnyObjects {
     }
 
     /**
-     * This function takes a generic value and a character as the delimiter.
+     * This function takes a generic {@code value} and a character as the
+     * delimiter.
      *
-     * Firstly, if the generic is a sequence, then we iterate
-     * through each item and split the string representation, by the delimiter,
-     * of each item individually, trimming any whitespace away. We then
-     * convert this new sequence to a list and return that.
+     * <p>
+     * Firstly, if the generic is a sequence, then we iterate through each item
+     * and split the string representation, by the delimiter, of each item
+     * individually, trimming any whitespace away. We then convert this new
+     * sequence to a list and return that.
+     * </p>
      *
-     * Secondly, if the generic is not a sequence, then we simply
-     * convert the item to a String and split by the delimiter, again trimming
-     * the whitespace, and then we convert that new sequence to a list and
-     * return that.
+     * <p>
+     * Secondly, if the generic is not a sequence, then we simply convert the
+     * item to a String and split by the delimiter, again trimming the
+     * whitespace, and then we convert that new sequence to a list and return
+     * that.
+     * </p>
      *
      * @param value The generic value
      * @param delimiter The character that we use to specify the boundary
-     *                  between different parts of the text.
-     * @param <T> The type of the generic value
-     * @return a list that is separated by the delimiter.
+     *            between different parts of the text.
+     * @param The type of the generic value
+     * @return a list based on the {@code value} being split
      */
     public static <T> List<String> split(T value, char delimiter) {
-        Function<Object, List<String>> f = x -> new StringSplitter(
-                x.toString(), delimiter, SplitOption.TRIM_WHITESPACE).toList();
-
+        Function<Object, List<String>> splitter = item -> new StringSplitter(
+                item.toString(), delimiter, SplitOption.TRIM_WHITESPACE)
+                        .toList();
         return Sequences.isSequence(value)
-                ? Sequences.flatMap(value, f)
-                : f.apply(value);
+                ? Sequences.stream(value).map(splitter).flatMap(List::stream)
+                        .collect(Collectors.toList())
+                : splitter.apply(value);
     }
 
     /**
-     * Executes the above split function (see for more detail), but with the
-     * default parameter of ','.
-     *
-     * Since Java lacks default parameters, we have to overload the function.
-     *
+     * Perform a {@link #split(Object, char)} based on the a comma delimiter.
+     * 
      * @param value the generic value
-     * @param <T> the type of the generic value
-     * @return a list that is separated by commas
+     * @param the type of the generic value
+     * @return a list based on the {@code value} being split
      */
     public static <T> List<String> split(T value) {
         return split(value, ',');

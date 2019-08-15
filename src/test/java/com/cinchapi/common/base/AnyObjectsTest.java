@@ -66,7 +66,7 @@ public class AnyObjectsTest {
     }
 
     @Test
-    public void split() {
+    public void testSplit() {
         final List<String> result = AnyObjects.split(
                 ImmutableList.of("One, Two", "Three", "Four, Five"));
 
