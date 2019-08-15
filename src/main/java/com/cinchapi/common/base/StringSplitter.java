@@ -17,6 +17,8 @@ package com.cinchapi.common.base;
 
 import static com.cinchapi.common.base.SplitOption.*;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
@@ -235,6 +237,10 @@ public class StringSplitter {
             builder.add(next());
         }
         return builder.build();
+    }
+
+    public List<String> toList() {
+        return Arrays.asList(toArray());
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -74,11 +75,9 @@ public final class AnyObjects {
         }
     }
 
-    public static <T> List<String> split(T value, String delimiter) {
-        Function<Object, List<String>> f = x ->
-                Arrays.stream(x.toString().split(delimiter))
-                        .map(String::trim)
-                        .collect(Collectors.toList());
+    public static <T> List<String> split(T value, char delimiter) {
+        Function<Object, List<String>> f = x -> new StringSplitter(
+                x.toString(), delimiter, SplitOption.TRIM_WHITESPACE).toList();
 
         return Sequences.isSequence(value)
                 ? Sequences.flatMap(value, f)
@@ -86,7 +85,7 @@ public final class AnyObjects {
     }
 
     public static <T> List<String> split(T value) {
-        return split(value, ",");
+        return split(value, ',');
     }
 
     /**
