@@ -67,8 +67,8 @@ public final class Sequences {
      * performed in the order of iteration (if an iteration order is specified).
      * Exceptions thrown by the action are relayed to the caller.
      * 
-     * @param sequence: a sequence
-     * @param action: a function that takes a T and returns nothing
+     * @param sequence
+     * @param action
      */
     @SuppressWarnings("unchecked")
     public static <T> void forEach(Object sequence, Consumer<T> action) {

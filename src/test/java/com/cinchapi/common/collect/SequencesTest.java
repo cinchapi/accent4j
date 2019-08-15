@@ -15,8 +15,6 @@
  */
 package com.cinchapi.common.collect;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,23 +32,6 @@ import com.google.common.collect.Sets;
  * @author Jeff Nelson
  */
 public class SequencesTest {
-
-    @Test
-    public void testMap() {
-        Object oldList = ImmutableList.of("One", "Two", "Three");
-        List<Integer> newList = Sequences.map(oldList, t ->
-                t.toString().length());
-        Assert.assertTrue(newList.get(0) == 3);
-        Assert.assertTrue(newList.get(2) == 5);
-    }
-    @Test
-    public void testFlatMap() {
-        Object oldList = ImmutableList.of("Test.Two", "Potato", "Run");
-        List<String> newList = Sequences.flatMap(oldList, t ->
-                Arrays.asList(t.toString().split("\\.")));
-
-        Assert.assertEquals(newList.size(), 4);
-    }
 
     @Test
     public void testIsSequence() {
