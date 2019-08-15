@@ -2,6 +2,7 @@
 
 #### Version 1.8.0 (TBD)
 * Added `Benchmark#average` method that runs an action for a specified number of rounds and returns the **average** run time.
+* Added a `CountUpLatch` synchronization construct to allow threads to wait until a latch has been incremented at least `n` times; even if `n` isn't known until after the incrementation begins.
 
 #### Version 1.7.1 (August 4, 2019)
 * Fix a bug that causes the `WrapperAwareStringSplitter` to incorrectly split a string by a delimiter within a wrapped character sequence if there was no instance of the delimiter character appearing before the wrapped characters.
