@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.8.1 (September 2, 2019)
+* Added a version of `AnyObjects#split` that takes a `StringSplitter` as a parameter to provide more configurable split functionality.
+
 #### Version 1.8.0 (August 16, 2019)
 * Added `Benchmark#average` method that runs an action for a specified number of rounds and returns the **average** run time.
 * Added a `CountUpLatch` synchronization construct to allow threads to wait until a latch has been incremented at least `n` times; even if `n` isn't known until after the incrementation begins.
