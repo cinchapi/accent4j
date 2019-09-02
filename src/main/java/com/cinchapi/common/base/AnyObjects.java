@@ -74,51 +74,6 @@ public final class AnyObjects {
     }
 
     /**
-     * This function takes a generic {@code value} and a character as the
-     * delimiter.
-     *
-     * <p>
-     * Firstly, if the generic is a sequence, then we iterate through each item
-     * and split the string representation, by the delimiter, of each item
-     * individually, trimming any whitespace away. We then convert this new
-     * sequence to a list and return that.
-     * </p>
-     *
-     * <p>
-     * Secondly, if the generic is not a sequence, then we simply convert the
-     * item to a String and split by the delimiter, again trimming the
-     * whitespace, and then we convert that new sequence to a list and return
-     * that.
-     * </p>
-     *
-     * @param value The generic value
-     * @param delimiter The character that we use to specify the boundary
-     *            between different parts of the text.
-     * @param The type of the generic value
-     * @return a list based on the {@code value} being split
-     */
-    public static <T> List<String> split(T value, char delimiter) {
-        Function<Object, String[]> splitter = item -> new StringSplitter(
-                item.toString(), delimiter, SplitOption.TRIM_WHITESPACE)
-                        .toArray();
-        return Sequences.isSequence(value)
-                ? Sequences.stream(value).map(splitter).flatMap(Arrays::stream)
-                        .collect(Collectors.toList())
-                : Arrays.asList(splitter.apply(value));
-    }
-
-    /**
-     * Perform a {@link #split(Object, char)} based on the a comma delimiter.
-     * 
-     * @param value the generic value
-     * @param the type of the generic value
-     * @return a list based on the {@code value} being split
-     */
-    public static <T> List<String> split(T value) {
-        return split(value, ',');
-    }
-
-    /**
      * Return {@code theDefault} unless the {@code preferredCheck} passes in
      * which case the {@code preferred} value is returned.
      * 
@@ -230,6 +185,76 @@ public final class AnyObjects {
     public static <T> void registerEmptyDefinition(Class<T> clazz,
             EmptyDefinition<T> def) {
         EMPTY.define(clazz, object -> def.metBy(object));
+    }
+
+    /**
+     * Perform a {@link #split(Object, char)} based on the a comma delimiter.
+     * 
+     * @param value the generic value
+     * @param the type of the generic value
+     * @return a list based on the {@code value} being split
+     */
+    public static <T> List<String> split(T value) {
+        return split(value, ',');
+    }
+
+    /**
+     * This function takes a generic {@code value} and a character as the
+     * delimiter.
+     *
+     * <p>
+     * Firstly, if the generic is a sequence, then we iterate through each item
+     * and split the string representation, by the delimiter, of each item
+     * individually, trimming any whitespace away. We then convert this new
+     * sequence to a list and return that.
+     * </p>
+     *
+     * <p>
+     * Secondly, if the generic is not a sequence, then we simply convert the
+     * item to a String and split by the delimiter, again trimming the
+     * whitespace, and then we convert that new sequence to a list and return
+     * that.
+     * </p>
+     *
+     * @param value The generic value
+     * @param delimiter The character that we use to specify the boundary
+     *            between different parts of the text.
+     * @param The type of the generic value
+     * @return a list based on the {@code value} being split
+     */
+    public static <T> List<String> split(T value, char delimiter) {
+        return split(value, v -> new StringSplitter(v, delimiter,
+                SplitOption.TRIM_WHITESPACE));
+    }
+
+    /**
+     * Intelligently split the {@code value} using a {@link StringSplitter} that
+     * is provided by the {@code generator}.
+     * <p>
+     * If {@code value} is a {@link Sequences#isSequence(Object) sequence}, each
+     * of its items are split and collected in the {@link List} that is
+     * returned.
+     * </p>
+     * <p>
+     * Otherwise, if {@code value} is not a sequence, its {@link #toString()}
+     * representation is split and collected in the {@link List} that is
+     * returned.
+     * </p>
+     * 
+     * @param value
+     * @param generator
+     * @return a {@link List} containing all of the tokens that result from
+     *         splitting the {@code value} using a {@link StringSplitter}
+     *         produced by the {@code generator}
+     */
+    public static <T> List<String> split(T value,
+            Function<String, StringSplitter> generator) {
+        Function<Object, String[]> splitter = item -> generator
+                .apply(item.toString()).toArray();
+        return Sequences.isSequence(value)
+                ? Sequences.stream(value).map(splitter).flatMap(Arrays::stream)
+                        .collect(Collectors.toList())
+                : Arrays.asList(splitter.apply(value));
     }
 
     private AnyObjects() {/* noinit */}
