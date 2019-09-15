@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.8.2 ( September 14, 2019)
+* Fixed a bug that caused a `StringSplitter` to throw an `IllegalStateException` when `toArray()` would generate an empty array because the combination of the original input and split options did not produce any distinct tokens (i.e. using `SplitOption.TRIM_WHITESPACE` with an empty string input). 
+
 #### Version 1.8.1 (September 2, 2019)
 * Added a version of `AnyObjects#split` that takes a `StringSplitter` as a parameter to provide more configurable split functionality.
 
