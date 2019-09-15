@@ -275,6 +275,13 @@ public class StringSplitterTest {
             Assert.assertFalse(it.next().contains(" "));
         }
     }
+    
+    @Test
+    public void testSplitEmptyString() {
+        String string = "";
+        StringSplitter it = new StringSplitter(string, ',', SplitOption.TRIM_WHITESPACE);
+        Assert.assertArrayEquals(new String[0], it.toArray());
+    }
 
     /**
      * Execute the logic for the StringSplitter test.
