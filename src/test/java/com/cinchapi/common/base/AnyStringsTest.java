@@ -59,5 +59,17 @@ public class AnyStringsTest {
         Assert.assertEquals(expected,
                 AnyStrings.replaceUnicodeConfusables("`a`", '`'));
     }
+    
+    @Test
+    public void testJoinEmptyCharacterSeparator() {
+        String expected = "";
+        Assert.assertEquals(expected, AnyStrings.join(','));
+    }
+    
+    @Test
+    public void testJoinEmptyStringSeparator() {
+        String expected = "";
+        Assert.assertEquals(expected, AnyStrings.join(" and "));
+    }
 
 }
