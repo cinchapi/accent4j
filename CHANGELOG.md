@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.8.3 (October 26, 2019)
+* Fixed a bug that caused `AnyStrings#join` to throw an `IndexOutOfBoundsException` when trying to join an empty array of arguments with a separator. These functions now correctly return an empty string.
+
 #### Version 1.8.2 ( September 14, 2019)
 * Fixed a bug that caused a `StringSplitter` to throw an `IllegalStateException` when `toArray()` would generate an empty array because the combination of the original input and split options did not produce any distinct tokens (i.e. using `SplitOption.TRIM_WHITESPACE` with an empty string input). 
 
