@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.8.4 (October 30, 2019)
+* Fixed a bug that caused `Sequences#isSequence` to throw a `NullPointerException` when checking a `null` reference. This method will now return `false` when provided a `null` parameter.
+
 #### Version 1.8.3 (October 26, 2019)
 * Fixed a bug that caused `AnyStrings#join` to throw an `IndexOutOfBoundsException` when trying to join an empty array of arguments with a separator. These functions now correctly return an empty string.
 
