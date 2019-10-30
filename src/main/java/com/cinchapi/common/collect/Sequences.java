@@ -57,7 +57,7 @@ public final class Sequences {
      * @return {@code true} if the object is a sequence
      */
     public static boolean isSequence(Object object) {
-        return isSequenceType(object.getClass());
+        return object != null && isSequenceType(object.getClass());
     }
 
     /**
