@@ -69,5 +69,10 @@ public class SequencesTest {
         Assert.assertTrue(Sequences.contains(sequence, 9));
         Assert.assertFalse(Sequences.contains(sequence, 90));
     }
+    
+    @Test
+    public void testIsSequenceNullSafe() {
+        Assert.assertFalse(Sequences.isSequence(null));
+    }
 
 }
