@@ -18,8 +18,8 @@ package com.cinchapi.common.collect;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -60,12 +60,12 @@ public class CoalescableTreeMapTest {
                     "" + System.currentTimeMillis() + rand.nextInt());
         }
         Assert.assertEquals(candidates.size(), map.size());
-        Set<String> data = map.coalesce("jeff",
+        Map<String, String> data = map.coalesce("jeff",
                 (key, candidate) -> key.equalsIgnoreCase(candidate));
         Assert.assertEquals(2, data.size());
-        Iterator<String> it = data.iterator();
-        Assert.assertEquals(map.get("Jeff"), it.next());
-        Assert.assertEquals(map.get("jeff"), it.next());
+        Iterator<String> it = data.keySet().iterator();
+        Assert.assertEquals(map.get("Jeff"), data.get(it.next()));
+        Assert.assertEquals(map.get("jeff"), data.get(it.next()));
         map.coalesce("1eff", (key, candidate) -> false); // No NPE
     }
 

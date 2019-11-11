@@ -17,16 +17,19 @@ package com.cinchapi.common.collect;
 
 import java.util.Map.Entry;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
+
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * A {@link TreeMap} that contains {@link #coalesce(Object, BiPredicate)
- * functionality} that returns data for a range of consecutive keys that are sufficiently similar.
+ * functionality} that returns data for a range of consecutive keys that are
+ * sufficiently similar.
  *
  * @author Jeff Nelson
  */
@@ -46,11 +49,11 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
     }
 
     /**
-     * Return a {@link Set} containing the values mapped from {@code key} and
-     * any "nearby" keys that are determined by the {@code matcher} to pass the
+     * Return a {@link Map} containing the entries for keys nearby and including
+     * {@code key} and that are determined by the {@code matcher} to pass the
      * desired threshold of similarity to {@code key}.
      * <p>
-     * This method only coalesces consecutive ranges of keys that are
+     * This method only coalesces consecutive ranges of entries that are
      * immediately "lower" or "higher" than the lookup {@code key}. This method
      * evaluates keys on both side of {@code key} until it reaches on that the
      * {@code matcher} determines is not similar enough.
@@ -60,43 +63,40 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      * @param matcher a {@link BiPredicate} that takes the lookup {@code key}
      *            and a potentially coalescible key and returns a boolean that
      *            determines whether the key can be coalesced
-     * @return A {@link Set} containing the values that the {@code matcher}
+     * @return A {@link Map} containing the entries that the {@code matcher}
      *         determines should coalesce to the values mapped from the
      *         {@code key}
      */
-    public Set<V> coalesce(K key, BiPredicate<K, K> matcher) {
+    public Map<K, V> coalesce(K key, BiPredicate<K, K> matcher) {
         V matched = get(key);
-        List<V> lower = Lists.newArrayList();
-        List<V> higher = Lists.newArrayList();
-        Set<V> coalesced = Sets.newLinkedHashSet();
+        List<Entry<K, V>> coalesced = Lists.newArrayList();
         K current = key;
         while (current != null) {
             Entry<K, V> next = lowerEntry(current);
             if(next != null && matcher.test(key, next.getKey())) {
-                lower.add(0, next.getValue());
+                coalesced.add(0, next);
                 current = next.getKey();
             }
             else {
                 current = null;
             }
+        }
+        if(matched != null) {
+            coalesced.add(new SimpleImmutableEntry<>(key, matched));
         }
         current = key;
         while (current != null) {
             Entry<K, V> next = higherEntry(current);
             if(next != null && matcher.test(key, next.getKey())) {
-                higher.add(0, next.getValue());
+                coalesced.add(next);
                 current = next.getKey();
             }
             else {
                 current = null;
             }
         }
-        coalesced.addAll(lower);
-        if(matched != null) {
-            coalesced.add(matched);
-        }
-        coalesced.addAll(higher);
-        return coalesced;
+        return coalesced.stream().collect(Collectors.toMap(Entry::getKey,
+                Entry::getValue, (m1, m2) -> m2, LinkedHashMap::new));
     }
 
 }
