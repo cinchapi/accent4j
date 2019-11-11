@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.9.0 (November 11, 2019)
+* Added the `CoalescableTreeMap` data structure that contains a `coalesce` method to return values for a consecutive range of similar keys.
+
 #### Version 1.8.4 (October 30, 2019)
 * Fixed a bug that caused `Sequences#isSequence` to throw a `NullPointerException` when checking a `null` reference. This method will now return `false` when provided a `null` parameter.
 
