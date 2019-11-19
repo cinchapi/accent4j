@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.9.1 (TBD)
+* Added an improvement to `LazyTransformSet` that caches previously transformed values and makes a best effort to keep them from being transformed on subsequent iterations. 
+
 #### Version 1.9.0 (November 11, 2019)
 * Added the `CoalescableTreeMap` data structure that contains a `coalesce` method to return values for a consecutive range of similar keys.
 
