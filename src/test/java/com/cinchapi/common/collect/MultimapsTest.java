@@ -16,10 +16,12 @@
 package com.cinchapi.common.collect;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
@@ -42,6 +44,16 @@ public class MultimapsTest {
                 .asMapWithSingleValueWherePossible(mmap);
         Assert.assertEquals(1, map.get("foo"));
         Assert.assertEquals(ImmutableSet.of(2, 3), map.get("bar"));
+    }
+
+    @Test
+    public void testMultiMapFromMap() {
+        Map<String, Set<Integer>> data = ImmutableMap.of("a",
+                ImmutableSet.of(1), "b", ImmutableSet.of(1, 2), "c",
+                ImmutableSet.of(3), "d", ImmutableSet.of(3, 4, 5), "e",
+                ImmutableSet.of(1, 2, 3, 4, 5, 6, 7));
+        Multimap<String, Integer> mmap = Multimaps.from(data);
+        Assert.assertEquals(data, mmap.asMap());
     }
 
 }
