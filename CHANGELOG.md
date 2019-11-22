@@ -1,7 +1,8 @@
 # Changelog
 
-#### Version 1.9.1 (TBD)
+#### Version 1.10.0 (TBD)
 * Added an improvement to `LazyTransformSet` that caches previously transformed values and makes a best effort to keep them from being transformed on subsequent iterations. 
+* Added a `ExecutorRaceService` that can be used to execute multiple tasks in parallel with the option to give one of the tasks a head start. The first of the tasks to complete has its `Future` returned to the caller.
 * Added the `Multimaps#from` method that transforms a `Map` whose values are a `Set` of objects into a `Multimap`.
 
 #### Version 1.9.0 (November 11, 2019)
