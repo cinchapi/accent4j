@@ -21,20 +21,60 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 /**
+ * Unit tests for {@link ExecutorRaceService}.
  *
- *
- * @author jeff
+ * @author Jeff Nelson
  */
 public class ExecutorRaceServiceTest {
 
+    @Test
+    public void testRaceRunnable()
+            throws InterruptedException, ExecutionException {
+        AtomicInteger value = new AtomicInteger(0);
+        Runnable a = () -> {
+            try {
+                Thread.sleep(1000);
+                value.compareAndSet(0, 1);
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        };
+        Runnable b = () -> {
+            try {
+                Thread.sleep(500);
+                value.compareAndSet(0, 2);
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        };
+        Runnable c = () -> {
+            try {
+                Thread.sleep(1500);
+                value.compareAndSet(0, 3);
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        };
+        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(
+                Executors.newCachedThreadPool());
+        ers.race(a, b, c);
+        Assert.assertEquals(2, value.get());
+    }
+
     @SuppressWarnings("unchecked")
     @Test
-    public void testRaceReturnsFastest() throws InterruptedException, ExecutionException {
+    public void testRaceReturnsFastest()
+            throws InterruptedException, ExecutionException {
         Callable<Integer> a = () -> {
             Thread.sleep(1000);
             return 1;
@@ -47,17 +87,19 @@ public class ExecutorRaceServiceTest {
             Thread.sleep(1500);
             return 3;
         };
-        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(Executors.newCachedThreadPool());
-        Future<Integer> future = ers.race(a, b,c);
+        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(
+                Executors.newCachedThreadPool());
+        Future<Integer> future = ers.race(a, b, c);
         Assert.assertTrue(future.isDone());
         int expected = 2;
         int actual = future.get();
         Assert.assertEquals(expected, actual);
     }
-    
+
     @SuppressWarnings("unchecked")
     @Test
-    public void testRaceWithHeadStart() throws InterruptedException, ExecutionException {
+    public void testRaceWithHeadStart()
+            throws InterruptedException, ExecutionException {
         Callable<Integer> a = () -> {
             Thread.sleep(1000);
             return 1;
@@ -70,17 +112,20 @@ public class ExecutorRaceServiceTest {
             Thread.sleep(1500);
             return 3;
         };
-        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(Executors.newCachedThreadPool());
-        Future<Integer> future = ers.raceWithHeadStart(1, TimeUnit.SECONDS, a, b,c);
+        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(
+                Executors.newCachedThreadPool());
+        Future<Integer> future = ers.raceWithHeadStart(1, TimeUnit.SECONDS, a,
+                b, c);
         Assert.assertTrue(future.isDone());
         int expected = 1;
         int actual = future.get();
         Assert.assertEquals(expected, actual);
     }
-    
+
     @SuppressWarnings("unchecked")
     @Test
-    public void testRaceWithHeadStartAndStillLose() throws InterruptedException, ExecutionException {
+    public void testRaceWithHeadStartAndStillLose()
+            throws InterruptedException, ExecutionException {
         Callable<Integer> a = () -> {
             Thread.sleep(1000);
             return 1;
@@ -93,17 +138,20 @@ public class ExecutorRaceServiceTest {
             Thread.sleep(1500);
             return 3;
         };
-        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(Executors.newCachedThreadPool());
-        Future<Integer> future = ers.raceWithHeadStart(500, TimeUnit.MILLISECONDS, c,b,a);
+        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(
+                Executors.newCachedThreadPool());
+        Future<Integer> future = ers.raceWithHeadStart(500,
+                TimeUnit.MILLISECONDS, c, b, a);
         Assert.assertTrue(future.isDone());
         int expected = 2;
         int actual = future.get();
         Assert.assertEquals(expected, actual);
     }
-    
+
     @SuppressWarnings("unchecked")
     @Test
-    public void testRaceDoesNotRunCallableIfHeadStartPrevails() throws InterruptedException, ExecutionException {
+    public void testRaceDoesNotRunCallableIfHeadStartPrevails()
+            throws InterruptedException, ExecutionException {
         AtomicBoolean run = new AtomicBoolean(false);
         Callable<Integer> a = () -> {
             Thread.sleep(1000);
@@ -119,8 +167,10 @@ public class ExecutorRaceServiceTest {
             run.set(true);
             return 3;
         };
-        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(Executors.newCachedThreadPool());
-        Future<Integer> future = ers.raceWithHeadStart(1000, TimeUnit.MILLISECONDS, b,a,c);
+        ExecutorRaceService<Integer> ers = new ExecutorRaceService<>(
+                Executors.newCachedThreadPool());
+        Future<Integer> future = ers.raceWithHeadStart(1000,
+                TimeUnit.MILLISECONDS, b, a, c);
         Assert.assertTrue(future.isDone());
         int expected = 2;
         int actual = future.get();

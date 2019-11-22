@@ -96,7 +96,7 @@ public class ExecutorRaceService<V> {
      */
     public Future<V> race(Runnable task, Runnable... tasks)
             throws InterruptedException {
-        return race(task, tasks);
+        return raceWithHeadStart(0, TimeUnit.MICROSECONDS, task, tasks);
     }
 
     /**
