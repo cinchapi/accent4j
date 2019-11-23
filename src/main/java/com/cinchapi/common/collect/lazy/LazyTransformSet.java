@@ -18,6 +18,7 @@ package com.cinchapi.common.collect.lazy;
 import java.util.AbstractSet;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
@@ -42,6 +43,7 @@ import java.util.stream.StreamSupport;
 
 import com.cinchapi.common.base.ReadOnlyIterator;
 import com.cinchapi.common.base.Verify;
+import com.google.common.collect.Lists;
 
 /**
  * A {@link LazyTransformSet} reads through to another {@link Set} and
@@ -77,6 +79,12 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
     private final Set<F> from;
 
     /**
+     * A cache of the values that have already been transformed, indexed by
+     * the iteration order.
+     */
+    private final List<T> cache;
+
+    /**
      * The transforming function.
      */
     private final Function<F, T> transformer;
@@ -90,11 +98,13 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
     private LazyTransformSet(Set<F> from, Function<F, T> transformer) {
         this.from = from;
         this.transformer = transformer;
+        this.cache = Lists.newArrayList();
     }
 
     @Override
     public Iterator<T> iterator() {
-        return new SkippableTransformIterator<>(from.iterator(), transformer);
+        return new SkippableTransformIterator<>(from.iterator(), transformer,
+                cache);
     }
 
     @Override
@@ -138,15 +148,22 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
         private long index = 0;
 
         /**
+         * A cache of the values that have already been transformed, indexed by
+         * the iteration order.
+         */
+        private final List<T> cache;
+
+        /**
          * Construct a new instance.
          * 
          * @param skip
          * @param from
          * @param transformer
          */
-        SkippableTransformIterator(Iterator<F> from,
-                Function<F, T> transformer) {
+        SkippableTransformIterator(Iterator<F> from, Function<F, T> transformer,
+                List<T> cache) {
             super(from, transformer);
+            this.cache = cache;
         }
 
         @Override
@@ -154,7 +171,14 @@ public class LazyTransformSet<F, T> extends AbstractSet<T> {
             F next = from.next();
             T transformed;
             if(index >= skip) {
-                transformed = transformer.apply(next);
+                if(cache.size() < (index + 1)
+                        || (transformed = cache.get((int) index)) == null) {
+                    transformed = transformer.apply(next);
+                    while (cache.size() < index + 1) {
+                        cache.add(null);
+                    }
+                    cache.set((int) index, transformed);
+                }
             }
             else {
                 // Since the elements are being skipped, the assumption is that
