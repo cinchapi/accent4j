@@ -24,9 +24,6 @@ import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cinchapi.common.base.AnyStrings;
-import com.cinchapi.common.base.SplitOption;
-import com.cinchapi.common.base.StringSplitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 

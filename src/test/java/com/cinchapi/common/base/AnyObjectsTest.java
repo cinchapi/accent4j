@@ -26,8 +26,6 @@ import com.google.common.collect.ImmutableList;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cinchapi.common.base.AnyObjects;
-
 /**
  * Unit tests for {@link AnyObjects} functions.
  * 
