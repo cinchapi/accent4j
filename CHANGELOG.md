@@ -2,7 +2,8 @@
 
 #### Version 1.12.0 (December 8, 2020)
 * Fixed a bug that made it possible for the `ByteBuffer` returend from `ByteBuffers#get(ByteBuffer int)` to have a different byte order than the input source.
-* Deprecated `ByteBuffers#encodeAsHex` in favor 
+* Deprecated `ByteBuffers#encodeAsHex` in favor of `ByteBuffers#encodeAsHexString`.
+* Deprecated `ByteBuffers#decodeFromHex` in favor of `ByteBuffers#decodeFromHexString`.
 
 #### Version 1.11.0 (February 12, 2020)
 * Added the `TriConsumer` functional interface that is similar to `BiConsumer` for three input arguments.
