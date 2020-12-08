@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.11.1 (December 8, 2020)
+* Fixed a bug that made it possible for the `ByteBuffer` returend from `ByteBuffers#get(ByteBuffer int)` to have a different byte order than the input source.
+
 #### Version 1.11.0 (February 12, 2020)
 * Added the `TriConsumer` functional interface that is similar to `BiConsumer` for three input arguments.
 

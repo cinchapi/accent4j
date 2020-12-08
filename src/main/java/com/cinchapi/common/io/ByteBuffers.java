@@ -26,8 +26,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.cinchapi.common.base.CheckedExceptions;
-import com.cinchapi.common.base.Verify;
 import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
+import com.google.common.base.Preconditions;
 
 /**
  * Additional utility methods for ByteBuffers that are not found in the
@@ -213,12 +213,14 @@ public abstract class ByteBuffers {
      * @param length
      * @return a ByteBuffer that has {@code length} bytes from {@code buffer}
      */
-    public static ByteBuffer get(ByteBuffer buffer, int length) {
-        Verify.thatArgument(buffer.remaining() >= length,
-                "The number of bytes remaining in the buffer cannot be less than the desired length");
+    public static ByteBuffer get(ByteBuffer source, int length) {
+        Preconditions.checkArgument(source.remaining() >= length,
+                "The number of bytes remaining in the buffer cannot be less than length");
         byte[] backingArray = new byte[length];
-        buffer.get(backingArray);
-        return ByteBuffer.wrap(backingArray);
+        source.get(backingArray);
+        ByteBuffer destination = ByteBuffer.wrap(backingArray);
+        destination.order(source.order());
+        return destination;
     }
 
     /**
