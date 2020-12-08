@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
 import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 
 /**
  * Additional utility methods for ByteBuffers that are not found in the
@@ -160,6 +161,32 @@ public abstract class ByteBuffers {
      * @param hex
      * @return the binary data
      */
+    public static ByteBuffer decodeFromHexString(String hex) {
+        return ByteBuffer.wrap(BaseEncoding.base16().decode(hex));
+    }
+
+    /**
+     * Encode the remaining bytes in as {@link ByteBuffer} as a hex string and
+     * maintain the current position.
+     * 
+     * @param buffer
+     * @return the hex string
+     */
+    public static String encodeAsHexString(ByteBuffer buffer) {
+        buffer.rewind();
+        return BaseEncoding.base16().encode(ByteBuffers.getByteArray(buffer));
+    }
+
+    /**
+     * Decode the {@code hex}adeciaml string and return the resulting binary
+     * data.
+     * 
+     * @param hex
+     * @return the binary data
+     * @deprecated in favor of {@link #decodeFromHexString(String)}; which
+     *             expects its input in a different case format
+     */
+    @Deprecated
     public static ByteBuffer decodeFromHex(String hex) {
         int len = hex.length();
         byte[] data = new byte[len / 2];
@@ -176,7 +203,10 @@ public abstract class ByteBuffers {
      * 
      * @param buffer
      * @return the hex string
+     * @deprecated in favor of {@link #encodeAsHexString(ByteBuffer)}; which
+     *             returns the value in a different case format
      */
+    @Deprecated
     public static String encodeAsHex(ByteBuffer buffer) {
         StringBuilder sb = new StringBuilder();
         buffer.mark();
@@ -413,6 +443,7 @@ public abstract class ByteBuffers {
         buffer.reset();
         return chars;
     }
+
     /**
      * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
      * {@code buffer}.
