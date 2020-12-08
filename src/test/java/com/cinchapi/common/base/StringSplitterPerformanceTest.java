@@ -21,9 +21,6 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.cinchapi.common.base.AnyStrings;
-import com.cinchapi.common.base.QuoteAwareStringSplitter;
-import com.cinchapi.common.base.StringSplitter;
 import com.cinchapi.common.profile.Benchmark;
 
 /**
