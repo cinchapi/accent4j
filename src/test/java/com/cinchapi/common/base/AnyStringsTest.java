@@ -71,5 +71,23 @@ public class AnyStringsTest {
         String expected = "";
         Assert.assertEquals(expected, AnyStrings.join(" and "));
     }
+    
+    @Test
+    public void testTryParseNumberReproA() {
+        String string = "e45";
+        Assert.assertNull(AnyStrings.tryParseNumber(string));
+    }
+    
+    @Test
+    public void testTryParseNumberValidScientifiedNotation() {
+        String string = "1e4";
+        Assert.assertNotNull(AnyStrings.tryParseNumber(string));
+    }
+    
+    @Test
+    public void testTryParseNumberInvalidScientifiedNotation() {
+        String string = "1e4e";
+        Assert.assertNull(AnyStrings.tryParseNumber(string));
+    }
 
 }

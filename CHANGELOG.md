@@ -1,5 +1,8 @@
 # Changelog
 
+# Version 1.12.1 (TBD)
+* Fixed a bug in `AnyStrings#tryParseNumber` that caused an error to be thrown instead of returning `null` when parsing strings with a leading `E` or `e` followed by digit characters (e.g. `e45`). These strings were mistaken for a number in scientific notation, but the parser has been fixed so that error no longer occurs.
+
 #### Version 1.12.0 (December 8, 2020)
 * Fixed a bug that made it possible for the `ByteBuffer` returend from `ByteBuffers#get(ByteBuffer int)` to have a different byte order than the input source.
 * Deprecated `ByteBuffers#encodeAsHex` in favor of `ByteBuffers#encodeAsHexString`.
