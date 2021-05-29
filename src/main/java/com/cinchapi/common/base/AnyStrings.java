@@ -797,7 +797,7 @@ public class AnyStrings {
                     // Double objects by appending a single 'D' character.
                     return Double.valueOf(value.substring(0, i));
                 }
-                else if((c == 'E' || c == 'e') && i < size - 1) {
+                else if((c == 'E' || c == 'e') && i > 0 && i < size - 1) {
                     // CON-627: Account for valid representations of scientific
                     // notation
                     if(!scientific) {
