@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.12.1 (TBD)
+* Improved the performance of `CountUpLatch` by using better synchronization control.
+
 #### Version 1.12.0 (December 8, 2020)
 * Fixed a bug that made it possible for the `ByteBuffer` returend from `ByteBuffers#get(ByteBuffer int)` to have a different byte order than the input source.
 * Deprecated `ByteBuffers#encodeAsHex` in favor of `ByteBuffers#encodeAsHexString`.
