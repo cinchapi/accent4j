@@ -87,11 +87,17 @@ public abstract class ByteBuffers {
      *         {@code buffer}.
      */
     public static byte[] getByteArray(ByteBuffer buffer) {
-        buffer.mark();
-        byte[] array = new byte[buffer.remaining()];
-        buffer.get(array);
-        buffer.reset();
-        return array;
+        if(buffer.hasArray() && buffer.position() == 0
+                && buffer.remaining() == buffer.capacity()) {
+            return buffer.array();
+        }
+        else {
+            buffer.mark();
+            byte[] array = new byte[buffer.remaining()];
+            buffer.get(array);
+            buffer.reset();
+            return array;
+        }
     }
 
     /**
