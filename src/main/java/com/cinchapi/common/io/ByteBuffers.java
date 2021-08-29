@@ -87,8 +87,7 @@ public abstract class ByteBuffers {
      *         {@code buffer}.
      */
     public static byte[] getByteArray(ByteBuffer buffer) {
-        if(buffer.hasArray() && buffer.position() == 0
-                && buffer.remaining() == buffer.capacity()) {
+        if(buffer.hasArray() && buffer.remaining() == buffer.capacity()) {
             return buffer.array();
         }
         else {

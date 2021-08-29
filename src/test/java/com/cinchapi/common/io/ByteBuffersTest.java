@@ -51,6 +51,17 @@ public class ByteBuffersTest {
     }
     
     @Test
+    public void testGetByteBufferFromBufferWithBackingArraySubsetPosition() {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        buffer.putLong(17);
+        buffer.flip();
+        buffer.position(1);
+        byte[] bytes = ByteBuffers.getByteArray(buffer);
+        Assert.assertNotSame(bytes, buffer.array());
+        Assert.assertEquals(7, bytes.length);
+    }
+    
+    @Test
     public void testGetByteBufferFromBufferWithoutBackingArray() {
         ByteBuffer buffer = ByteBuffer.allocateDirect(8);
         buffer.putLong(17);
