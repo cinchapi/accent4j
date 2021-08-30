@@ -131,5 +131,49 @@ public class CountUpLatchTest {
         Assert.assertTrue(b.get());
         Assert.assertFalse(a.get());
     }
+    
+    @Test
+    public void testAwaitNotSignaledUntilCountIsReached() throws InterruptedException {
+        CountUpLatch latch = new CountUpLatch();
+        CountDownLatch signal = new CountDownLatch(1);
+        AtomicBoolean failed = new AtomicBoolean(false);
+        Thread t1 = new Thread(() -> {
+            try {
+                latch.await(2);
+                signal.countDown();
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        t1.setDaemon(true);
+        t1.start();
+        latch.countUp();
+        Assert.assertEquals(1, latch.getCount());
+        Assert.assertFalse(failed.get());
+    }
+    
+    @Test
+    public void testAwaitSignaledIfCountIsReached() throws InterruptedException {
+        CountUpLatch latch = new CountUpLatch();
+        CountDownLatch signal = new CountDownLatch(1);
+        AtomicBoolean failed = new AtomicBoolean(true);
+        Thread t1 = new Thread(() -> {
+            try {
+                latch.await(2);
+                failed.set(false);
+                signal.countDown();
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        t1.setDaemon(true);
+        t1.start();
+        latch.countUp();
+        latch.countUp();
+        signal.await();
+        Assert.assertFalse(failed.get());
+    }
 
 }
