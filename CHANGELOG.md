@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.13.0 (TBD)
+* Added the `ByteBuffers#share` method that returns a new ByteBuffer containing a shared subseqence of a source `ByteBuffer` while incrementing the `position` of the source the same number of bytes that are shared.
+
 #### Version 1.12.1 (August 30, 2021)
 * Improved the performance of `CountUpLatch` by using better synchronization control.
 * Fixed a bug in `AnyStrings#tryParseNumber` that caused an error to be thrown instead of returning `null` when parsing strings with a leading `E` or `e` followed by digit characters (e.g. `e45`). These strings were mistaken for a number in scientific notation, but the parser has been fixed so that error no longer occurs.

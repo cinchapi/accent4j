@@ -406,6 +406,65 @@ public abstract class ByteBuffers {
         buffer.position(oldPosition);
         return slice;
     }
+    
+    /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at it's current position, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         it's current position and the byte at {@code length} positions
+     *         away
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int length) {
+        return share(buffer, buffer.position(), length);
+    }
+
+    /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at {@code position}, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         {@code position} and {@code position + length}
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int position,
+            int length) {
+        int end = position + length;
+        Preconditions.checkArgument(end <= buffer.limit());
+        int limit = buffer.limit();
+
+        // Narrow the #buffer's window to be between the desired start and #end
+        // #positions so that the #slice is similarly narrowed
+        buffer.position(position);
+        buffer.limit(end);
+        ByteBuffer slice = buffer.slice();
+
+        // Reset the #buffer's original #limit, but advance it's position to the
+        // #end of the #slice.
+        buffer.limit(limit);
+        buffer.position(end);
+
+        return slice;
+    }
 
     /**
      * Return a byte array with the content of {@code buffer}. This method
