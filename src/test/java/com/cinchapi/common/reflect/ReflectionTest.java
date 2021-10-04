@@ -399,6 +399,13 @@ public class ReflectionTest {
         Reflection.call(new Foo(), "verA", "foo", new Long(1));
         Assert.assertTrue(true); // lack of Exception means we pass
     }
+    
+    @Test
+    public void testCallOverrideWithGenericParameter() {
+        GenericChild obj = new GenericChild();
+        Reflection.call(obj, "put", "Company", "Cinchapi");
+        Assert.assertTrue(true); // lack of Exception means we pass
+    }
 
     private static class A {
 
@@ -562,6 +569,21 @@ public class ReflectionTest {
 
         public void verA(String arg0, Long arg) {}
 
+    }
+    
+    public class GenericBase {
+        
+        public <T> void put(String key, T value) {
+            
+        }
+    }
+    
+    public class GenericChild extends GenericBase {
+        
+        @Override
+        public <T> void put(String key, T value) {
+            
+        }
     }
 
 }

@@ -1,6 +1,12 @@
 # Changelog
 
-#### Version 1.12.1 (TBD)
+#### Version 1.13.0 (TBD)
+* Added the `ByteBuffers#share` method that returns a new ByteBuffer containing a shared subseqence of a source `ByteBuffer` while incrementing the `position` of the source the same number of bytes that are shared.
+
+#### Version 1.12.2 (TBD)
+* Fixed a bug in `Reflection#call` that threw a `NoSuchMethodException` when trying to call an overriden method that accepts a generic parameter.
+
+#### Version 1.12.1 (August 30, 2021)
 * Improved the performance of `CountUpLatch` by using better synchronization control.
 * Fixed a bug in `AnyStrings#tryParseNumber` that caused an error to be thrown instead of returning `null` when parsing strings with a leading `E` or `e` followed by digit characters (e.g. `e45`). These strings were mistaken for a number in scientific notation, but the parser has been fixed so that error no longer occurs.
 * Optimized `ByteBuffers#getByteArray` to return the backing array of a `ByteBuffer` if it exists and the position of the `ByteBuffer` is `0` as well as the number of bytes `remaining` being equal to its `capacity`.
