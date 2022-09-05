@@ -979,7 +979,12 @@ public final class Reflection {
                             .getParameterCount() == paramTypes.length) {
                         potential.add(method);
                     }
-                    else if(callable != TernaryTruth.FALSE) {
+                    else if(callable != TernaryTruth.FALSE
+                            && deferred.isEmpty()) {
+                        // This means that an expected parameter is of type
+                        // Object, which is callable, but let's defer to see if
+                        // there is another method that has a more specific
+                        // expected parameter type that might match.
                         deferred.add(method);
                     }
                 }
