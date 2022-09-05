@@ -1,10 +1,8 @@
 # Changelog
 
-#### Version 1.13.0 (TBD)
+#### Version 1.13.0 (September 5, 2022)
 * Added the `ByteBuffers#share` method that returns a new ByteBuffer containing a shared subseqence of a source `ByteBuffer` while incrementing the `position` of the source the same number of bytes that are shared.
 * Upgraded `logback` dependency to version `1.2.11`
-
-#### Version 1.12.2 (TBD)
 * Fixed a bug in `Reflection#call` that threw a `NoSuchMethodException` when trying to call an overriden method that accepts a generic parameter.
 
 #### Version 1.12.1 (August 30, 2021)
