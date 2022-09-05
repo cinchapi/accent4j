@@ -19,7 +19,7 @@ dependencies {
     compile 'com.google.code.findbugs:jsr305:3.0.1'
     compile 'com.google.guava:guava:25.1-jre'
     compile 'org.slf4j:slf4j-api:1.7.5'
-    compile 'ch.qos.logback:logback-classic:1.0.13'
+    compile 'ch.qos.logback:logback-classic:1.2.11'
 
 	testCompile 'junit:junit:4.11'
 }
