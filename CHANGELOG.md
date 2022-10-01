@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.13.1 (TBD)
+* Fixed a bug that caused a `NoSuchMethodException` to be thrown when using the `Reflection` utility to `call` a non-overriden interface-defined default method.
+
 #### Version 1.13.0 (September 5, 2022)
 * Added the `ByteBuffers#share` method that returns a new ByteBuffer containing a shared subseqence of a source `ByteBuffer` while incrementing the `position` of the source the same number of bytes that are shared.
 * Upgraded `logback` dependency to version `1.2.11`

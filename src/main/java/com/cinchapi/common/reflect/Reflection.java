@@ -23,10 +23,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -968,8 +970,10 @@ public final class Reflection {
             Class<?>... paramTypes) {
         List<Method> potential = Lists.newArrayListWithCapacity(1);
         List<Method> deferred = Lists.newArrayListWithCapacity(1);
+        Deque<Class<?>> queue = new ArrayDeque<>();
+        queue.add(clazz);
         try {
-            while (clazz != null) {
+            while ((clazz = queue.poll()) != null) {
                 for (Method method : Arrays.stream(clazz.getDeclaredMethods())
                         .filter(method -> method.getName().equals(name))
                         .collect(Collectors.toList())) {
@@ -989,7 +993,15 @@ public final class Reflection {
                     }
                 }
                 if(potential.isEmpty()) {
-                    clazz = clazz.getSuperclass();
+                    Class<?> superClass = clazz.getSuperclass();
+                    if(superClass != null) {
+                        queue.add(superClass);
+                    }
+                    for (Class<?> iface : clazz.getInterfaces()) {
+                        // Account for default interface methods that are not
+                        // explicitly overridden in the the #clazz.
+                        queue.add(iface);
+                    }
                 }
                 else {
                     break;
