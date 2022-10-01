@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.13.1 (TBD)
+#### Version 1.13.1 (October 1, 2022)
 * Fixed a bug that caused a `NoSuchMethodException` to be thrown when using the `Reflection` utility to `call` a non-overriden interface-defined default method.
 
 #### Version 1.13.0 (September 5, 2022)
