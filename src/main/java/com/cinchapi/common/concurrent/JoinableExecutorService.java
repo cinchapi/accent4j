@@ -30,7 +30,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 import com.cinchapi.common.base.CheckedExceptions;
@@ -60,7 +60,26 @@ import com.google.common.collect.ImmutableList;
  * @author Jeff Nelson
  */
 public class JoinableExecutorService extends AbstractExecutorService {
-    
+
+    /**
+     * Indicates that the executor is in a {@link #state} that allows it to
+     * accept new tasks.
+     */
+    private static final int RUNNING = 1;
+
+    /**
+     * Indicates that the executor is in a {@link #state} that prevents the
+     * submission of new tasks, but allows for the execution of any existing
+     * tasks in service of a graceful shutdown.
+     */
+    private static final int SHUTDOWN = 2;
+
+    /**
+     * Indicates that the executor is in a {@link #state} that no further task
+     * execution can happen.
+     */
+    private static final int TERMINATED = 3;
+
     /**
      * The underlying {@link ExecutorService} that provides and manages each
      * worker thread.
@@ -75,7 +94,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
     /**
      * The state of the executor.
      */
-    private AtomicReference<State> state;
+    private AtomicInteger state;
 
     /**
      * Construct a new instance.
@@ -97,69 +116,15 @@ public class JoinableExecutorService extends AbstractExecutorService {
         this.groups = new LinkedBlockingQueue<>();
         this.workers = Executors.newFixedThreadPool(numWorkerThreads,
                 threadFactory);
-        this.state = new AtomicReference<>(State.RUNNING);
+        this.state = new AtomicInteger(RUNNING);
         for (int i = 0; i < numWorkerThreads; ++i) {
-            workers.execute(() -> {
-                for (;;) {
-                    if(state.compareAndSet(State.TERMINATED,
-                            State.TERMINATED)) {
-                        break;
-                    }
-                    else {
-                        BlockingQueue<? extends Runnable> group;
-                        if(state.compareAndSet(State.SHUTDOWN,
-                                State.SHUTDOWN)) {
-                            group = groups.poll();
-                            if(group == null) {
-                                break;
-                            }
-                        }
-                        else {
-                            try {
-                                group = groups.take();
-                            }
-                            catch (InterruptedException e) {
-                                // Interrupt signals a request to shutdown or
-                                // shutdownNow. In either case, re-loop and
-                                // check the #state. If an immediate halt is
-                                // required, the internal task queue will be
-                                // emptied and we don't have to worry here
-                                Thread.currentThread().interrupt();
-                                continue;
-                            }
-                        }
-                        Runnable task = group.poll();
-                        if(task != null) {
-                            run(task);
-                            if(state.compareAndSet(State.SHUTDOWN,
-                                    State.SHUTDOWN)) {
-                                // Since we are shutting down, just complete all
-                                // the tasks in the group and be done
-                                while ((task = group.poll()) != null) {
-                                    run(task);
-                                }
-                            }
-                            else {
-                                groups.offer(group);
-                            }
-                        }
-                        else {
-                            // Since part of the contract is that tasks will not
-                            // be added after a queue has been submitted, assume
-                            // that all that work for this group has been done.
-                            continue;
-                        }
-                    }
-                }
-            });
+            workers.execute(this::executeTaskLoop);
         }
-
     }
 
     /**
      * Blocks until all tasks have completed execution after a shutdown request
-     * or the current thread is interrupted, whichever
-     * happens first.
+     * or the current thread is interrupted, whichever happens first.
      * 
      * @return {@code true} if the executor is terminated
      * @throws InterruptedException
@@ -176,7 +141,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
 
     @Override
     public void execute(Runnable command) {
-        if(state.compareAndSet(State.RUNNING, State.RUNNING)) {
+        if(state.compareAndSet(RUNNING, RUNNING)) {
             BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
             queue.add(command);
             groups.offer(queue);
@@ -188,12 +153,12 @@ public class JoinableExecutorService extends AbstractExecutorService {
 
     @Override
     public boolean isShutdown() {
-        return workers.isShutdown() && state.get() != State.RUNNING;
+        return workers.isShutdown() && state.get() != RUNNING;
     }
 
     @Override
     public boolean isTerminated() {
-        return workers.isTerminated() && state.get() == State.TERMINATED
+        return workers.isTerminated() && state.get() == TERMINATED
                 && groups.isEmpty();
     }
 
@@ -228,7 +193,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
             Callable<V>... tasks) {
         Preconditions.checkNotNull(tasks);
         Preconditions.checkArgument(tasks.length > 0);
-        if(state.compareAndSet(State.RUNNING, State.RUNNING)) {
+        if(state.compareAndSet(RUNNING, RUNNING)) {
             BlockingQueue<FutureTask<V>> queue = new LinkedBlockingQueue<>();
             List<Future<V>> futures = new ArrayList<>();
             for (Callable<V> task : tasks) {
@@ -289,7 +254,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
             Runnable... tasks) {
         Preconditions.checkNotNull(tasks);
         Preconditions.checkArgument(tasks.length > 0);
-        if(state.compareAndSet(State.RUNNING, State.RUNNING)) {
+        if(state.compareAndSet(RUNNING, RUNNING)) {
             BlockingQueue<FutureTask<Void>> queue = new LinkedBlockingQueue<>();
             List<Future<Void>> futures = new ArrayList<>();
             for (Runnable task : tasks) {
@@ -380,19 +345,19 @@ public class JoinableExecutorService extends AbstractExecutorService {
 
     @Override
     public void shutdown() {
-        if(state.compareAndSet(State.RUNNING, State.SHUTDOWN)) {
+        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
             workers.shutdownNow();
             while (!workers.isTerminated()) {
                 continue;
             }
-            state.compareAndSet(State.SHUTDOWN, State.TERMINATED);
+            state.compareAndSet(SHUTDOWN, TERMINATED);
         }
     }
 
     @Override
     public List<Runnable> shutdownNow() {
-        if(state.compareAndSet(State.RUNNING, State.TERMINATED)
-                || state.compareAndSet(State.SHUTDOWN, State.TERMINATED)) {
+        if(state.compareAndSet(RUNNING, TERMINATED)
+                || state.compareAndSet(SHUTDOWN, TERMINATED)) {
             workers.shutdownNow();
             List<Runnable> unfinished = new ArrayList<>();
             groups.forEach(group -> group.drainTo(unfinished));
@@ -401,6 +366,91 @@ public class JoinableExecutorService extends AbstractExecutorService {
         }
         else {
             return ImmutableList.of();
+        }
+    }
+
+    /**
+     * The main loop for worker threads in the executor service. This method
+     * runs continuously until the executor service is terminated. It is
+     * responsible for executing tasks from the task groups that have been
+     * submitted to the service.
+     *
+     * <p>
+     * The worker loop operates as follows:
+     * <ol>
+     * <li>If the executor service is in the {@link State#TERMINATED} state, the
+     * loop
+     * terminates and the worker thread exits.</li>
+     * <li>If the executor service is in the {@link State#SHUTDOWN} state, the
+     * worker attempts to retrieve and process a task group from the queue.</li>
+     * <li>If there are no task groups available in the shutdown state, the
+     * worker thread exits the loop and terminates.</li>
+     * <li>If the executor service is in the {@link State#RUNNING} state, the
+     * worker retrieves a task group from the queue and processes it.</li>
+     * <li>For each task in the group, the worker calls the
+     * {@link #run(Runnable)} method to execute the task.</li>
+     * <li>If the executor service transitions to the {@link State#SHUTDOWN}
+     * state during task execution, the worker continues executing all remaining
+     * tasks in the current group before exiting the loop.</li>
+     * <li>If the executor service remains in the {@link State#RUNNING} state,
+     * the worker returns the partially processed group back to the queue for
+     * another worker to continue execution.</li>
+     * </ol>
+     * </p>
+     * <p>
+     * The worker loop is designed to handle interruptions and state transitions
+     * gracefully, ensuring that all submitted tasks are eventually executed
+     * unless the executor service is terminated forcefully.
+     * </p>
+     */
+    private void executeTaskLoop() {
+        for (;;) {
+            if(state.compareAndSet(TERMINATED, TERMINATED)) {
+                break;
+            }
+            else {
+                BlockingQueue<? extends Runnable> group;
+                if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
+                    group = groups.poll();
+                    if(group == null) {
+                        break;
+                    }
+                }
+                else {
+                    try {
+                        group = groups.take();
+                    }
+                    catch (InterruptedException e) {
+                        // Interrupt signals a request to shutdown or
+                        // shutdownNow. In either case, re-loop and
+                        // check the #state. If an immediate halt is
+                        // required, the internal task queue will be
+                        // emptied and we don't have to worry here
+                        Thread.currentThread().interrupt();
+                        continue;
+                    }
+                }
+                Runnable task = group.poll();
+                if(task != null) {
+                    run(task);
+                    if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
+                        // Since we are shutting down, just complete all
+                        // the tasks in the group and be done
+                        while ((task = group.poll()) != null) {
+                            run(task);
+                        }
+                    }
+                    else {
+                        groups.offer(group);
+                    }
+                }
+                else {
+                    // Since part of the contract is that tasks will not
+                    // be added after a queue has been submitted, assume
+                    // that all that work for this group has been done.
+                    continue;
+                }
+            }
         }
     }
 
@@ -422,15 +472,6 @@ public class JoinableExecutorService extends AbstractExecutorService {
             }
             catch (Throwable e) {}
         }
-    }
-
-    /**
-     * Tracks the state of the executor.
-     *
-     * @author Jeff Nelson
-     */
-    private enum State {
-        RUNNING, SHUTDOWN, TERMINATED
     }
 
 }
