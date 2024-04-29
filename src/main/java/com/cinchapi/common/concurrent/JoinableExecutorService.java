@@ -277,7 +277,6 @@ public class JoinableExecutorService extends AbstractExecutorService {
                 catch (ExecutionException e) {
                     Runnable t = tasks[i];
                     errorHandler.accept(t, e);
-                    throw CheckedExceptions.wrapAsRuntimeException(e);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

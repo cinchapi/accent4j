@@ -129,4 +129,11 @@ public abstract class AbstractExecutorServiceTest {
                 terminated);
     }
 
+    @Test(expected = RejectedExecutionException.class)
+    public void testRejectedExecutionAfterShutdown() {
+        executor.shutdown();
+        executor.execute(() -> {});
+        Assert.fail("Expected RejectedExecutionException");
+    }
+
 }

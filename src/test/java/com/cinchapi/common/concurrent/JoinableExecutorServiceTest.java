@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.concurrent;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -98,7 +99,6 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
         }
     }
 
-
     @Test
     public void testIsShutdownAndIsTerminated() throws InterruptedException {
         executor.shutdown();
@@ -111,7 +111,6 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
         Assert.assertTrue(executor.isTerminated());
     }
 
-
     @Test
     public void testExecuteMultipleTasks() throws InterruptedException {
         JoinableExecutorService executor = (JoinableExecutorService) this.executor;
@@ -123,7 +122,6 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
         executor.join(commands.build());
         Assert.assertEquals(10, counter.get());
     }
-
 
     @Test
     public void testJoinRunnables() throws Exception {
@@ -145,9 +143,9 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
             // Ensure that no task was dropped
             Assert.assertEquals(100, map.size());
             Assert.assertEquals(100, count.size());
-            
+
             // Ensure that no task was dropped
-            for(Entry<Integer, AtomicInteger> entry : count.entrySet()) {
+            for (Entry<Integer, AtomicInteger> entry : count.entrySet()) {
                 Assert.assertEquals(1, entry.getValue().get());
             }
         }
@@ -162,7 +160,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
                     "The main thread did not help with any of the work. Possible race condition");
         }
     }
-    
+
     @SuppressWarnings("unchecked")
     @Test
     public void testJoinCallables() throws Exception {
@@ -185,12 +183,12 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
             // Ensure that no task was dropped
             Assert.assertEquals(100, map.size());
             Assert.assertEquals(100, count.size());
-            
+
             // Ensure that no task was dropped
-            for(Entry<Integer, AtomicInteger> entry : count.entrySet()) {
+            for (Entry<Integer, AtomicInteger> entry : count.entrySet()) {
                 Assert.assertEquals(1, entry.getValue().get());
             }
-            for(Future<Integer> future : futures) {
+            for (Future<Integer> future : futures) {
                 Assert.assertTrue(future.isDone());
             }
         }
@@ -204,6 +202,22 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
             System.err.println(
                     "The main thread did not help with any of the work. Possible race condition");
         }
+    }
+
+    @Test
+    public void testExceptionHandling() {
+        JoinableExecutorService executor = (JoinableExecutorService) this.executor;
+        AtomicInteger counter = new AtomicInteger();
+
+        List<Runnable> tasks = new ArrayList<>();
+        tasks.add(() -> {
+            throw new IllegalArgumentException("Task 1 exception");
+        });
+        tasks.add(() -> counter.incrementAndGet());
+        executor.join((task, error) -> {
+            counter.incrementAndGet();
+        }, tasks.toArray(new Runnable[0]));
+        Assert.assertEquals(2, counter.get());
     }
 
     @Override
