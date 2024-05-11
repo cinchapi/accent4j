@@ -1,7 +1,7 @@
 # Changelog
 
 #### Version 1.14.0 (TBD)
-* `JoinableExecutorService`: A new class in the `concurrent` package that enhances a standard `ExecutorService` with capabilities for the calling thread to join task execution. This service allows threads to submit groups of tasks and then participate directly in executing those tasks, aiding in faster completion and improved resource utilization. It ensures tasks are initiated in iteration order but balances task execution across groups to maintain consistent system performance. This feature is beneficial for applications requiring high throughput and dynamic task management.
+* `JoinableExecutorService`: A new class in the `concurrent` package that enhances a standard `ExecutorService` with the ability for the calling thread to join task execution. This service allows threads to submit groups of tasks and then participate directly in executing those tasks, aiding in faster completion and improved resource utilization. It ensures tasks are initiated in iteration order but balances task execution across groups to maintain consistent system performance. This feature is beneficial for applications requiring high throughput and dynamic task management.
 
 #### Version 1.13.1 (October 1, 2022)
 * Fixed a bug that caused a `NoSuchMethodException` to be thrown when using the `Reflection` utility to `call` a non-overriden interface-defined default method.
