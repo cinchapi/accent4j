@@ -636,7 +636,7 @@ public final class Reflection {
                         Object arg = args[i];
                         Class<?> type = paramTypes[i];
                         Class<?> altType = getAltType(type);
-                        if(!type.isAssignableFrom(arg.getClass())
+                        if(arg != null && !type.isAssignableFrom(arg.getClass())
                                 && !altType.isAssignableFrom(arg.getClass())) {
                             continue outer;
                         }
