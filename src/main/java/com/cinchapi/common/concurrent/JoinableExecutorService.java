@@ -212,14 +212,14 @@ public class JoinableExecutorService extends AbstractExecutorService {
         Preconditions.checkNotNull(tasks);
         Preconditions.checkArgument(tasks.length > 0);
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            List<FutureTask<V>> futures = new ArrayList<>();
+            List<Future<V>> futures = new ArrayList<>();
             for (Callable<V> task : tasks) {
                 FutureTask<V> future = new FutureTask<>(task);
                 this.tasks.offer(future);
                 futures.add(future);
             }
             for (int i = futures.size() - 1; i >= 0; --i) {
-                FutureTask<V> task = futures.get(i);
+                FutureTask<V> task = (FutureTask<V>) futures.get(i);
                 if(!task.isDone()) {
                     // Use the calling thread to steal work before awaiting all
                     // tasks to complete
@@ -239,8 +239,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
                     Thread.currentThread().interrupt();
                 }
             }
-            return futures.stream().map(f -> Future.class.cast(f))
-                    .collect(Collectors.toList());
+            return futures;
         }
         else {
             throw new RejectedExecutionException();
