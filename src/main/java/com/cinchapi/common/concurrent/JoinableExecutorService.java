@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,34 +28,48 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 import com.cinchapi.common.base.CheckedExceptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
- * A {@link JoinableExecutorService} provides asynchronous execution of task
- * groups with an option for the calling thread to {@link #join(Runnable...)
- * join} and participate in executing its group's tasks while awaiting their
+ * A {@link JoinableExecutorService} provides asynchronous execution of tasks
+ * with an option for the calling thread to {@link #join(Runnable...)
+ * join} and participate in executing its submitted tasks while awaiting their
  * completion.
  * <p>
  * This {@link ExecutorService} acts as a shared resource for multiple
- * processes, enabling each to execute a group of subtasks. It uniquely allows
- * the calling threads of these processes to contribute actively in executing
- * the tasks they submitted, facilitating faster completion and efficient use of
- * resources.
+ * processes. Under high contention, the calling thread's participation in
+ * completing the tasks it submitted guarantees that the performance will be no
+ * worse than if the caller executed each task serially, without using an
+ * {@link ExecutorService}.
  * </p>
  * <p>
- * When a group of tasks is submitted, they are <strong>initiated</strong> in
- * iteration order. However, this {@link ExecutorService} strives to balance the
- * distribution of progress across all groups to maintain consistency in overall
- * system performance. So, internal worker threads tend to execute tasks across
- * groups in a breadth-first manner.
+ * In most cases, the calling thread will work alongside the shared threads in
+ * this {@link ExecutorService} to complete all of the submitted tasks faster
+ * and more efficiently than using a standard {@link ExecutorService}.
+ * </p>
+ * <p>
+ * Key features of {@link JoinableExecutorService}:
+ * <ul>
+ * <li>Allows the calling thread to join and participate in executing its
+ * submitted tasks.</li>
+ * <li>Ensures performance is no worse than serial execution under high
+ * contention.</li>
+ * <li>Enables faster and more efficient task completion compared to a standard
+ * {@link ExecutorService}.</li>
+ * </ul>
+ * </p>
+ * <p>
+ * <p>
+ * The {@link #join(Runnable...) join} methods block until all submitted tasks
+ * are completed.
  * </p>
  *
  * @author Jeff Nelson
@@ -81,20 +96,24 @@ public class JoinableExecutorService extends AbstractExecutorService {
     private static final int TERMINATED = 3;
 
     /**
-     * The underlying {@link ExecutorService} that provides and manages each
-     * worker thread.
-     */
-    private final ExecutorService workers;
-
-    /**
-     * The task groups that have been {@link #submit(BlockingQueue) submitted}.
-     */
-    private final BlockingQueue<BlockingQueue<? extends Runnable>> groups;
-
-    /**
      * The state of the executor.
      */
     private AtomicInteger state;
+
+    /**
+     * Signals that all worker threads have terminated.
+     */
+    private CountDownLatch termination;
+
+    /**
+     * The queue of tasks that the worker threads pull from.
+     */
+    private final BlockingQueue<FutureTask<?>> tasks;
+    
+    /**
+     * The worker threads.
+     */
+    private final Thread[] workers;
 
     /**
      * Construct a new instance.
@@ -113,13 +132,15 @@ public class JoinableExecutorService extends AbstractExecutorService {
      */
     public JoinableExecutorService(int numWorkerThreads,
             ThreadFactory threadFactory) {
-        this.groups = new LinkedBlockingQueue<>();
-        this.workers = Executors.newFixedThreadPool(numWorkerThreads,
-                threadFactory);
+        this.tasks = new LinkedBlockingQueue<>();
         this.state = new AtomicInteger(RUNNING);
+        this.workers = new Thread[numWorkerThreads];
         for (int i = 0; i < numWorkerThreads; ++i) {
-            workers.execute(this::executeTaskLoop);
+            Thread worker = threadFactory.newThread(this::executeTaskLoop);
+            workers[i] = worker;
+            worker.start();
         }
+        this.termination = new CountDownLatch(numWorkerThreads);
     }
 
     /**
@@ -136,15 +157,13 @@ public class JoinableExecutorService extends AbstractExecutorService {
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit)
             throws InterruptedException {
-        return workers.awaitTermination(timeout, unit);
+        return termination.await(timeout, unit);
     }
 
     @Override
     public void execute(Runnable command) {
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-            queue.add(command);
-            groups.offer(queue);
+            this.tasks.offer(new FutureTask<Void>(command, null));
         }
         else {
             throw new RejectedExecutionException();
@@ -153,13 +172,12 @@ public class JoinableExecutorService extends AbstractExecutorService {
 
     @Override
     public boolean isShutdown() {
-        return workers.isShutdown() && state.get() != RUNNING;
+        return state.get() != RUNNING;
     }
 
     @Override
     public boolean isTerminated() {
-        return workers.isTerminated() && state.get() == TERMINATED
-                && groups.isEmpty();
+        return state.get() == TERMINATED;
     }
 
     /**
@@ -194,19 +212,19 @@ public class JoinableExecutorService extends AbstractExecutorService {
         Preconditions.checkNotNull(tasks);
         Preconditions.checkArgument(tasks.length > 0);
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            BlockingQueue<FutureTask<V>> queue = new LinkedBlockingQueue<>();
-            List<Future<V>> futures = new ArrayList<>();
+            List<FutureTask<V>> futures = new ArrayList<>();
             for (Callable<V> task : tasks) {
                 FutureTask<V> future = new FutureTask<>(task);
-                queue.offer(future);
+                this.tasks.offer(future);
                 futures.add(future);
             }
-            groups.offer(queue);
-            FutureTask<V> task;
-            while ((task = queue.poll()) != null) {
-                // Use the calling thread to steal work before waiting for all
-                // the tasks to complete
-                run(task);
+            for (int i = futures.size() - 1; i >= 0; --i) {
+                FutureTask<V> task = futures.get(i);
+                if(!task.isDone()) {
+                    // Use the calling thread to steal work before awaiting all
+                    // tasks to complete
+                    task.run();
+                }
             }
             for (int i = 0; i < futures.size(); ++i) {
                 Future<V> future = futures.get(i);
@@ -216,13 +234,13 @@ public class JoinableExecutorService extends AbstractExecutorService {
                 catch (ExecutionException e) {
                     Callable<V> t = tasks[i];
                     errorHandler.accept(t, e);
-                    throw CheckedExceptions.wrapAsRuntimeException(e);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }
-            return futures;
+            return futures.stream().map(f -> Future.class.cast(f))
+                    .collect(Collectors.toList());
         }
         else {
             throw new RejectedExecutionException();
@@ -255,19 +273,19 @@ public class JoinableExecutorService extends AbstractExecutorService {
         Preconditions.checkNotNull(tasks);
         Preconditions.checkArgument(tasks.length > 0);
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            BlockingQueue<FutureTask<Void>> queue = new LinkedBlockingQueue<>();
-            List<Future<Void>> futures = new ArrayList<>();
+            List<FutureTask<Void>> futures = new ArrayList<>();
             for (Runnable task : tasks) {
                 FutureTask<Void> future = new FutureTask<>(task, null);
-                queue.offer(future);
+                this.tasks.offer(future);
                 futures.add(future);
             }
-            groups.offer(queue);
-            Runnable task;
-            while ((task = queue.poll()) != null) {
-                // Use the calling thread to steal work before waiting for all
-                // the tasks to complete
-                run(task);
+            for (int i = futures.size() - 1; i >= 0; --i) {
+                FutureTask<Void> task = futures.get(i);
+                if(!task.isDone()) {
+                    // Use the calling thread to steal work before awaiting all
+                    // tasks to complete
+                    task.run();
+                }
             }
             for (int i = 0; i < futures.size(); ++i) {
                 Future<Void> future = futures.get(i);
@@ -345,22 +363,19 @@ public class JoinableExecutorService extends AbstractExecutorService {
     @Override
     public void shutdown() {
         if(state.compareAndSet(RUNNING, SHUTDOWN)) {
-            workers.shutdownNow();
-            while (!workers.isTerminated()) {
-                continue;
+            for (int i = 0; i < workers.length; ++i) {
+                Thread worker = workers[i];
+                worker.interrupt();
             }
-            state.compareAndSet(SHUTDOWN, TERMINATED);
         }
     }
 
     @Override
     public List<Runnable> shutdownNow() {
-        if(state.compareAndSet(RUNNING, TERMINATED)
-                || state.compareAndSet(SHUTDOWN, TERMINATED)) {
-            workers.shutdownNow();
+        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
+            shutdown();
             List<Runnable> unfinished = new ArrayList<>();
-            groups.forEach(group -> group.drainTo(unfinished));
-            groups.clear();
+            tasks.drainTo(unfinished);
             return unfinished;
         }
         else {
@@ -404,73 +419,39 @@ public class JoinableExecutorService extends AbstractExecutorService {
      */
     private void executeTaskLoop() {
         for (;;) {
-            if(state.compareAndSet(TERMINATED, TERMINATED)) {
+            if(state.compareAndSet(RUNNING, RUNNING)) {
+                FutureTask<?> task;
+                try {
+                    task = tasks.take();
+                }
+                catch (InterruptedException e) {
+                    // Interrupt signals a request to shutdown or
+                    // shutdownNow. In either case, re-loop and
+                    // check the #state. If an immediate halt is
+                    // required, the internal task queue will be
+                    // emptied and we don't have to worry here
+                    Thread.currentThread().interrupt();
+                    continue;
+                }
+                task.run();
+            }
+            else if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
+                FutureTask<?> task = tasks.poll();
+                if(task == null) {
+                    // No tasks remain, so break out and terminate this thread.
+                    state.compareAndSet(SHUTDOWN, TERMINATED);
+                    break;
+                }
+            }
+            else if(state.compareAndSet(TERMINATED, TERMINATED)) {
                 break;
             }
             else {
-                BlockingQueue<? extends Runnable> group;
-                if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
-                    group = groups.poll();
-                    if(group == null) {
-                        break;
-                    }
-                }
-                else {
-                    try {
-                        group = groups.take();
-                    }
-                    catch (InterruptedException e) {
-                        // Interrupt signals a request to shutdown or
-                        // shutdownNow. In either case, re-loop and
-                        // check the #state. If an immediate halt is
-                        // required, the internal task queue will be
-                        // emptied and we don't have to worry here
-                        Thread.currentThread().interrupt();
-                        continue;
-                    }
-                }
-                Runnable task = group.poll();
-                if(task != null) {
-                    run(task);
-                    if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
-                        // Since we are shutting down, just complete all
-                        // the tasks in the group and be done
-                        while ((task = group.poll()) != null) {
-                            run(task);
-                        }
-                    }
-                    else {
-                        groups.offer(group);
-                    }
-                }
-                else {
-                    // Since part of the contract is that tasks will not
-                    // be added after a queue has been submitted, assume
-                    // that all that work for this group has been done.
-                    continue;
-                }
+                // The state has changed, so re-loop and check again
+                continue;
             }
         }
-    }
-
-    /**
-     * Execute the {@code task}.
-     * 
-     * @param task
-     */
-    private void run(Runnable task) {
-        if(task instanceof RunnableFuture
-                && !((RunnableFuture<?>) task).isDone()) {
-            // NOTE: Exception handling is automatically
-            // handled by the internals of FutureTask
-            task.run();
-        }
-        else if(task != null) {
-            try {
-                task.run();
-            }
-            catch (Throwable e) {}
-        }
+        termination.countDown();
     }
 
 }

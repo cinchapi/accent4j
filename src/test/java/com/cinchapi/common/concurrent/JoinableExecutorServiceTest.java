@@ -22,8 +22,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +34,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.cinchapi.common.base.ArrayBuilder;
-import com.google.common.collect.Lists;
 
 /**
  * Unit tests for {@link JoinableExecutorService}.
@@ -42,42 +41,6 @@ import com.google.common.collect.Lists;
  * @author Jeff Nelson
  */
 public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
-
-    @Test
-    public void testSequentialExecutionWithinGroups()
-            throws InterruptedException {
-        JoinableExecutorService service = new JoinableExecutorService(3);
-        List<Integer> results = new CopyOnWriteArrayList<>();
-        ArrayBuilder<Runnable> group1 = ArrayBuilder.builder();
-        group1.add(() -> results.add(1));
-        group1.add(() -> results.add(2));
-
-        ArrayBuilder<Runnable> group2 = ArrayBuilder.builder();
-        group2.add(() -> results.add(3));
-        group2.add(() -> results.add(4));
-
-        service.join(group1.build());
-        service.join(group2.build());
-        service.shutdown();
-        Assert.assertTrue(service.isShutdown());
-
-        service.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-        Assert.assertEquals(4, results.size());
-        List<Boolean> seen = Lists.newArrayList(false, false, false, false,
-                false);
-        for (int i = 0; i < results.size(); ++i) {
-            int result = results.get(i);
-            seen.set(result, true);
-            if(result == 2) {
-                // 2 must have been added after 1
-                Assert.assertTrue(seen.get(1));
-            }
-            else if(result == 4) {
-                // 4 must have been added after 1
-                Assert.assertTrue(seen.get(3));
-            }
-        }
-    }
 
     @Test
     public void testBasicTaskExecution() throws Exception {
@@ -218,6 +181,54 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
             counter.incrementAndGet();
         }, tasks.toArray(new Runnable[0]));
         Assert.assertEquals(2, counter.get());
+    }
+
+    @Test
+    public void testGuranteedProgressEvenIfAllWorkerThreadsAreBusy()
+            throws InterruptedException {
+        int numThreads = 4;
+        JoinableExecutorService a = (JoinableExecutorService) this.executor;
+        ExecutorService b = Executors.newFixedThreadPool(numThreads);
+        AtomicInteger aCount = new AtomicInteger(0);
+        AtomicInteger bCount = new AtomicInteger(0);
+        Thread aThread = new Thread(() -> {
+            for (int i = 0; i < numThreads; ++i) {
+                a.submit(() -> {
+                    try {
+                        Thread.sleep(5000);
+                    }
+                    catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+            Runnable[] tasks = new Runnable[numThreads];
+            for (int i = 0; i < numThreads; ++i) {
+                tasks[i] = () -> aCount.incrementAndGet();
+            }
+            a.join(tasks);
+
+        });
+        Thread bThread = new Thread(() -> {
+            for (int i = 0; i < numThreads; ++i) {
+                b.submit(() -> {
+                    try {
+                        Thread.sleep(5000);
+                    }
+                    catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+            for (int i = 0; i < numThreads; ++i) {
+                b.submit(() -> bCount.incrementAndGet());
+            }
+        });
+        aThread.start();
+        bThread.start();
+        Thread.sleep(100);
+        Assert.assertTrue(aCount.get() > 0);
+        Assert.assertFalse(bCount.get() > 0);
     }
 
     @Override
