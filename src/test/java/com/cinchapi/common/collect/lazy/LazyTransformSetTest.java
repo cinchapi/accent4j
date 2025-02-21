@@ -139,5 +139,11 @@ public class LazyTransformSetTest {
         Assert.assertEquals(c0.get(), transformed);
         Assert.assertEquals(d0.get(), transformed);
     }
+    
+    @Test
+    public void testEmptyLazyTransformSet() {
+        Set<String> set = LazyTransformSet.of(ImmutableSet.of(), o -> o.toString());
+        Assert.assertTrue(set.isEmpty());
+    }
 
 }
