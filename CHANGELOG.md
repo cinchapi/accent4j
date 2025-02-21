@@ -2,6 +2,7 @@
 
 #### Version 1.14.0 (TBD)
 * `JoinableExecutorService`: A new class in the `concurrent` package that enhances a standard `ExecutorService` with the ability for the calling thread to join task execution. This service allows threads to submit groups of tasks and then participate directly in executing those tasks, aiding in faster completion and improved resource utilization. It ensures tasks are initiated in iteration order but balances task execution across groups to maintain consistent system performance. This feature is beneficial for applications requiring high throughput and dynamic task management.
+* Fixed a bug that caused the `Reflection#newInstance` method to throw a `NullPointerException` when a `null` was provided for a Nullable parameter.
 
 ##### Bug Fixes
 * Fixed a bug that caused some methods in `Sequences` to have poor performance if the `toString` method of a potential `Sequence` was computationally expensive
