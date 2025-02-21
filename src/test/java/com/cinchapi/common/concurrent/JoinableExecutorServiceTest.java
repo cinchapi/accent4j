@@ -233,7 +233,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
 
     @Override
     protected ExecutorService $getExecutorService() {
-        return new JoinableExecutorService(4);
+        return JoinableExecutorService.create(4);
     }
 
 }
