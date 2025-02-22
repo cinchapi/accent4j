@@ -406,15 +406,6 @@ public class ReflectionTest {
         Reflection.call(obj, "put", "Company", "Cinchapi");
         Assert.assertTrue(true); // lack of Exception means we pass
     }
-    
-    @Test
-    public void testCallDefaultInterfaceMethod() {
-        ClassB obj = new ClassB();
-        String expected = "Jeff Nelson";
-        String actual = Reflection.call(obj, "foo", expected);
-        Assert.assertEquals("foo_"+expected, actual);
-        Assert.assertEquals("baz", Reflection.call(obj, "baz", expected));
-    }
 
     @Test
     public void testCallDefaultInterfaceMethod() {
@@ -722,42 +713,6 @@ public class ReflectionTest {
             this.dvalue = value;
             this.tag = tag;
         }
-    }
-    
-    class ClassA implements InterfaceA, InterfaceB {
-
-
-        @Override
-        public String baz(String value) {
-            return value;
-        }
-        
-    }
-    
-    class ClassB extends ClassA {
-        
-        @Override
-        public String baz(String value) {
-            return "baz";
-        }
-    }
-    
-    interface InterfaceA {
-        
-        public String baz(String value);
-        
-        public default String foo(String value) {
-            return "foo_"+value;
-        }
-        
-    }
-    
-    interface InterfaceB {
-        public default String bar(String value) {
-            return "bar_"+value;
-        }
-        
-        public String baz(String value);
     }
 
 }
