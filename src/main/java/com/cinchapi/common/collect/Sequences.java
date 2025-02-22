@@ -90,7 +90,7 @@ public final class Sequences {
     @SuppressWarnings("unchecked")
     public static <T> boolean contains(Object sequence, T element) {
         Preconditions.checkArgument(isSequence(sequence),
-                sequence + " is not a valid sequence");
+                "%s is not a valid sequence", sequence);
         if(sequence instanceof Iterable) {
             return Iterables.contains((Iterable<T>) sequence, element);
         }
@@ -111,7 +111,7 @@ public final class Sequences {
     @SuppressWarnings("unchecked")
     public static <T> Stream<T> stream(Object sequence) {
         Preconditions.checkArgument(isSequence(sequence),
-                sequence + " is not a valid sequence");
+                "%s is not a valid sequence", sequence);
         if(sequence instanceof Iterable) {
             return Streams.stream((Iterable<T>) sequence);
         }

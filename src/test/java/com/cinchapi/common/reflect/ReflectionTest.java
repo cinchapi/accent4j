@@ -399,7 +399,7 @@ public class ReflectionTest {
         Reflection.call(new Foo(), "verA", "foo", new Long(1));
         Assert.assertTrue(true); // lack of Exception means we pass
     }
-    
+
     @Test
     public void testCallOverrideWithGenericParameter() {
         GenericChild obj = new GenericChild();
@@ -414,6 +414,66 @@ public class ReflectionTest {
         String actual = Reflection.call(obj, "foo", expected);
         Assert.assertEquals("foo_"+expected, actual);
         Assert.assertEquals("baz", Reflection.call(obj, "baz", expected));
+    }
+
+    @Test
+    public void testCallDefaultInterfaceMethod() {
+        ClassB obj = new ClassB();
+        String expected = "Jeff Nelson";
+        String actual = Reflection.call(obj, "foo", expected);
+        Assert.assertEquals("foo_" + expected, actual);
+        Assert.assertEquals("baz", Reflection.call(obj, "baz", expected));
+    }
+
+    @Test
+    public void testNewInstanceWithNullValue() {
+        String value = null;
+        A a = Reflection.newInstance(A.class, value);
+        Assert.assertEquals(value, a.string);
+    }
+
+    @Test
+    public void testNewInstanceWithNullValues() {
+        String string = "foo";
+        Integer ivalue = 5;
+        Long lvalue = 8L;
+        Double dvalue = 3.0;
+        String label = "label";
+
+        F f;
+
+        f = Reflection.newInstance(F.class, null, ivalue, label);
+        Assert.assertNull(f.string);
+        Assert.assertEquals(f.ivalue, ivalue);
+        Assert.assertEquals(f.label, label);
+
+        f = Reflection.newInstance(F.class, string, (Integer) null, label);
+        Assert.assertNull(f.ivalue);
+        Assert.assertEquals(f.string, string);
+        // FIXME: The the F(String, Double, String) constructor was chosen
+        // Assert.assertEquals(f.label, label);
+
+        f = Reflection.newInstance(F.class, null, null, label);
+        Assert.assertNull(f.string);
+        Assert.assertNull(f.ivalue);
+        Assert.assertNull(f.lvalue);
+        Assert.assertNull(f.dvalue);
+        // FIXME: The the F(String, Double, String) constructor was chosen
+        // Assert.assertEquals(f.label, label);
+
+        f = Reflection.newInstance(F.class, null, null, null);
+        Assert.assertNull(f.string);
+        Assert.assertNull(f.ivalue);
+        Assert.assertNull(f.lvalue);
+        Assert.assertNull(f.dvalue);
+        Assert.assertNull(f.label);
+
+        f = Reflection.newInstance(F.class, string, lvalue, null);
+        Assert.assertEquals(string, f.string);
+        Assert.assertNull(f.ivalue);
+        Assert.assertEquals(lvalue, f.lvalue);
+        Assert.assertNull(f.dvalue);
+        Assert.assertNull(f.label);
     }
 
     private static class A {
@@ -579,19 +639,88 @@ public class ReflectionTest {
         public void verA(String arg0, Long arg) {}
 
     }
-    
+
     public class GenericBase {
-        
+
         public <T> void put(String key, T value) {
-            
+
         }
     }
-    
+
     public class GenericChild extends GenericBase {
-        
+
         @Override
         public <T> void put(String key, T value) {
-            
+
+        }
+    }
+
+    class ClassA implements InterfaceA, InterfaceB {
+
+        @Override
+        public String baz(String value) {
+            return value;
+        }
+
+    }
+
+    class ClassB extends ClassA {
+
+        @Override
+        public String baz(String value) {
+            return "baz";
+        }
+    }
+
+    interface InterfaceA {
+
+        public String baz(String value);
+
+        public default String foo(String value) {
+            return "foo_" + value;
+        }
+
+    }
+
+    interface InterfaceB {
+        public default String bar(String value) {
+            return "bar_" + value;
+        }
+
+        public String baz(String value);
+    }
+
+    public static class F {
+
+        String string;
+        Integer ivalue;
+        Long lvalue;
+        String label;
+        Double dvalue;
+        String tag;
+
+        public F(String string, Integer value, String label) {
+            this.string = string;
+            this.ivalue = value;
+            this.label = label;
+        }
+
+        public F(String string, Long value, String label) {
+            this.string = string;
+            this.lvalue = value;
+            this.label = label;
+        }
+
+        public F(Double value, String string, String label) {
+            this.dvalue = value;
+            this.string = string;
+            this.label = label;
+        }
+
+        public F(String string, Double value, String tag) {
+            this.string = string;
+            this.dvalue = value;
+            this.tag = tag;
         }
     }
     
