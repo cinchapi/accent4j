@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.15.0 (TBD)
+* Added a fluent builder API for `Benchmark` that provides a more intuitive way to configure and run benchmarks. The builder supports specifying time units, performing warmup runs, and executing benchmarks asynchronously to ensure fair comparisons between multiple benchmarks by eliminating the impact of JVM warmup and optimization order.
+
 #### Version 1.14.0 (February 22, 2025)
 * `JoinableExecutorService`: A new class in the `concurrent` package that enhances a standard `ExecutorService` with the ability for the calling thread to join task execution. This service allows threads to submit groups of tasks and then participate directly in executing those tasks, aiding in faster completion and improved resource utilization. It ensures tasks are initiated in iteration order but balances task execution across groups to maintain consistent system performance. This feature is beneficial for applications requiring high throughput and dynamic task management.
 * Fixed a bug that caused the `Reflection#newInstance` method to throw a `NullPointerException` when a `null` was provided for a Nullable parameter.
