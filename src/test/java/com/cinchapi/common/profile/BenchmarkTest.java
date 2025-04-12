@@ -69,15 +69,22 @@ public class BenchmarkTest {
         Assert.assertTrue(elapsed < 60);
     }
 
-    // @Test(expected = IllegalArgumentException.class)
-    // public void testRunWithNegativeTimes() {
-    // benchmark.run(-1);
-    // }
-    //
-    // @Test(expected = IllegalArgumentException.class)
-    // public void testRunWithNegativeWarmupsAndTimes() {
-    // benchmark.run(-1, -1);
-    // }
+    @Test(expected = IllegalArgumentException.class)
+    public void testRunWithNegativeTimes() {
+        benchmark.run(-1);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRunWithNegativeWarmupsAndTimes() {
+        Benchmark.measure(() -> {
+            try {
+                Thread.sleep(10);
+            }
+            catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).in(TimeUnit.MILLISECONDS).warmups(-1).run(-1);
+    }
 
     @Test
     public void testAverage() {
