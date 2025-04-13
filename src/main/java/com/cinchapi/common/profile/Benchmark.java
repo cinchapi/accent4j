@@ -55,6 +55,16 @@ public abstract class Benchmark {
     }
 
     /**
+     * Start building a benchmark by providing the action to measure.
+     * 
+     * @param action the action to benchmark
+     * @return a builder to continue configuring the benchmark
+     */
+    public static ActionStage of(Runnable action) {
+        return measure(action);
+    }
+
+    /**
      * The {@link TimeUnit} in which the elapsed time should be expressed when
      * returned to the caller.
      */
