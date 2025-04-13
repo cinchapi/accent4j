@@ -76,6 +76,8 @@ public abstract class Benchmark {
      * @param unit the desired {@link #unit time unit}
      */
     public Benchmark(TimeUnit unit) {
+        // TODO: Deprecate the use of the Constructor to encourage people to use
+        // the builder. Eventually make this constructor private.
         this.unit = unit;
     }
 
