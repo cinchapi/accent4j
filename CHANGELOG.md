@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.15.0 (TBD)
+#### Version 1.15.0 (April 13, 2025)
 * Added a fluent builder API for `Benchmark` that provides a more intuitive way to configure and run benchmarks. The builder supports specifying time units, performing warmup runs, and executing benchmarks asynchronously to ensure fair comparisons between multiple benchmarks by eliminating the impact of JVM warmup and optimization order.
 
 #### Version 1.14.0 (February 22, 2025)
