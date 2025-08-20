@@ -6,6 +6,7 @@
   * `getAllImplementedInterfaces()` - Returns all interfaces from the entire class hierarchy, including interfaces from superclasses
   * `getAllDefaultInterfaceMethods()` - Returns all default interface methods available to a class from its implemented interfaces
   * `getAllNonOverriddenDefaultInterfaceMethods()` - Returns default interface methods that have not been overridden by the class or its hierarchy
+  * `invokeDefaultInterfaceMethod()` - Invokes a default interface method on a target object using MethodHandles for proper access
   * Each method has both `Class<?>` and `Object` parameter variants for convenience
   * These utilities are particularly useful for reflection-based frameworks that need to understand interface inheritance and default method availability
 

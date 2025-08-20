@@ -16,6 +16,8 @@
 package com.cinchapi.common.reflect;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -786,6 +788,75 @@ public final class Reflection {
     public static Collection<Class<?>> getTypeArguments(String field,
             Object object) {
         return getTypeArguments(getDeclaredField(field, object));
+    }
+
+    /**
+     * Invoke a default interface method on the specified {@code target} object.
+     * This method allows you to call default interface methods that may not be
+     * directly accessible through normal reflection due to Java's access
+     * restrictions on default methods.
+     *
+     * <p>Default interface methods are methods declared in interfaces with the
+     * {@code default} keyword. These methods can be invoked on objects that
+     * implement the interface, but they require special handling in reflection
+     * due to their unique access patterns.</p>
+     *
+     * <p>This method uses {@link MethodHandles} to properly invoke default
+     * methods, handling both Java 8 and Java 9+ compatibility. It will throw
+     * an exception if the method is not a default method, if the declaring
+     * class is not an interface, or if the target object does not implement
+     * the interface.</p>
+     *
+     * <p>For example, if you have an interface with a default method:</p>
+     * <pre>{@code
+     * interface MyInterface {
+     *     default String getMessage() {
+     *         return "Hello from default method";
+     *     }
+     * }
+     * }</pre>
+     *
+     * <p>You can invoke it like this:</p>
+     * <pre>{@code
+     * MyInterface obj = new MyInterface() {};
+     * Method method = MyInterface.class.getDeclaredMethod("getMessage");
+     * String result = (String) Reflection.invokeDefaultInterfaceMethod(obj, method);
+     * }</pre>
+     *
+     * @param target the object on which to invoke the default method
+     * @param method the default method to invoke
+     * @param args the arguments to pass to the method
+     * @return the result of invoking the default method
+     * @throws IllegalArgumentException if the method is not a default method,
+     *         if the declaring class is not an interface, or if the target
+     *         does not implement the interface
+     * @throws RuntimeException if the method invocation fails
+     */
+    public static Object invokeDefaultInterfaceMethod(Object target,
+            Method method, Object... args) {
+        Preconditions.checkArgument(method.isDefault());
+        Class<?> declaringClass = method.getDeclaringClass();
+        Preconditions.checkArgument(declaringClass.isInterface());
+        Preconditions.checkArgument(declaringClass.isInstance(target));
+        try {
+            MethodHandles.Lookup lookup;
+            try {
+                // Java 9+
+                lookup = callStatic(MethodHandles.class, "privateLookupIn",
+                        declaringClass, MethodHandles.lookup());
+            }
+            catch (Exception e) {
+                // Java 8 fallback
+                lookup = newInstance(MethodHandles.Lookup.class, declaringClass,
+                        MethodHandles.Lookup.PRIVATE);
+            }
+            MethodHandle handle = lookup
+                    .unreflectSpecial(method, declaringClass).bindTo(target);
+            return handle.invokeWithArguments(args);
+        }
+        catch (Throwable t) {
+            throw CheckedExceptions.wrapAsRuntimeException(t);
+        }
     }
 
     /**

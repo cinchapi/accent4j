@@ -30,7 +30,7 @@ import org.junit.Test;
  */
 public class InterfaceReflectionTest {
 
-    interface BaseInterface {
+    public interface BaseInterface {
         default String baseDefaultMethod() {
             return "base_default";
         }
@@ -42,7 +42,7 @@ public class InterfaceReflectionTest {
         String abstractMethod();
     }
 
-    interface ExtendedInterface extends BaseInterface {
+    public interface ExtendedInterface extends BaseInterface {
         default String extendedDefaultMethod() {
             return "extended_default";
         }
@@ -52,7 +52,7 @@ public class InterfaceReflectionTest {
         }
     }
 
-    interface SiblingInterface {
+    public interface SiblingInterface {
         default String siblingDefaultMethod() {
             return "sibling_default";
         }
@@ -62,7 +62,7 @@ public class InterfaceReflectionTest {
         }
     }
 
-    interface DeepInterface extends ExtendedInterface {
+    public interface DeepInterface extends ExtendedInterface {
         default String deepDefaultMethod() {
             return "deep_default";
         }
@@ -344,6 +344,130 @@ public class InterfaceReflectionTest {
         // The sets should be different
         Assert.assertNotEquals(directInterfaces, allInterfaces);
         Assert.assertTrue(allInterfaces.size() > directInterfaces.size());
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethod() throws Exception {
+        // Test basic invocation of a default interface method
+        NoOverrideClass obj = new NoOverrideClass();
+        Method method = BaseInterface.class.getDeclaredMethod("baseDefaultMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("base_default", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodWithParameters() throws Exception {
+        // Test invocation of a default interface method with parameters
+        NoOverrideClass obj = new NoOverrideClass();
+        Method method = BaseInterface.class.getDeclaredMethod("overridableMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("base_overridable", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodFromExtendedInterface() throws Exception {
+        // Test invocation of a default method from an extended interface
+        ChildClass obj = new ChildClass();
+        Method method = ExtendedInterface.class.getDeclaredMethod("extendedDefaultMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("extended_default", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodFromDeepInterface() throws Exception {
+        // Test invocation of a default method from a deeply extended interface
+        GrandChildClass obj = new GrandChildClass();
+        Method method = DeepInterface.class.getDeclaredMethod("deepDefaultMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("deep_default", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodWithMultipleInterfaces() throws Exception {
+        // Test invocation when object implements multiple interfaces with default methods
+        ChildClass obj = new ChildClass();
+        Method siblingMethod = SiblingInterface.class.getDeclaredMethod("siblingDefaultMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, siblingMethod);
+        Assert.assertEquals("sibling_default", result);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvokeDefaultInterfaceMethodWithNonDefaultMethod() throws Exception {
+        // Test that invoking a non-default method throws an exception
+        NoOverrideClass obj = new NoOverrideClass();
+        Method method = NoOverrideClass.class.getDeclaredMethod("abstractMethod");
+
+        Reflection.invokeDefaultInterfaceMethod(obj, method);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvokeDefaultInterfaceMethodWithNonInterfaceMethod() throws Exception {
+        // Test that invoking a method from a class (not interface) throws an exception
+        NoOverrideClass obj = new NoOverrideClass();
+        Method method = NoOverrideClass.class.getDeclaredMethod("abstractMethod");
+
+        Reflection.invokeDefaultInterfaceMethod(obj, method);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvokeDefaultInterfaceMethodWithIncompatibleTarget() throws Exception {
+        // Test that invoking with a target that doesn't implement the interface throws an exception
+        SimpleClass obj = new SimpleClass(); // Doesn't implement BaseInterface
+        Method method = BaseInterface.class.getDeclaredMethod("baseDefaultMethod");
+
+        Reflection.invokeDefaultInterfaceMethod(obj, method);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodWithOverriddenMethod() throws Exception {
+        // Test that invoking an overridden default method still works
+        // The method should invoke the interface's default implementation, not the class override
+        OverrideTestClass obj = new OverrideTestClass();
+        Method method = BaseInterface.class.getDeclaredMethod("overridableMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("base_overridable", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodWithInheritedOverride() throws Exception {
+        // Test that invoking a default method that was overridden by a superclass still works
+        ChildClass obj = new ChildClass();
+        Method method = BaseInterface.class.getDeclaredMethod("overridableMethod");
+
+        Object result = Reflection.invokeDefaultInterfaceMethod(obj, method);
+        Assert.assertEquals("base_overridable", result);
+    }
+
+    @Test
+    public void testInvokeDefaultInterfaceMethodWithComplexInheritance() throws Exception {
+        // Test invocation in a complex inheritance scenario
+        GrandChildClass obj = new GrandChildClass();
+
+        // Test method from base interface
+        Method baseMethod = BaseInterface.class.getDeclaredMethod("baseDefaultMethod");
+        Object baseResult = Reflection.invokeDefaultInterfaceMethod(obj, baseMethod);
+        Assert.assertEquals("base_default", baseResult);
+
+        // Test method from extended interface
+        Method extendedMethod = ExtendedInterface.class.getDeclaredMethod("extendedDefaultMethod");
+        Object extendedResult = Reflection.invokeDefaultInterfaceMethod(obj, extendedMethod);
+        Assert.assertEquals("extended_default", extendedResult);
+
+        // Test method from deep interface
+        Method deepMethod = DeepInterface.class.getDeclaredMethod("deepDefaultMethod");
+        Object deepResult = Reflection.invokeDefaultInterfaceMethod(obj, deepMethod);
+        Assert.assertEquals("deep_default", deepResult);
+
+        // Test method from sibling interface
+        Method siblingMethod = SiblingInterface.class.getDeclaredMethod("siblingDefaultMethod");
+        Object siblingResult = Reflection.invokeDefaultInterfaceMethod(obj, siblingMethod);
+        Assert.assertEquals("sibling_default", siblingResult);
     }
 
 }
