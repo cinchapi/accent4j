@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2013-2015 Cinchapi Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,8 +29,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
@@ -78,7 +81,7 @@ import com.google.common.reflect.TypeToken;
  * the other.</li>
  * </ul>
  * </p>
- * 
+ *
  * @author Jeff Nelson
  */
 public final class Reflection {
@@ -86,7 +89,7 @@ public final class Reflection {
     /**
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args}.
-     * 
+     *
      * @param obj
      * @param methodName
      * @param args
@@ -99,7 +102,7 @@ public final class Reflection {
     /**
      * Return a {@link Callable} that can execute
      * {@link #call(Object, String, Object...)} asynchronously.
-     * 
+     *
      * @param obj the object on which to call the method
      * @param methodName the name of the method to call
      * @param args the method parameters
@@ -121,7 +124,7 @@ public final class Reflection {
      * Call {@code methodName} on the specified {@code obj} with the specified
      * {@code args} if and only if the {@code evaluate} function returns
      * {@code true}.
-     * 
+     *
      * @param evaluate the {@link Function} that is given the (possibly cached)
      *            {@link Method} instance that corresponds to {@code methodName}
      *            ; use this to evaluate whether the method should be called
@@ -162,7 +165,7 @@ public final class Reflection {
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args} if and only if that method is natively accessible
      * according to java language access rules.
-     * 
+     *
      * @param obj
      * @param methodName
      * @param args
@@ -176,7 +179,7 @@ public final class Reflection {
     /**
      * Use reflection to call a static method in {@code clazz} with the
      * specified {@code args}.
-     * 
+     *
      * @param clazz the {@link Class} instance
      * @param method the method name
      * @param args the args to pass to the method upon invocation
@@ -191,7 +194,7 @@ public final class Reflection {
      * Use reflection to call a static method in {@code clazz} with the
      * specified {@code args} if and only if that method is natively accessible
      * according to java language access rules.
-     * 
+     *
      * @param clazz the {@link Class} instance
      * @param method the method name
      * @param args the args to pass to the method upon invocation
@@ -209,7 +212,7 @@ public final class Reflection {
      * variable that is not visible (i.e. when hacking the internals of a 3rd
      * party library).
      * </p>
-     * 
+     *
      * @param variable the name of the variable to retrieve
      * @param obj the object from which to retrieve the value
      * @return the value of the {@code variable} on {@code obj}, if it exists;
@@ -231,7 +234,7 @@ public final class Reflection {
      * Given a {@link Class}, return an array containing all the {@link Field}
      * objects that represent those declared within the class's entire hierarchy
      * after the base {@link Object} class.
-     * 
+     *
      * @param clazz the {@link Class} to inspect
      * @return the array of declared fields
      */
@@ -255,7 +258,7 @@ public final class Reflection {
      * Given an object, return an array containing all the {@link Field} objects
      * that represent those declared within {@code obj's} entire class hierarchy
      * after the base {@link Object}.
-     * 
+     *
      * @param obj the {@link Object} to inspect
      * @return the array of declared fields
      */
@@ -267,7 +270,7 @@ public final class Reflection {
      * Given a {@link Class}, return an array containing all the {@link Method}
      * objects that represent those declared within the class's entire hierarchy
      * after the base {@link Object} class.
-     * 
+     *
      * @param clazz the {@link Class} to inspect
      * @return the array of declared methods
      */
@@ -291,7 +294,7 @@ public final class Reflection {
      * Given a {@link Class}, return an array containing all the {@link Method}
      * objects that represent those declared within {@code obj's} entire class
      * hierarchy after the base {@link Object}.
-     * 
+     *
      * @param obj the {@link Class} to inspect
      * @return the array of declared methods
      */
@@ -300,9 +303,215 @@ public final class Reflection {
     }
 
     /**
+     * Return all default interface methods available to the {@code clazz} from
+     * its implemented interfaces. This method includes default methods from all
+     * interfaces in the class hierarchy, including those extended by directly
+     * implemented interfaces.
+     *
+     * <p>
+     * Default interface methods are methods declared in interfaces with the
+     * {@code default} keyword that provide a default implementation. These
+     * methods are inherited by classes that implement the interface unless
+     * explicitly overridden.
+     * </p>
+     *
+     * <p>
+     * For example, if class {@code MyClass} implements {@code InterfaceA}
+     * which extends {@code InterfaceB}, and both interfaces have default
+     * methods, this method will return default methods from both interfaces.
+     * </p>
+     *
+     * @param clazz the class whose default interface methods to retrieve
+     * @return an array of default interface methods available to the class
+     */
+    public static Method[] getAllDefaultInterfaceMethods(Class<?> clazz) {
+        Set<Class<?>> ifaces = getAllImplementedInterfaces(clazz);
+        Map<Signature, Method> methods = new LinkedHashMap<>();
+        for (Class<?> iface : ifaces) {
+            for (Method method : iface.getDeclaredMethods()) {
+                if(method.isDefault()) {
+                    Signature signature = new Signature(method);
+                    methods.putIfAbsent(signature, method);
+                }
+            }
+        }
+        return methods.values().toArray(Array.containing());
+    }
+
+    /**
+     * Return all default interface methods available to the {@code object}'s
+     * class from its implemented interfaces. This method includes default
+     * methods
+     * from all interfaces in the class hierarchy, including those extended by
+     * directly implemented interfaces.
+     *
+     * <p>
+     * Default interface methods are methods declared in interfaces with the
+     * {@code default} keyword that provide a default implementation. These
+     * methods are inherited by classes that implement the interface unless
+     * explicitly overridden.
+     * </p>
+     *
+     * <p>
+     * For example, if the object's class implements {@code InterfaceA} which
+     * extends {@code InterfaceB}, and both interfaces have default methods,
+     * this
+     * method will return default methods from both interfaces.
+     * </p>
+     *
+     * @param object the object whose default interface methods to retrieve
+     * @return an array of default interface methods available to the object's
+     *         class
+     */
+    public static Method[] getAllDefaultInterfaceMethods(Object object) {
+        return getAllDefaultInterfaceMethods(object.getClass());
+    }
+
+    /**
+     * Return all interfaces implemented by the {@code clazz} and its entire
+     * class hierarchy. This method traverses up the class inheritance chain and
+     * collects interfaces from each superclass, including interfaces extended
+     * by
+     * directly implemented interfaces.
+     *
+     * <p>
+     * For example, if class {@code MyClass} extends {@code ParentClass} which
+     * implements {@code InterfaceA}, and {@code InterfaceA} extends
+     * {@code InterfaceB}, this method will return both {@code InterfaceA} and
+     * {@code InterfaceB}.
+     * </p>
+     *
+     * <p>
+     * This method differs from {@link #getImplementedInterfaces(Class)} in
+     * that it traverses up the entire class inheritance hierarchy, collecting
+     * interfaces from each superclass, whereas {@code getImplementedInterfaces}
+     * only looks at the specified class itself.
+     * </p>
+     *
+     * @param clazz the class whose interfaces to retrieve
+     * @return a set of all interfaces implemented by the class hierarchy
+     */
+    public static Set<Class<?>> getAllImplementedInterfaces(Class<?> clazz) {
+        Set<Class<?>> ifaces = new LinkedHashSet<>();
+        for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+            ifaces.addAll(getImplementedInterfaces(c));
+        }
+        return ifaces;
+    }
+
+    /**
+     * Return all interfaces implemented by the {@code object}'s class and its
+     * entire class hierarchy. This method traverses up the class inheritance
+     * chain and collects interfaces from each superclass, including interfaces
+     * extended by directly implemented interfaces.
+     *
+     * <p>
+     * For example, if the object's class extends {@code ParentClass} which
+     * implements {@code InterfaceA}, and {@code InterfaceA} extends
+     * {@code InterfaceB}, this method will return both {@code InterfaceA} and
+     * {@code InterfaceB}.
+     * </p>
+     *
+     * <p>
+     * This method differs from {@link #getImplementedInterfaces(Object)} in
+     * that it traverses up the entire class inheritance hierarchy, collecting
+     * interfaces from each superclass, whereas {@code getImplementedInterfaces}
+     * only looks at the object's class itself.
+     * </p>
+     *
+     * @param object the object whose interfaces to retrieve
+     * @return a set of all interfaces implemented by the object's class
+     *         hierarchy
+     */
+    public static Set<Class<?>> getAllImplementedInterfaces(Object object) {
+        return getAllImplementedInterfaces(object.getClass());
+    }
+
+    /**
+     * Return all default interface methods available to the {@code clazz} that
+     * have not been overridden by the class or its hierarchy. This method
+     * identifies default interface methods that are still available for use
+     * because they haven't been explicitly overridden.
+     *
+     * <p>
+     * Default interface methods can be overridden by classes that implement
+     * the interface. When a class provides its own implementation of a default
+     * method, the interface's default implementation is no longer available.
+     * This method helps identify which default methods are still accessible.
+     * </p>
+     *
+     * <p>
+     * For example, if {@code InterfaceA} has a default method
+     * {@code defaultMethod()}, and class {@code MyClass} implements
+     * {@code InterfaceA} but does not override {@code defaultMethod()}, then
+     * this method will return {@code defaultMethod()}. However, if
+     * {@code MyClass} provides its own implementation of
+     * {@code defaultMethod()}, it will not be included in the result.
+     * </p>
+     *
+     * <p>
+     * This method is useful for reflection-based frameworks that need to
+     * understand which default interface methods are available for invocation
+     * on a given class.
+     * </p>
+     *
+     * @param clazz the class whose non-overridden default interface methods to
+     *            retrieve
+     * @return an array of default interface methods not overridden by the class
+     */
+    public static Method[] getAllNonOverriddenDefaultInterfaceMethods(
+            Class<?> clazz) {
+        Set<Signature> declared = Arrays.stream(getAllDeclaredMethods(clazz))
+                .filter(method -> !Modifier.isPrivate(method.getModifiers()))
+                .map(Signature::of).collect(Collectors.toSet());
+        return Arrays.stream(getAllDefaultInterfaceMethods(clazz))
+                .filter(method -> !declared.contains(Signature.of(method)))
+                .toArray(Method[]::new);
+
+    }
+
+    /**
+     * Return all default interface methods available to the {@code object}'s
+     * class that have not been overridden by the class or its hierarchy. This
+     * method identifies default interface methods that are still available for
+     * use because they haven't been explicitly overridden.
+     *
+     * <p>
+     * Default interface methods can be overridden by classes that implement
+     * the interface. When a class provides its own implementation of a default
+     * method, the interface's default implementation is no longer available.
+     * This method helps identify which default methods are still accessible.
+     * </p>
+     *
+     * <p>
+     * For example, if {@code InterfaceA} has a default method
+     * {@code defaultMethod()}, and the object's class implements
+     * {@code InterfaceA} but does not override {@code defaultMethod()}, then
+     * this method will return {@code defaultMethod()}. However, if the object's
+     * class provides its own implementation of {@code defaultMethod()}, it will
+     * not be included in the result.
+     * </p>
+     *
+     * <p>
+     * This method is useful for reflection-based frameworks that need to
+     * understand which default interface methods are available for invocation
+     * on a given object.
+     * </p>
+     *
+     * @param object the object whose non-overridden default interface methods
+     *            to retrieve
+     * @return an array of default interface methods not overridden by the
+     *         object's class
+     */
+    public static Method[] getAllNonOverriddenDefaultInterfaceMethods(
+            Object object) {
+        return getAllNonOverriddenDefaultInterfaceMethods(object.getClass());
+    }
+
+    /**
      * Reflectively get the value of the {@code field} from the provided
      * {@code object} and attempt an automatic type cast.
-     * 
+     *
      * @param field the {@link Field} object representing the desired variable
      * @param object the object whose value for the {@code field} should be
      *            retrieved
@@ -324,7 +533,7 @@ public final class Reflection {
     /**
      * This is literally just syntactic sugar for {@link Class#forName(String)}
      * that doesn't throw a checked exception.
-     * 
+     *
      * @param name the name of the class
      * @return the {@link Class} object if can be found
      */
@@ -341,7 +550,7 @@ public final class Reflection {
     /**
      * Return the closest common ancestor class for all of the input
      * {@code classes}.
-     * 
+     *
      * @param classes the classes that have a common ancestor
      * @return the closest common ancestor
      */
@@ -351,7 +560,7 @@ public final class Reflection {
 
     /**
      * Return all the common ancestors for the {@code classes}.
-     * 
+     *
      * @param classes
      * @return the common ancestors of the specified classes
      */
@@ -369,7 +578,7 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the class or class
      * hierarchy.
-     * 
+     *
      * @param name the field name
      * @param clazz the class that contains the field
      * @return the {@link Field} object
@@ -381,7 +590,7 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the {@code obj}'s
      * class or class hierarchy.
-     * 
+     *
      * @param name the field name
      * @param obj the object whose class contains the field
      * @return the {@link Field} object
@@ -393,7 +602,7 @@ public final class Reflection {
     /**
      * Return the enum value at position {@code ordinal} for the
      * {@code enumType}.
-     * 
+     *
      * @param enumType the {@link Enum} class
      * @param ordinal the value position
      * @return the {@link Enum} value
@@ -412,7 +621,7 @@ public final class Reflection {
     /**
      * Return the enum value from {@code enumType} with the specified
      * {@code identifier}.
-     * 
+     *
      * @param enumType the {@link Enum} class
      * @param identifier the value name or ordinal
      * @return the {@link Enum} value
@@ -430,7 +639,7 @@ public final class Reflection {
     /**
      * Return the enum value from {@code enumType} with the specified
      * {@code name}.
-     * 
+     *
      * @param enumType the {@link Enum} class
      * @param name the value name
      * @return the {@link Enum} value
@@ -442,10 +651,60 @@ public final class Reflection {
     }
 
     /**
+     * Return all interfaces implemented by the {@code clazz}, including
+     * interfaces extended by directly implemented interfaces. This method does
+     * not traverse up the class inheritance hierarchy.
+     *
+     * <p>
+     * For example, if class {@code MyClass} implements {@code InterfaceA},
+     * and {@code InterfaceA} extends {@code InterfaceB}, this method will
+     * return
+     * both {@code InterfaceA} and {@code InterfaceB}.
+     * </p>
+     *
+     * @param clazz the class whose interfaces to retrieve
+     * @return a set of interfaces implemented by the class
+     */
+    public static Set<Class<?>> getImplementedInterfaces(Class<?> clazz) {
+        Set<Class<?>> ifaces = new LinkedHashSet<>();
+        Deque<Class<?>> stack = new ArrayDeque<>(
+                Arrays.asList(clazz.getInterfaces()));
+        while (!stack.isEmpty()) {
+            Class<?> iface = stack.pop();
+            if(ifaces.add(iface)) {
+                for (Class<?> superIface : iface.getInterfaces()) {
+                    stack.push(superIface);
+                }
+            }
+        }
+        return ifaces;
+    }
+
+    /**
+     * Return all interfaces implemented by the {@code object}'s class,
+     * including
+     * interfaces extended by directly implemented interfaces. This method does
+     * not traverse up the class inheritance hierarchy.
+     *
+     * <p>
+     * For example, if class {@code MyClass} implements {@code InterfaceA},
+     * and {@code InterfaceA} extends {@code InterfaceB}, this method will
+     * return
+     * both {@code InterfaceA} and {@code InterfaceB}.
+     * </p>
+     *
+     * @param object the object whose interfaces to retrieve
+     * @return a set of interfaces implemented by the object's class
+     */
+    public static Set<Class<?>> getImplementedInterfaces(Object object) {
+        return getImplementedInterfaces(object.getClass());
+    }
+
+    /**
      * Return a {@link Method} instance from {@code clazz} named {@code method}
      * (that takes arguments of {@code paramTypes} respectively)
      * while making a best effort attempt to unbox primitive parameter types
-     * 
+     *
      * @param clazz the class instance in which the method is contained
      * @param method the name of the method
      * @param paramTypes the types for the respective paramters
@@ -472,7 +731,7 @@ public final class Reflection {
      * Return a collection containing the type arguments for the provided
      * {@code field}. If there are no type arguments, the collection that is
      * returned is empty.
-     * 
+     *
      * @param field
      * @return the type arguments
      */
@@ -505,7 +764,7 @@ public final class Reflection {
      * Return a collection containing the type arguments for the provided
      * {@code field} in {@code clazz}. If there are no type arguments, the
      * collection that is returned is empty.
-     * 
+     *
      * @param field
      * @param clazz
      * @return the type arguments
@@ -519,7 +778,7 @@ public final class Reflection {
      * Return a collection containing the type arguments for the provided
      * {@code field} of the {@code object}'s class. If there are no type
      * arguments, the collection that is returned is empty.
-     * 
+     *
      * @param field
      * @param object
      * @return the type arguments
@@ -532,7 +791,7 @@ public final class Reflection {
     /**
      * Return {@code true} if the {@code method} is callable with the provided
      * {@code params}.
-     * 
+     *
      * @param method
      * @param params
      * @return {@code true} if the provided {@code params} match the expected
@@ -559,7 +818,7 @@ public final class Reflection {
      * the hierarchy. If necessary, the caller must do further inspection to
      * retrieve the exact annotation state.
      * </p>
-     * 
+     *
      * @param method
      * @param annotationClass
      * @return {@code true} if a version of the method in the hierarchy was
@@ -592,7 +851,7 @@ public final class Reflection {
     /**
      * Implementation of {@link ClassLoader#loadClass(String)} that throws an
      * {@link RuntimeException} instead of a checked exception.
-     * 
+     *
      * @param name
      * @param classLoader
      * @return the loaded class
@@ -610,7 +869,7 @@ public final class Reflection {
     /**
      * Given a {@link Class}, create a new instance by calling the appropriate
      * constructor for the given {@code args}.
-     * 
+     *
      * @param clazz the type of instance to construct
      * @param args the parameters to pass to the constructor
      * @return the new instance
@@ -666,7 +925,7 @@ public final class Reflection {
     /**
      * Call {@code constructor} with {@code args} and return a new instance of
      * type {@code T}.
-     * 
+     *
      * @param constructor the {@link Constructor} to use for creation
      * @param args the initialization args to pass to the constructor
      * @return an instance of the class to which the {@code constructor} belongs
@@ -685,7 +944,7 @@ public final class Reflection {
     /**
      * Return a new instance of the specified {@code clazz} by calling the
      * appropriate constructor with the specified {@code args}.
-     * 
+     *
      * @param clazz the fully qualified name of the {@link Class}
      * @param args the args to pass to the constructor
      * @return the new instance
@@ -714,7 +973,7 @@ public final class Reflection {
      * {@code data} map does not correspond to a named variable within the
      * {@code obj}'s class.
      * </p>
-     * 
+     *
      * @param data a mapping from variable name to value
      * @param obj the object on which to set the data
      */
@@ -732,7 +991,7 @@ public final class Reflection {
      * parts of the code assume that {@code obj} is immutable, or the
      * {@code variable} is used in a multi threaded context.
      * </p>
-     * 
+     *
      * @param variable the name of the variable to set
      * @param value the value to set
      * @param obj the object on which to set the value
@@ -750,7 +1009,7 @@ public final class Reflection {
     /**
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args}.
-     * 
+     *
      * @param setAccessible an indication as to whether the reflective call
      *            should suppress Java language access checks or not
      * @param obj
@@ -769,7 +1028,7 @@ public final class Reflection {
      * Do the work to use reflection to call a static method in {@code clazz}
      * with the specified {@code args} while optionally obeying the native java
      * language access rules.
-     * 
+     *
      * @param setAccessible a flag that determines whether java language access
      *            rules will be overridden
      * @param clazz the {@link Class} instance
@@ -786,7 +1045,7 @@ public final class Reflection {
     /**
      * Return the boxed version of {@code clazz} if it is a primitive, or the
      * unboxed version if it is a wrapper.
-     * 
+     *
      * @param clazz the class for which the alt type is returned
      * @return the alt type
      */
@@ -827,7 +1086,7 @@ public final class Reflection {
 
     /**
      * Get all the ancestors for {@code clazz} in an ordered set.
-     * 
+     *
      * @param clazz
      * @return the ancestors of {@code clazz}
      */
@@ -857,7 +1116,7 @@ public final class Reflection {
     /**
      * Return the value of the {@link Field} called {@code name} in
      * {@code clazz} from the specified {@code obj}.
-     * 
+     *
      * @param name the name of the field
      * @param clazz the {@link Class} in which the field is defined
      * @return the associated {@link Field} object
@@ -895,7 +1154,7 @@ public final class Reflection {
      * <p>
      * This method will take care of making the field accessible.
      * </p>
-     * 
+     *
      * @param name the name of the field to get
      * @param obj the object from which to get the field
      * @return the {@link Field} object
@@ -908,7 +1167,7 @@ public final class Reflection {
     /**
      * Return a set of classes that are considered to be interchangeable with
      * {@code clazz}.
-     * 
+     *
      * @param clazz
      * @return a set of classes
      */
@@ -934,7 +1193,7 @@ public final class Reflection {
      * Return the {@link Method} object called {@code name} in {@code clazz}
      * that accepts the specified {@code args} and optionally ignore the native
      * java language access rules.
-     * 
+     *
      * @param setAccessible a flag that indicates whether the native java
      *            language access rules should be ignored
      * @param name the method name
@@ -956,7 +1215,7 @@ public final class Reflection {
      * Return the {@link Method} object called {@code name} in {@code clazz}
      * that accepts the specified {@code args} and optionally ignore the native
      * java language access rules.
-     * 
+     *
      * @param args (optional) args to plug into the params
      * @param setAccessible a flag that indicates whether the native java
      *            language access rules should be ignored
@@ -1054,7 +1313,7 @@ public final class Reflection {
     /**
      * Invoke {@code method} with {@code args}. If {@code object} is
      * {@code null}, this is a static invocation.
-     * 
+     *
      * @param method
      * @param object
      * @param args
@@ -1067,7 +1326,7 @@ public final class Reflection {
             int count;
             // @formatter:off
             if((count = method.getParameterCount()) > 0 // its possible for method to have varags
-                    && (args.length >= count - 1) // the number of arguments provided is at least equal to the number of non vararg parameters 
+                    && (args.length >= count - 1) // the number of arguments provided is at least equal to the number of non vararg parameters
                     && (method.getParameterTypes()[count - 1].isArray() // the last paramter expected is an array type
                             && (args.length == 0 || !args[args.length - 1] // no args were provided OR the last arg provided is NOT an array (meaning its not a vararg invocation literal)
                                     .getClass().isArray()))) {
@@ -1117,7 +1376,7 @@ public final class Reflection {
      * if all other factors indicate that the method is callable with the param
      * types.
      * </p>
-     * 
+     *
      * @param method
      * @param paramTypes
      * @return a ternary truth value that indicates the level of certainty that
@@ -1206,7 +1465,7 @@ public final class Reflection {
      * if all other factors indicate that the method is callable with the param
      * types.
      * </p>
-     * 
+     *
      * @param method
      * @param paramTypes
      * @return a ternary truth value that indicates the level of certainty that
@@ -1224,7 +1483,7 @@ public final class Reflection {
      * Return the unboxed version of the input {@code clazz}. This is usually
      * a class that represents a primitive for an autoboxed wrapper class.
      * Otherwise, the input {@code clazz} is returned.
-     * 
+     *
      * @param clazz the {@link Class} to unbox
      * @return the unboxed class
      */
@@ -1259,5 +1518,52 @@ public final class Reflection {
     }
 
     private Reflection() {/* noinit */}
+
+    /**
+     * A representation of a method signature consisting of the method name and
+     * parameter types.
+     *
+     * @author Jeff Nelson
+     */
+    private static final class Signature {
+
+        /**
+         * Create a {@link Signature} from a {@link Method}.
+         *
+         * @param method the method to create a signature for
+         * @return a signature representing the method
+         */
+        static Signature of(Method method) {
+            return new Signature(method);
+        }
+
+        private final String name;
+        private final List<Class<?>> params;
+
+        /**
+         * Create a new signature from a method.
+         *
+         * @param method the method to create a signature for
+         */
+        Signature(Method method) {
+            this.name = method.getName();
+            this.params = Arrays.asList(method.getParameterTypes());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if(this == o)
+                return true;
+            if(!(o instanceof Signature))
+                return false;
+            Signature s = (Signature) o;
+            return name.equals(s.name) && params.equals(s.params);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, params);
+        }
+    }
 
 }
