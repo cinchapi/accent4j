@@ -1,16 +1,17 @@
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.8'
+    gradleVersion = '3.0'
 }
 
 apply plugin: 'java'
 apply plugin: 'eclipse'
-apply plugin: 'maven'
 apply plugin: 'signing'
+apply plugin: 'maven-publish'
 
 repositories {
     mavenCentral()
     maven {
-      url 'https://oss.sonatype.org/content/repositories/snapshots/'
+        name 'central-portal-snapshots'
+        url 'https://central.sonatype.com/repository/maven-snapshots/'
     }
 }
 
@@ -38,6 +39,13 @@ ext.globalVersion  = getVersion()
 group = 'com.cinchapi'
 version = globalVersion
 
+// Drop the build component from version number and use that for
+// publishing
+ext.mavenVersion = globalVersion.split('\\.')
+ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
+ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
+ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
+
 if (JavaVersion.current().isJava8Compatible()) {
     allprojects {
         tasks.withType(Javadoc) {
@@ -52,11 +60,6 @@ jar {
     }
 }
 
-signing {
-    required { gradle.taskGraph.hasTask("uploadArchives") }
-    sign configurations.archives
-}
-
 task sourcesJar(type: Jar, dependsOn: classes) {
 	classifier = 'sources'
 	from sourceSets.main.allSource
@@ -68,55 +71,81 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
 }
 
 artifacts {
+	archives jar
 	archives sourcesJar
 	archives javadocJar
 }
 
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-            // Drop the build component from version number and use that in the
-            // POM file
-            def _version = project.version.split('\\.')
-            _version[3] = _version[3].replaceAll("[0-9]+-", "-")
-            _version[3] = _version[3].replaceAll("[0-9]+", "").trim()
-            _version = _version.join(".").replace(".-", "-").replaceAll('\\.$', "")
-            pom.version = _version
-
-            pom.project {
-               name 'Accent4J'
-               packaging 'jar'
-               description 'Accent4J is a suite of libraries, helpers and data structures that make Java programming idioms more fluent.'
-               url 'http://cinchapi.com'
-
-               scm {
-                   url 'git@github.com:cinchapi/accent4j.git'
-                   connection 'git@github.com:cinchapi/accent4j.git'
-                   developerConnection 'git@github.com:cinchapi/accent4j.git'
-               }
-
-               licenses {
-                   license {
-                       name 'The Apache License'
-                       url 'http://opensource.org/licenses/Apache-2.0'
-                       distribution 'repo'
-                   }
-               }
-
-               developers {
-                   developer {
-                       id 'jnelson'
-                       name 'Jeff Nelson'
-                   }
-               }
-           }
-
-           def mavenUrl = pom.version.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+){0,1}$') ? 'https://oss.sonatype.org/service/local/staging/deploy/maven2' : 'https://oss.sonatype.org/content/repositories/snapshots'
-           repository(url: mavenUrl) {
-               authentication(userName: sonatypeUsername, password: sonatypePassword)
-           }
-        }
+publishing {
+  repositories {
+    maven {
+      name = 'cloudsmith'
+      def releasesRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source/"
+      def snapshotsRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source-snapshots/"
+      url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+      credentials {
+        username = System.getenv('CLOUDSMITH_API_USER')
+        password = System.getenv('CLOUDSMITH_API_KEY')
+      }
     }
+    // maven {
+    //   name = 'central'
+    //   def releasesRepoUrl = "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
+    //   def snapshotsRepoUrl = "https://central.sonatype.com/repository/maven-snapshots/"
+    //   url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+    //   credentials {
+    //     username = System.getenv('CENTRAL_TOKEN_USER')
+    //     password = System.getenv('CENTRAL_TOKEN_PASS')
+    //   }
+    // }
+  }
+  publications {
+    maven(MavenPublication) {
+      from components.java
+      artifact sourcesJar
+      artifact javadocJar
+      groupId group
+      artifactId project.name
+      version mavenVersion
+    }
+  }
 }
+
+// signing {
+//     required { gradle.taskGraph.hasTask("publish") }
+//     sign configurations.archives
+// }
+// // ===== Post-upload finalize step =====
+// // This notifies the compatibility service to move your upload into the
+// // Central Publisher Portal so you can see/release it there.
+// // Must run from the same IP as the upload (same CI job).
+// def centralNamespace = 'com.cinchapi'
+
+// task finalizeCentralUpload(type: Exec) {
+//     // Only if: a) release (not -SNAPSHOT), b) user didn't opt out, and
+//     // c) the Central publish task is actually in the graph
+//     onlyIf {
+//         !mavenVersion.endsWith('SNAPSHOT') &&
+//         !project.hasProperty('skipCentralFinalize') &&
+//         gradle.taskGraph.allTasks*.name.contains('publishMavenPublicationToCentralRepository')
+//     }
+
+//     // Move all runtime logic here so config-phase never fails on non-publish tasks
+//     doFirst {
+//         def user = System.getenv('CENTRAL_TOKEN_USER')
+//         def pass = System.getenv('CENTRAL_TOKEN_PASS')
+//         if (!user || !pass) {
+//             throw new GradleException('Missing Central Portal token credentials (centralUsername/centralPassword or env CENTRAL_TOKEN_USER/CENTRAL_TOKEN_PASS)')
+//         }
+//         def bearer = "${user}:${pass}".bytes.encodeBase64().toString()
+//         commandLine 'bash', '-lc', """
+//           curl -sS -X POST \\
+//             -H 'Authorization: Bearer ${bearer}' \\
+//             https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/${centralNamespace}
+//         """
+//     }
+// }
+
+// tasks.publish {
+//     finalizedBy finalizeCentralUpload
+// }

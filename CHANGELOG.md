@@ -1,7 +1,23 @@
 # Changelog
 
-#### Version 1.14.0 (TBD)
+#### Version 1.16.0 (TBD)
+* Added comprehensive interface reflection utilities to the `Reflection` class for working with Java interfaces and default methods:
+  * `getImplementedInterfaces()` - Returns interfaces directly implemented by a class, including interfaces extended by those directly implemented interfaces
+  * `getAllImplementedInterfaces()` - Returns all interfaces from the entire class hierarchy, including interfaces from superclasses
+  * `getAllDefaultInterfaceMethods()` - Returns all default interface methods available to a class from its implemented interfaces
+  * `getAllNonOverriddenDefaultInterfaceMethods()` - Returns default interface methods that have not been overridden by the class or its hierarchy
+  * `invokeDefaultInterfaceMethod()` - Invokes a default interface method on a target object using MethodHandles for proper access
+  * Each method has both `Class<?>` and `Object` parameter variants for convenience
+  * These utilities are particularly useful for reflection-based frameworks that need to understand interface inheritance and default method availability
+* **Breaking Change**: `JoinableExecutorService` has been refactored from a concrete class to an interface. This change requires using one of the static factory methods to create instances instead of using constructors directly. The refactoring provides better abstraction and allows for different implementation strategies.
+* Added `JoinableDirectExecutorService` implementation that executes tasks synchronously in the calling thread, enabling the same code constructs and execution paths when async behavior is not preferred or when configuration requires synchronous execution
+
+#### Version 1.15.0 (April 13, 2025)
+* Added a fluent builder API for `Benchmark` that provides a more intuitive way to configure and run benchmarks. The builder supports specifying time units, performing warmup runs, and executing benchmarks asynchronously to ensure fair comparisons between multiple benchmarks by eliminating the impact of JVM warmup and optimization order.
+
+#### Version 1.14.0 (February 22, 2025)
 * `JoinableExecutorService`: A new class in the `concurrent` package that enhances a standard `ExecutorService` with the ability for the calling thread to join task execution. This service allows threads to submit groups of tasks and then participate directly in executing those tasks, aiding in faster completion and improved resource utilization. It ensures tasks are initiated in iteration order but balances task execution across groups to maintain consistent system performance. This feature is beneficial for applications requiring high throughput and dynamic task management.
+* Fixed a bug that caused the `Reflection#newInstance` method to throw a `NullPointerException` when a `null` was provided for a Nullable parameter.
 
 ##### Bug Fixes
 * Fixed a bug that caused some methods in `Sequences` to have poor performance if the `toString` method of a potential `Sequence` was computationally expensive
@@ -28,7 +44,7 @@
 * Added the `TriConsumer` functional interface that is similar to `BiConsumer` for three input arguments.
 
 #### Version 1.10.0 (November 23, 2019)
-* Added an improvement to `LazyTransformSet` that caches previously transformed values and makes a best effort to keep them from being transformed on subsequent iterations. 
+* Added an improvement to `LazyTransformSet` that caches previously transformed values and makes a best effort to keep them from being transformed on subsequent iterations.
 * Added an `ExecutorRaceService` that can be used to execute multiple tasks in parallel with the option to give one of the tasks a head start. The first of the tasks to complete has its `Future` returned to the caller.
 * Added the `Multimaps#from` method that transforms a `Map` whose values are a `Set` of objects into a `Multimap`.
 
@@ -42,7 +58,7 @@
 * Fixed a bug that caused `AnyStrings#join` to throw an `IndexOutOfBoundsException` when trying to join an empty array of arguments with a separator. These functions now correctly return an empty string.
 
 #### Version 1.8.2 ( September 14, 2019)
-* Fixed a bug that caused a `StringSplitter` to throw an `IllegalStateException` when `toArray()` would generate an empty array because the combination of the original input and split options did not produce any distinct tokens (i.e. using `SplitOption.TRIM_WHITESPACE` with an empty string input). 
+* Fixed a bug that caused a `StringSplitter` to throw an `IllegalStateException` when `toArray()` would generate an empty array because the combination of the original input and split options did not produce any distinct tokens (i.e. using `SplitOption.TRIM_WHITESPACE` with an empty string input).
 
 #### Version 1.8.1 (September 2, 2019)
 * Added a version of `AnyObjects#split` that takes a `StringSplitter` as a parameter to provide more configurable split functionality.
@@ -98,7 +114,7 @@
 #### Version 1.2.0 (October 14, 2018)
 * Add the `Adjective` framework. An `Adjective` is a group of class and class-hirearchy specific definitions that describe a trait that may apply to objects. Some adjectives may have built-in definitions, but all of them are intended to be customizable on a per-instance (e.g. no static state) basis using the `define` method. An adjective's applicability for an object can be tested using the `describes` method.
 * The `Empty` adjective is provided. By default, `Empty` describes a null value, an empty String, an empty Iterable, or an empty Array.
-* Deprecated the `AnyObjects#isNullOrEmpty`* and `AnyObjects#registerEmptyDefinition` methods in favor of using `Empty` instances when needed. These methods should be avoid because they rely on static state that can cause global conflicts. 
+* Deprecated the `AnyObjects#isNullOrEmpty`* and `AnyObjects#registerEmptyDefinition` methods in favor of using `Empty` instances when needed. These methods should be avoid because they rely on static state that can cause global conflicts.
 * Added `Sequences` utility class containing operations for `Iterable` and `Array` objects.
 * Added `Enums` utility class with functions to parse enums from values while ignoring `toString` case and/or using custom logic.
 * Added the `Association#ensure` static factory method that only creates a new `Association` from a `Map` if the `Map` is not already an `Association`. Otherwise, the input instance is returned.
