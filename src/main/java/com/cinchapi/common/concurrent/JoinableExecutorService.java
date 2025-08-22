@@ -15,168 +15,159 @@
  */
 package com.cinchapi.common.concurrent;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 import com.cinchapi.common.base.CheckedExceptions;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
 /**
- * A {@link JoinableExecutorService} provides asynchronous execution of tasks
- * with an option for the calling thread to {@link #join(Runnable...)
- * join} and participate in executing its submitted tasks while awaiting their
- * completion.
+ * A {@link JoinableExecutorService} is a specialized {@link ExecutorService}
+ * designed to accelerate the execution of a batch of tasks by having the
+ * submitting thread actively participate in the work while it waits for them
+ * to complete.
+ *
+ * <h2>Core Concept: Active Waiting</h2>
  * <p>
- * This {@link ExecutorService} acts as a shared resource for multiple
- * processes. Under high contention, the calling thread's participation in
- * completing the tasks it submitted guarantees that the performance will be no
- * worse than if the caller executed each task serially, without using an
- * {@link ExecutorService}.
+ * The primary feature of this interface is the set of
+ * {@link #join(Callable...) join} methods.
+ * When a thread calls {@link #join(Callable...) join}, it blocks until all
+ * provided tasks are finished. Unlike a traditional {@code Future.get()} call
+ * where the thread would wait idly (<strong>passive waiting</strong>), a thread
+ * calling {@link #join(Callable...) join} becomes a temporary worker for the
+ * tasks it just submitted (<strong>active waiting</strong>).
  * </p>
  * <p>
- * In most cases, the calling thread will work alongside the shared threads in
- * this {@link ExecutorService} to complete all of the submitted tasks faster
- * and more efficiently than using a standard {@link ExecutorService}.
+ * This cooperative approach transforms potential idle time into productive
+ * work, maximizing CPU utilization and reducing the total time required to
+ * complete the entire batch of tasks.
  * </p>
+ *
+ * <h2>How It Works: A "Take-Back" Strategy</h2>
  * <p>
- * Key features of {@link JoinableExecutorService}:
+ * Implementations of this interface typically use a simple but effective
+ * architecture to achieve this behavior:
+ * </p>
+ * <ol>
+ * <li><strong>Single Shared Queue:</strong> All worker threads in the pool
+ * pull tasks from one central {@link java.util.concurrent.BlockingQueue}.</li>
+ * <li><strong>Submission and "Take-Back":</strong> When {@code join} is
+ * called, all tasks are added to this shared queue. The calling thread
+ * then immediately attempts to <strong>take back</strong> those same
+ * tasks from the queue before a dedicated worker can.</li>
+ * <li><strong>Completion:</strong> If the calling thread successfully
+ * retrieves a task, it executes it directly. The {@code join} method
+ * only returns after all tasks in the batch have been completed, whether
+ * they were run by the calling thread or the pool's workers.</li>
+ * </ol>
+ *
+ * <h2>Ideal Use Case: Parallel Independent Tasks</h2>
+ * <p>
+ * This executor is best suited for scenarios where a thread needs to dispatch
+ * a collection of <strong>independent, non-divisible tasks</strong> and then
+ * block until all are complete. This is common when a process needs to
+ * aggregate the results of several parallel operations.
+ * </p>
+ * Good examples include:
  * <ul>
- * <li>Allows the calling thread to join and participate in executing its
- * submitted tasks.</li>
- * <li>Ensures performance is no worse than serial execution under high
- * contention.</li>
- * <li>Enables faster and more efficient task completion compared to a standard
- * {@link ExecutorService}.</li>
+ * <li>Making several API calls to different microservices.</li>
+ * <li>Running a handful of unrelated, long-running database queries.</li>
+ * <li>Processing a set of files from a directory where each file can be
+ * handled separately.</li>
  * </ul>
+ *
+ * <h2>Comparison to Other Java Executors</h2>
+ * <p>
+ * <strong>vs. {@link java.util.concurrent.ThreadPoolExecutor}:</strong> A
+ * standard {@code ThreadPoolExecutor} would leave the calling thread idly
+ * blocked while waiting on {@code Future.get()}. This interface makes that
+ * waiting period productive.
  * </p>
  * <p>
- * <p>
- * The {@link #join(Runnable...) join} methods block until all submitted tasks
- * are completed.
+ * <strong>vs. {@link java.util.concurrent.ForkJoinPool}:</strong> While both
+ * executors involve caller participation, they are designed for fundamentally
+ * different problems and have different architectures.
+ * <ul>
+ * <li><strong>Task Type:</strong> This service is for a batch of monolithic
+ * {@code Runnable}/{@code Callable} tasks. A {@code ForkJoinPool} is for
+ * <strong>divisible, "divide-and-conquer"</strong> style
+ * {@code ForkJoinTask}s that can be recursively broken down.</li>
+ * <li><strong>Architecture:</strong> This service relies on a
+ * <strong>single shared queue</strong>, which can be a source of
+ * contention. A {@code ForkJoinPool} uses <strong>per-thread
+ * deques</strong> (double-ended queues) to dramatically reduce
+ * contention.</li>
+ * <li><strong>Work-Sharing Model:</strong> This service uses a simple
+ * "take-back" strategy. A {@code ForkJoinPool} uses a more sophisticated
+ * <strong>work-stealing</strong> algorithm, where any idle thread can
+ * steal tasks from any other busy thread, providing superior load
+ * balancing for recursive problems.</li>
+ * </ul>
  * </p>
  *
  * @author Jeff Nelson
  */
-public class JoinableExecutorService extends AbstractExecutorService {
+public interface JoinableExecutorService extends ExecutorService {
 
     /**
-     * Indicates that the executor is in a {@link #state} that allows it to
-     * accept new tasks.
+     * Create a new {@link JoinableExecutorService} with a fixed number of
+     * worker threads.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @return a new thread pool executor service
      */
-    private static final int RUNNING = 1;
-
-    /**
-     * Indicates that the executor is in a {@link #state} that prevents the
-     * submission of new tasks, but allows for the execution of any existing
-     * tasks in service of a graceful shutdown.
-     */
-    private static final int SHUTDOWN = 2;
-
-    /**
-     * Indicates that the executor is in a {@link #state} that no further task
-     * execution can happen.
-     */
-    private static final int TERMINATED = 3;
-
-    /**
-     * The state of the executor.
-     */
-    private AtomicInteger state;
-
-    /**
-     * Signals that all worker threads have terminated.
-     */
-    private CountDownLatch termination;
-
-    /**
-     * The queue of tasks that the worker threads pull from.
-     */
-    private final BlockingQueue<FutureTask<?>> tasks;
-    
-    /**
-     * The worker threads.
-     */
-    private final Thread[] workers;
-
-    /**
-     * Construct a new instance.
-     * 
-     * @param numWorkerThreads
-     */
-    public JoinableExecutorService(int numWorkerThreads) {
-        this(numWorkerThreads, Executors.defaultThreadFactory());
+    public static JoinableExecutorService create(int numWorkerThreads) {
+        return new JoinableThreadPoolExecutor(numWorkerThreads);
     }
 
     /**
-     * Construct a new instance.
-     * 
-     * @param numWorkerThreads
-     * @param threadFactory
+     * Create a new {@link JoinableExecutorService} with a fixed number of
+     * worker threads using the provided thread factory.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @param threadFactory the factory to use for creating threads
+     * @return a new thread pool executor service
      */
-    public JoinableExecutorService(int numWorkerThreads,
+    public static JoinableExecutorService create(int numWorkerThreads,
             ThreadFactory threadFactory) {
-        this.tasks = new LinkedBlockingQueue<>();
-        this.state = new AtomicInteger(RUNNING);
-        this.workers = new Thread[numWorkerThreads];
-        for (int i = 0; i < numWorkerThreads; ++i) {
-            Thread worker = threadFactory.newThread(this::executeTaskLoop);
-            workers[i] = worker;
-            worker.start();
-        }
-        this.termination = new CountDownLatch(numWorkerThreads);
+        return new JoinableThreadPoolExecutor(numWorkerThreads, threadFactory);
     }
 
     /**
-     * Blocks until all tasks have completed execution after a shutdown request
-     * or the current thread is interrupted, whichever happens first.
-     * 
-     * @return {@code true} if the executor is terminated
-     * @throws InterruptedException
+     * Create a new {@link JoinableExecutorService} that only uses the calling
+     * thread.
+     *
+     * @return a new direct executor service
      */
-    public boolean awaitTermination() throws InterruptedException {
-        return awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+    public static JoinableExecutorService direct() {
+        return new JoinableDirectExecutorService();
     }
 
-    @Override
-    public boolean awaitTermination(long timeout, TimeUnit unit)
-            throws InterruptedException {
-        return termination.await(timeout, unit);
+    /**
+     * Create a new pooled {@link JoinableExecutorService} with a fixed number
+     * of worker threads.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @return a new thread pool executor service
+     */
+    public static JoinableExecutorService pooled(int numWorkerThreads) {
+        return create(numWorkerThreads);
     }
 
-    @Override
-    public void execute(Runnable command) {
-        if(state.compareAndSet(RUNNING, RUNNING)) {
-            this.tasks.offer(new FutureTask<Void>(command, null));
-        }
-        else {
-            throw new RejectedExecutionException();
-        }
-    }
-
-    @Override
-    public boolean isShutdown() {
-        return state.get() != RUNNING;
-    }
-
-    @Override
-    public boolean isTerminated() {
-        return state.get() == TERMINATED;
+    /**
+     * Create a new pooled {@link JoinableExecutorService} with a fixed number
+     * of worker threads using the provided thread factory.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @param threadFactory the factory to use for creating threads
+     * @return a new thread pool executor service
+     */
+    public static JoinableExecutorService pooled(int numWorkerThreads,
+            ThreadFactory threadFactory) {
+        return create(numWorkerThreads, threadFactory);
     }
 
     /**
@@ -194,7 +185,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
      *            occurs while executing one of the {@code tasks}.
      * @param tasks
@@ -207,44 +198,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
     @SuppressWarnings("unchecked")
     public <V> List<Future<V>> join(
             BiConsumer<Callable<V>, Throwable> errorHandler,
-            Callable<V>... tasks) {
-        Preconditions.checkNotNull(tasks);
-        Preconditions.checkArgument(tasks.length > 0);
-        if(state.compareAndSet(RUNNING, RUNNING)) {
-            List<Future<V>> futures = new ArrayList<>();
-            for (Callable<V> task : tasks) {
-                FutureTask<V> future = new FutureTask<>(task);
-                this.tasks.offer(future);
-                futures.add(future);
-            }
-            for (int i = futures.size() - 1; i >= 0; --i) {
-                FutureTask<V> task = (FutureTask<V>) futures.get(i);
-                if(!task.isDone()) {
-                    // Use the calling thread to steal work before awaiting all
-                    // tasks to complete
-                    task.run();
-                }
-            }
-            for (int i = 0; i < futures.size(); ++i) {
-                Future<V> future = futures.get(i);
-                try {
-                    future.get();
-                }
-                catch (ExecutionException e) {
-                    Callable<V> t = tasks[i];
-                    errorHandler.accept(t, e);
-                }
-                catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-            return futures;
-        }
-        else {
-            throw new RejectedExecutionException();
-        }
-
-    }
+            Callable<V>... tasks);
 
     /**
      * Cause the calling thread to temporarily join this {@link ExecutorService
@@ -261,48 +215,13 @@ public class JoinableExecutorService extends AbstractExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
      *            occurs while executing one of the {@code tasks}.
      * @param tasks
      */
     public void join(BiConsumer<Runnable, Throwable> errorHandler,
-            Runnable... tasks) {
-        Preconditions.checkNotNull(tasks);
-        Preconditions.checkArgument(tasks.length > 0);
-        if(state.compareAndSet(RUNNING, RUNNING)) {
-            List<FutureTask<Void>> futures = new ArrayList<>();
-            for (Runnable task : tasks) {
-                FutureTask<Void> future = new FutureTask<>(task, null);
-                this.tasks.offer(future);
-                futures.add(future);
-            }
-            for (int i = futures.size() - 1; i >= 0; --i) {
-                FutureTask<Void> task = futures.get(i);
-                if(!task.isDone()) {
-                    // Use the calling thread to steal work before awaiting all
-                    // tasks to complete
-                    task.run();
-                }
-            }
-            for (int i = 0; i < futures.size(); ++i) {
-                Future<Void> future = futures.get(i);
-                try {
-                    future.get();
-                }
-                catch (ExecutionException e) {
-                    Runnable t = tasks[i];
-                    errorHandler.accept(t, e);
-                }
-                catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        }
-        else {
-            throw new RejectedExecutionException();
-        }
-    }
+            Runnable... tasks);
 
     /**
      * Cause the calling thread to temporarily join this {@link ExecutorService
@@ -319,7 +238,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param tasks
      * @return a list of {@link Future} objects that correspond to each of the
      *         submitted {@code tasks}; since this method awaits completion of
@@ -328,7 +247,7 @@ public class JoinableExecutorService extends AbstractExecutorService {
      *         immediately
      */
     @SuppressWarnings("unchecked")
-    public <V> List<Future<V>> join(Callable<V>... tasks) {
+    public default <V> List<Future<V>> join(Callable<V>... tasks) {
         return join((task, error) -> {
             throw CheckedExceptions.wrapAsRuntimeException(error);
         }, tasks);
@@ -349,107 +268,13 @@ public class JoinableExecutorService extends AbstractExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param tasks
      */
-    public void join(Runnable... tasks) {
+    public default void join(Runnable... tasks) {
         join((task, error) -> {
             throw CheckedExceptions.wrapAsRuntimeException(error);
         }, tasks);
-    }
-
-    @Override
-    public void shutdown() {
-        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
-            for (int i = 0; i < workers.length; ++i) {
-                Thread worker = workers[i];
-                worker.interrupt();
-            }
-        }
-    }
-
-    @Override
-    public List<Runnable> shutdownNow() {
-        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
-            shutdown();
-            List<Runnable> unfinished = new ArrayList<>();
-            tasks.drainTo(unfinished);
-            return unfinished;
-        }
-        else {
-            return ImmutableList.of();
-        }
-    }
-
-    /**
-     * The main loop for worker threads in the executor service. This method
-     * runs continuously until the executor service is terminated. It is
-     * responsible for executing tasks from the task groups that have been
-     * submitted to the service.
-     *
-     * <p>
-     * The worker loop operates as follows:
-     * <ol>
-     * <li>If the executor service is in the {@link State#TERMINATED} state, the
-     * loop
-     * terminates and the worker thread exits.</li>
-     * <li>If the executor service is in the {@link State#SHUTDOWN} state, the
-     * worker attempts to retrieve and process a task group from the queue.</li>
-     * <li>If there are no task groups available in the shutdown state, the
-     * worker thread exits the loop and terminates.</li>
-     * <li>If the executor service is in the {@link State#RUNNING} state, the
-     * worker retrieves a task group from the queue and processes it.</li>
-     * <li>For each task in the group, the worker calls the
-     * {@link #run(Runnable)} method to execute the task.</li>
-     * <li>If the executor service transitions to the {@link State#SHUTDOWN}
-     * state during task execution, the worker continues executing all remaining
-     * tasks in the current group before exiting the loop.</li>
-     * <li>If the executor service remains in the {@link State#RUNNING} state,
-     * the worker returns the partially processed group back to the queue for
-     * another worker to continue execution.</li>
-     * </ol>
-     * </p>
-     * <p>
-     * The worker loop is designed to handle interruptions and state transitions
-     * gracefully, ensuring that all submitted tasks are eventually executed
-     * unless the executor service is terminated forcefully.
-     * </p>
-     */
-    private void executeTaskLoop() {
-        for (;;) {
-            if(state.compareAndSet(RUNNING, RUNNING)) {
-                FutureTask<?> task;
-                try {
-                    task = tasks.take();
-                }
-                catch (InterruptedException e) {
-                    // Interrupt signals a request to shutdown or
-                    // shutdownNow. In either case, re-loop and
-                    // check the #state. If an immediate halt is
-                    // required, the internal task queue will be
-                    // emptied and we don't have to worry here
-                    Thread.currentThread().interrupt();
-                    continue;
-                }
-                task.run();
-            }
-            else if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
-                FutureTask<?> task = tasks.poll();
-                if(task == null) {
-                    // No tasks remain, so break out and terminate this thread.
-                    state.compareAndSet(SHUTDOWN, TERMINATED);
-                    break;
-                }
-            }
-            else if(state.compareAndSet(TERMINATED, TERMINATED)) {
-                break;
-            }
-            else {
-                // The state has changed, so re-loop and check again
-                continue;
-            }
-        }
-        termination.countDown();
     }
 
 }
