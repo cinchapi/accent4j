@@ -35,7 +35,6 @@ import java.util.function.BiConsumer;
 
 import com.cinchapi.common.base.CheckedExceptions;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
 /**
  * A {@link JoinableExecutorService} that uses a pool of worker threads.
@@ -189,7 +188,7 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
             }
             for (int i = futures.size() - 1; i >= 0; --i) {
                 FutureTask<V> task = (FutureTask<V>) futures.get(i);
-                if(!task.isDone()) {
+                if(!task.isDone() && this.tasks.remove(task)) {
                     // Use the calling thread to steal work before awaiting all
                     // tasks to complete
                     task.run();
@@ -249,7 +248,7 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
             }
             for (int i = futures.size() - 1; i >= 0; --i) {
                 FutureTask<Void> task = futures.get(i);
-                if(!task.isDone()) {
+                if(!task.isDone() && this.tasks.remove(task)) {
                     // Use the calling thread to steal work before awaiting all
                     // tasks to complete
                     task.run();
@@ -340,15 +339,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
 
     @Override
     public List<Runnable> shutdownNow() {
+        List<Runnable> unfinished = new ArrayList<>();
         if(state.compareAndSet(RUNNING, SHUTDOWN)) {
-            shutdown();
-            List<Runnable> unfinished = new ArrayList<>();
+            for (Thread worker : workers) {
+                worker.interrupt();
+            }
             tasks.drainTo(unfinished);
-            return unfinished;
         }
-        else {
-            return ImmutableList.of();
-        }
+        return unfinished;
     }
 
     /**
@@ -386,40 +384,50 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
      * </p>
      */
     private void executeTaskLoop() {
-        for (;;) {
-            if(state.compareAndSet(RUNNING, RUNNING)) {
-                FutureTask<?> task;
-                try {
-                    task = tasks.take();
+        try {
+            for (;;) {
+                if(state.compareAndSet(RUNNING, RUNNING)) {
+                    FutureTask<?> task;
+                    try {
+                        task = tasks.take();
+                    }
+                    catch (InterruptedException e) {
+                        // Interrupt signals a request to shutdown or
+                        // shutdownNow. In either case, re-loop and
+                        // check the #state. If an immediate halt is
+                        // required, the internal task queue will be
+                        // emptied and we don't have to worry here
+                        Thread.currentThread().interrupt();
+                        continue;
+                    }
+                    task.run();
                 }
-                catch (InterruptedException e) {
-                    // Interrupt signals a request to shutdown or
-                    // shutdownNow. In either case, re-loop and
-                    // check the #state. If an immediate halt is
-                    // required, the internal task queue will be
-                    // emptied and we don't have to worry here
-                    Thread.currentThread().interrupt();
-                    continue;
+                else if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
+                    FutureTask<?> task = tasks.poll();
+                    if(task == null) {
+                        // No tasks remain, so break out and terminate this
+                        // thread.
+                        break;
+                    }
+                    else {
+                        task.run();
+                    }
                 }
-                task.run();
-            }
-            else if(state.compareAndSet(SHUTDOWN, SHUTDOWN)) {
-                FutureTask<?> task = tasks.poll();
-                if(task == null) {
-                    // No tasks remain, so break out and terminate this thread.
-                    state.compareAndSet(SHUTDOWN, TERMINATED);
+                else if(state.compareAndSet(TERMINATED, TERMINATED)) {
                     break;
                 }
-            }
-            else if(state.compareAndSet(TERMINATED, TERMINATED)) {
-                break;
-            }
-            else {
-                // The state has changed, so re-loop and check again
-                continue;
+                else {
+                    // The state has changed, so re-loop and check again
+                    continue;
+                }
             }
         }
-        termination.countDown();
+        finally {
+            termination.countDown();
+            if(termination.getCount() == 0) {
+                state.compareAndSet(SHUTDOWN, TERMINATED);
+            }
+        }
     }
 
 }

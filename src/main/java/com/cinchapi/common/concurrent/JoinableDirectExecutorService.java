@@ -29,7 +29,7 @@ import java.util.function.BiConsumer;
 import com.google.common.collect.ImmutableList;
 
 /**
- * A {@link JoinableExecutorService} that uses the calling thread..
+ * A {@link JoinableExecutorService} that only uses the calling thread.
  *
  * @author Jeff Nelson
  */

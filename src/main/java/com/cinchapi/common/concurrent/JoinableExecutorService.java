@@ -25,37 +25,87 @@ import java.util.function.BiConsumer;
 import com.cinchapi.common.base.CheckedExceptions;
 
 /**
- * A {@link JoinableExecutorService} provides asynchronous execution of tasks
- * with an option for the calling thread to {@link #join(Runnable...)
- * join} and participate in executing its submitted tasks while awaiting their
- * completion.
+ * A {@link JoinableExecutorService} is a specialized {@link ExecutorService}
+ * designed to accelerate the execution of a batch of tasks by having the
+ * submitting thread actively participate in the work while it waits for them
+ * to complete.
+ *
+ * <h2>Core Concept: Active Waiting</h2>
  * <p>
- * This {@link ExecutorService} acts as a shared resource for multiple
- * processes. Under high contention, the calling thread's participation in
- * completing the tasks it submitted guarantees that the performance will be no
- * worse than if the caller executed each task serially, without using an
- * {@link ExecutorService}.
+ * The primary feature of this interface is the set of
+ * {@link #join(Callable...) join} methods.
+ * When a thread calls {@link #join(Callable...) join}, it blocks until all
+ * provided tasks are finished. Unlike a traditional {@code Future.get()} call
+ * where the thread would wait idly (<strong>passive waiting</strong>), a thread
+ * calling {@link #join(Callable...) join} becomes a temporary worker for the
+ * tasks it just submitted (<strong>active waiting</strong>).
  * </p>
  * <p>
- * In most cases, the calling thread will work alongside the shared threads in
- * this {@link ExecutorService} to complete all of the submitted tasks faster
- * and more efficiently than using a standard {@link ExecutorService}.
+ * This cooperative approach transforms potential idle time into productive
+ * work, maximizing CPU utilization and reducing the total time required to
+ * complete the entire batch of tasks.
  * </p>
+ *
+ * <h2>How It Works: A "Take-Back" Strategy</h2>
  * <p>
- * Key features of {@link JoinableExecutorService}:
+ * Implementations of this interface typically use a simple but effective
+ * architecture to achieve this behavior:
+ * </p>
+ * <ol>
+ * <li><strong>Single Shared Queue:</strong> All worker threads in the pool
+ * pull tasks from one central {@link java.util.concurrent.BlockingQueue}.</li>
+ * <li><strong>Submission and "Take-Back":</strong> When {@code join} is
+ * called, all tasks are added to this shared queue. The calling thread
+ * then immediately attempts to <strong>take back</strong> those same
+ * tasks from the queue before a dedicated worker can.</li>
+ * <li><strong>Completion:</strong> If the calling thread successfully
+ * retrieves a task, it executes it directly. The {@code join} method
+ * only returns after all tasks in the batch have been completed, whether
+ * they were run by the calling thread or the pool's workers.</li>
+ * </ol>
+ *
+ * <h2>Ideal Use Case: Parallel Independent Tasks</h2>
+ * <p>
+ * This executor is best suited for scenarios where a thread needs to dispatch
+ * a collection of <strong>independent, non-divisible tasks</strong> and then
+ * block until all are complete. This is common when a process needs to
+ * aggregate the results of several parallel operations.
+ * </p>
+ * Good examples include:
  * <ul>
- * <li>Allows the calling thread to join and participate in executing its
- * submitted tasks.</li>
- * <li>Ensures performance is no worse than serial execution under high
- * contention.</li>
- * <li>Enables faster and more efficient task completion compared to a standard
- * {@link ExecutorService}.</li>
+ * <li>Making several API calls to different microservices.</li>
+ * <li>Running a handful of unrelated, long-running database queries.</li>
+ * <li>Processing a set of files from a directory where each file can be
+ * handled separately.</li>
  * </ul>
+ *
+ * <h2>Comparison to Other Java Executors</h2>
+ * <p>
+ * <strong>vs. {@link java.util.concurrent.ThreadPoolExecutor}:</strong> A
+ * standard {@code ThreadPoolExecutor} would leave the calling thread idly
+ * blocked while waiting on {@code Future.get()}. This interface makes that
+ * waiting period productive.
  * </p>
  * <p>
- * <p>
- * The {@link #join(Runnable...) join} methods block until all submitted tasks
- * are completed.
+ * <strong>vs. {@link java.util.concurrent.ForkJoinPool}:</strong> While both
+ * executors involve caller participation, they are designed for fundamentally
+ * different problems and have different architectures.
+ * <ul>
+ * <li><strong>Task Type:</strong> This service is for a batch of monolithic
+ * {@code Runnable}/{@code Callable} tasks. A {@code ForkJoinPool} is for
+ * <strong>divisible, "divide-and-conquer"</strong> style
+ * {@code ForkJoinTask}s that can be recursively broken down.</li>
+ * <li><strong>Architecture:</strong> This service relies on a
+ * <strong>single shared queue</strong>, which can be a source of
+ * contention. A {@code ForkJoinPool} uses <strong>per-thread
+ * deques</strong> (double-ended queues) to dramatically reduce
+ * contention.</li>
+ * <li><strong>Work-Sharing Model:</strong> This service uses a simple
+ * "take-back" strategy. A {@code ForkJoinPool} uses a more sophisticated
+ * <strong>work-stealing</strong> algorithm, where any idle thread can
+ * steal tasks from any other busy thread, providing superior load
+ * balancing for recursive problems.</li>
+ * </ul>
  * </p>
  *
  * @author Jeff Nelson
@@ -63,28 +113,61 @@ import com.cinchapi.common.base.CheckedExceptions;
 public interface JoinableExecutorService extends ExecutorService {
 
     /**
-     * Return a new {@link JoinableExecutorService} with a fixed number of
+     * Create a new {@link JoinableExecutorService} with a fixed number of
      * worker threads.
-     * 
-     * @param numWorkerThreads
-     * @return the {@link JoinableExecutorService}
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @return a new thread pool executor service
      */
     public static JoinableExecutorService create(int numWorkerThreads) {
         return new JoinableThreadPoolExecutor(numWorkerThreads);
     }
 
     /**
-     * Return a new {@link JoinableExecutorService} with a fixed number of
-     * worker threads; each of which is created using the provided
-     * {@code threadFactory}.
-     * 
-     * @param numWorkerThreads
-     * @param threadFactory
-     * @return the {@link JoinableExecutorService}
+     * Create a new {@link JoinableExecutorService} with a fixed number of
+     * worker threads using the provided thread factory.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @param threadFactory the factory to use for creating threads
+     * @return a new thread pool executor service
      */
     public static JoinableExecutorService create(int numWorkerThreads,
             ThreadFactory threadFactory) {
         return new JoinableThreadPoolExecutor(numWorkerThreads, threadFactory);
+    }
+
+    /**
+     * Create a new {@link JoinableExecutorService} that only uses the calling
+     * thread.
+     *
+     * @return a new direct executor service
+     */
+    public static JoinableExecutorService direct() {
+        return new JoinableDirectExecutorService();
+    }
+
+    /**
+     * Create a new pooled {@link JoinableExecutorService} with a fixed number
+     * of worker threads.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @return a new thread pool executor service
+     */
+    public static JoinableExecutorService pooled(int numWorkerThreads) {
+        return create(numWorkerThreads);
+    }
+
+    /**
+     * Create a new pooled {@link JoinableExecutorService} with a fixed number
+     * of worker threads using the provided thread factory.
+     *
+     * @param numWorkerThreads the number of worker threads to create
+     * @param threadFactory the factory to use for creating threads
+     * @return a new thread pool executor service
+     */
+    public static JoinableExecutorService pooled(int numWorkerThreads,
+            ThreadFactory threadFactory) {
+        return create(numWorkerThreads, threadFactory);
     }
 
     /**
@@ -102,7 +185,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
      *            occurs while executing one of the {@code tasks}.
      * @param tasks
@@ -132,7 +215,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
      *            occurs while executing one of the {@code tasks}.
      * @param tasks
@@ -155,7 +238,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param tasks
      * @return a list of {@link Future} objects that correspond to each of the
      *         submitted {@code tasks}; since this method awaits completion of
@@ -185,7 +268,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * affect is that the group of {@code tasks} in completed in at least as
      * much time as they would be if the calling thread executed them serially
      * </p>
-     * 
+     *
      * @param tasks
      */
     public default void join(Runnable... tasks) {
