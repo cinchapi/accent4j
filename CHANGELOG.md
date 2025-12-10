@@ -11,6 +11,7 @@
   * These utilities are particularly useful for reflection-based frameworks that need to understand interface inheritance and default method availability
 * **Breaking Change**: `JoinableExecutorService` has been refactored from a concrete class to an interface. This change requires using one of the static factory methods to create instances instead of using constructors directly. The refactoring provides better abstraction and allows for different implementation strategies.
 * Added `JoinableDirectExecutorService` implementation that executes tasks synchronously in the calling thread, enabling the same code constructs and execution paths when async behavior is not preferred or when configuration requires synchronous execution
+* Fixed `Application.classpath()` to work on Java 9+ where the system class loader is no longer a `URLClassLoader`
 
 #### Version 1.15.0 (April 13, 2025)
 * Added a fluent builder API for `Benchmark` that provides a more intuitive way to configure and run benchmarks. The builder supports specifying time units, performing warmup runs, and executing benchmarks asynchronously to ensure fair comparisons between multiple benchmarks by eliminating the impact of JVM warmup and optimization order.
