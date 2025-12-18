@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.16.0 (TBD)
+#### Version 1.16.0 (December 18, 2025)
 * Added comprehensive interface reflection utilities to the `Reflection` class for working with Java interfaces and default methods:
   * `getImplementedInterfaces()` - Returns interfaces directly implemented by a class, including interfaces extended by those directly implemented interfaces
   * `getAllImplementedInterfaces()` - Returns all interfaces from the entire class hierarchy, including interfaces from superclasses
