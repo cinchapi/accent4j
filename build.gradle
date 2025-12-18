@@ -40,6 +40,10 @@ ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
 ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
 ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
 
+// Releases (X.Y.Z, X.Y.Z-rcN) and snapshots (X.Y.Z-SNAPSHOT) go to Maven Central
+// Feature branches go to Cloudsmith only
+ext.publishToMavenCentral = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?(-SNAPSHOT)?$')
+
 if (JavaVersion.current().isJava8Compatible()) {
   allprojects {
     tasks.withType(Javadoc) {
@@ -122,6 +126,11 @@ publishing {
 }
 
 signing {
-  required { !mavenVersion.endsWith('SNAPSHOT') }
+  required { publishToMavenCentral && !mavenVersion.endsWith('SNAPSHOT') }
   sign publishing.publications.maven
+}
+
+// Skip Maven Central publishing for feature branches
+tasks.matching { it.name.contains('Sonatype') }.configureEach {
+  onlyIf { publishToMavenCentral }
 }
