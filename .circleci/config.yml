@@ -48,7 +48,7 @@ jobs:
           name: Build and Publish
           command: |
             cd ~/$CIRCLE_PROJECT_REPONAME
-            ./gradlew clean build uploadArchives --no-daemon
+            ./gradlew clean build publish closeAndReleaseSonatypeStagingRepository --no-daemon
       - save_cache:
           paths:
             - ~/.gradle

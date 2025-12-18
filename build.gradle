@@ -1,122 +1,127 @@
-task wrapper(type: Wrapper) {
-    gradleVersion = '2.8'
+plugins {
+  id 'java-library'
+  id 'eclipse'
+  id 'maven-publish'
+  id 'signing'
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
 }
 
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'maven'
-apply plugin: 'signing'
-
 repositories {
-    mavenCentral()
-    maven {
-      url 'https://oss.sonatype.org/content/repositories/snapshots/'
-    }
+  mavenCentral()
 }
 
 dependencies {
-    compile 'org.fusesource.jansi:jansi:1.11'
-    compile 'com.google.code.findbugs:jsr305:3.0.1'
-    compile 'com.google.guava:guava:25.1-jre'
-    compile 'org.slf4j:slf4j-api:1.7.5'
-    compile 'ch.qos.logback:logback-classic:1.2.11'
+  api 'org.fusesource.jansi:jansi:1.11'
+  api 'com.google.code.findbugs:jsr305:3.0.1'
+  api 'com.google.guava:guava:25.1-jre'
+  api 'org.slf4j:slf4j-api:1.7.5'
+  api 'ch.qos.logback:logback-classic:1.2.11'
 
-	testCompile 'junit:junit:4.11'
+  testImplementation 'junit:junit:4.11'
 }
 
 def getVersion = { ->
-    def stdout = new ByteArrayOutputStream()
-    exec {
-        commandLine 'bash', 'version.sh'
-        standardOutput = stdout
-    }
-    return stdout.toString().trim()
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'bash', 'version.sh'
+    standardOutput = stdout
+  }
+  return stdout.toString().trim()
 }
 
-ext.globalVersion  = getVersion()
+ext.globalVersion = getVersion()
 
 group = 'com.cinchapi'
 version = globalVersion
 
+// Drop the build component from version number and use that for publishing
+ext.mavenVersion = globalVersion.split('\\.')
+ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
+ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
+ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
+
 if (JavaVersion.current().isJava8Compatible()) {
-    allprojects {
-        tasks.withType(Javadoc) {
-            options.addStringOption('Xdoclint:none', '-quiet')
-        }
+  allprojects {
+    tasks.withType(Javadoc) {
+      options.addStringOption('Xdoclint:none', '-quiet')
     }
+  }
 }
 
 jar {
-    manifest {
-        attributes("Specificiation-Title": "Accent4J", "Specificiation-Version": version, "Implementation-Version": version)
+  manifest {
+    attributes(
+      "Specificiation-Title": "Accent4J",
+      "Specificiation-Version": version,
+      "Implementation-Version": version
+    )
+  }
+}
+
+java {
+  withSourcesJar()
+  withJavadocJar()
+}
+
+// Sonatype / Maven Central via Nexus Publish Plugin
+nexusPublishing {
+  repositories {
+    sonatype {
+      nexusUrl = uri('https://ossrh-staging-api.central.sonatype.com/service/local/')
+      snapshotRepositoryUrl = uri('https://central.sonatype.com/repository/maven-snapshots/')
+      username = System.getenv('CENTRAL_TOKEN_USER')
+      password = System.getenv('CENTRAL_TOKEN_PASS')
     }
+  }
+}
+
+publishing {
+  repositories {
+    maven {
+      name = 'cloudsmith'
+      def releasesRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source/"
+      def snapshotsRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source-snapshots/"
+      url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+      credentials {
+        username = System.getenv('CLOUDSMITH_API_USER')
+        password = System.getenv('CLOUDSMITH_API_KEY')
+      }
+    }
+  }
+  publications {
+    maven(MavenPublication) {
+      from components.java
+      groupId = group
+      artifactId = project.name
+      version = mavenVersion
+      pom {
+        name = 'Accent4J'
+        description = 'Accent4J is a suite of utility libraries for Java'
+        url = 'https://github.com/cinchapi/accent4j'
+        inceptionYear = '2015'
+        licenses {
+          license {
+            name = 'Apache-2.0'
+            url = 'https://spdx.org/licenses/Apache-2.0.html'
+          }
+        }
+        developers {
+          developer {
+            id = 'jnelson'
+            name = 'Jeff Nelson'
+          }
+        }
+        scm {
+          connection = 'scm:git:https://github.com/cinchapi/accent4j.git'
+          developerConnection = 'scm:git:ssh://github.com/cinchapi/accent4j.git'
+          url = 'https://github.com/cinchapi/accent4j'
+        }
+      }
+    }
+  }
 }
 
 signing {
-    required { gradle.taskGraph.hasTask("uploadArchives") }
-    sign configurations.archives
-}
-
-task sourcesJar(type: Jar, dependsOn: classes) {
-	classifier = 'sources'
-	from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar, dependsOn: javadoc) {
-	classifier = 'javadoc'
-	from javadoc.destinationDir
-}
-
-artifacts {
-	archives sourcesJar
-	archives javadocJar
-}
-
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-            // Drop the build component from version number and use that in the
-            // POM file
-            def _version = project.version.split('\\.')
-            _version[3] = _version[3].replaceAll("[0-9]+-", "-")
-            _version[3] = _version[3].replaceAll("[0-9]+", "").trim()
-            _version = _version.join(".").replace(".-", "-").replaceAll('\\.$', "")
-            pom.version = _version
-
-            pom.project {
-               name 'Accent4J'
-               packaging 'jar'
-               description 'Accent4J is a suite of libraries, helpers and data structures that make Java programming idioms more fluent.'
-               url 'http://cinchapi.com'
-
-               scm {
-                   url 'git@github.com:cinchapi/accent4j.git'
-                   connection 'git@github.com:cinchapi/accent4j.git'
-                   developerConnection 'git@github.com:cinchapi/accent4j.git'
-               }
-
-               licenses {
-                   license {
-                       name 'The Apache License'
-                       url 'http://opensource.org/licenses/Apache-2.0'
-                       distribution 'repo'
-                   }
-               }
-
-               developers {
-                   developer {
-                       id 'jnelson'
-                       name 'Jeff Nelson'
-                   }
-               }
-           }
-
-           def mavenUrl = pom.version.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+){0,1}$') ? 'https://oss.sonatype.org/service/local/staging/deploy/maven2' : 'https://oss.sonatype.org/content/repositories/snapshots'
-           repository(url: mavenUrl) {
-               authentication(userName: sonatypeUsername, password: sonatypePassword)
-           }
-        }
-    }
+  required { !mavenVersion.endsWith('SNAPSHOT') }
+  sign publishing.publications.maven
 }

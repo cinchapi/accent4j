@@ -197,9 +197,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
                     try {
                         Thread.sleep(5000);
                     }
-                    catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    catch (InterruptedException e) {}
                 });
             }
             Runnable[] tasks = new Runnable[numThreads];
@@ -215,9 +213,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
                     try {
                         Thread.sleep(5000);
                     }
-                    catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    catch (InterruptedException e) {}
                 });
             }
             for (int i = 0; i < numThreads; ++i) {
@@ -233,7 +229,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
 
     @Override
     protected ExecutorService $getExecutorService() {
-        return new JoinableExecutorService(4);
+        return JoinableExecutorService.create(4);
     }
 
 }
