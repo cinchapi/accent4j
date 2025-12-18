@@ -1,32 +1,32 @@
 plugins {
-    id 'java-library'
-    id 'eclipse'
-    id 'maven-publish'
-    id 'signing'
-    id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
+  id 'java-library'
+  id 'eclipse'
+  id 'maven-publish'
+  id 'signing'
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
 }
 
 repositories {
-    mavenCentral()
+  mavenCentral()
 }
 
 dependencies {
-    api 'org.fusesource.jansi:jansi:1.11'
-    api 'com.google.code.findbugs:jsr305:3.0.1'
-    api 'com.google.guava:guava:25.1-jre'
-    api 'org.slf4j:slf4j-api:1.7.5'
-    api 'ch.qos.logback:logback-classic:1.2.11'
+  api 'org.fusesource.jansi:jansi:1.11'
+  api 'com.google.code.findbugs:jsr305:3.0.1'
+  api 'com.google.guava:guava:25.1-jre'
+  api 'org.slf4j:slf4j-api:1.7.5'
+  api 'ch.qos.logback:logback-classic:1.2.11'
 
-    testImplementation 'junit:junit:4.11'
+  testImplementation 'junit:junit:4.11'
 }
 
 def getVersion = { ->
-    def stdout = new ByteArrayOutputStream()
-    exec {
-        commandLine 'bash', 'version.sh'
-        standardOutput = stdout
-    }
-    return stdout.toString().trim()
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'bash', 'version.sh'
+    standardOutput = stdout
+  }
+  return stdout.toString().trim()
 }
 
 ext.globalVersion = getVersion()
@@ -41,84 +41,87 @@ ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
 ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
 
 if (JavaVersion.current().isJava8Compatible()) {
-    allprojects {
-        tasks.withType(Javadoc) {
-            options.addStringOption('Xdoclint:none', '-quiet')
-        }
+  allprojects {
+    tasks.withType(Javadoc) {
+      options.addStringOption('Xdoclint:none', '-quiet')
     }
+  }
 }
 
 jar {
-    manifest {
-        attributes("Specificiation-Title": "Accent4J", "Specificiation-Version": version, "Implementation-Version": version)
-    }
+  manifest {
+    attributes(
+      "Specificiation-Title": "Accent4J",
+      "Specificiation-Version": version,
+      "Implementation-Version": version
+    )
+  }
 }
 
 java {
-    withSourcesJar()
-    withJavadocJar()
+  withSourcesJar()
+  withJavadocJar()
 }
 
 // Sonatype / Maven Central via Nexus Publish Plugin
 nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl = uri('https://ossrh-staging-api.central.sonatype.com/service/local/')
-            snapshotRepositoryUrl = uri('https://central.sonatype.com/repository/maven-snapshots/')
-            username = System.getenv('CENTRAL_TOKEN_USER')
-            password = System.getenv('CENTRAL_TOKEN_PASS')
-        }
+  repositories {
+    sonatype {
+      nexusUrl = uri('https://ossrh-staging-api.central.sonatype.com/service/local/')
+      snapshotRepositoryUrl = uri('https://central.sonatype.com/repository/maven-snapshots/')
+      username = System.getenv('CENTRAL_TOKEN_USER')
+      password = System.getenv('CENTRAL_TOKEN_PASS')
     }
+  }
 }
 
 publishing {
-    repositories {
-        // Cloudsmith
-        maven {
-            name = 'cloudsmith'
-            def releasesRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source/"
-            def snapshotsRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source-snapshots/"
-            url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
-            credentials {
-                username = System.getenv('CLOUDSMITH_API_USER')
-                password = System.getenv('CLOUDSMITH_API_KEY')
-            }
-        }
+  repositories {
+    maven {
+      name = 'cloudsmith'
+      def releasesRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source/"
+      def snapshotsRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source-snapshots/"
+      url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+      credentials {
+        username = System.getenv('CLOUDSMITH_API_USER')
+        password = System.getenv('CLOUDSMITH_API_KEY')
+      }
     }
-    publications {
-        maven(MavenPublication) {
-            from components.java
-            groupId = group
-            artifactId = project.name
-            version = mavenVersion
-            pom {
-                name = 'Accent4J'
-                description = 'Accent4J is a suite of utility libraries for Java'
-                url = 'https://github.com/cinchapi/accent4j'
-                inceptionYear = '2015'
-                licenses {
-                    license {
-                        name = 'Apache-2.0'
-                        url = 'https://spdx.org/licenses/Apache-2.0.html'
-                    }
-                }
-                developers {
-                    developer {
-                        id = 'jnelson'
-                        name = 'Jeff Nelson'
-                    }
-                }
-                scm {
-                    connection = 'scm:git:https://github.com/cinchapi/accent4j.git'
-                    developerConnection = 'scm:git:ssh://github.com/cinchapi/accent4j.git'
-                    url = 'https://github.com/cinchapi/accent4j'
-                }
-            }
+  }
+  publications {
+    maven(MavenPublication) {
+      from components.java
+      groupId = group
+      artifactId = project.name
+      version = mavenVersion
+      pom {
+        name = 'Accent4J'
+        description = 'Accent4J is a suite of utility libraries for Java'
+        url = 'https://github.com/cinchapi/accent4j'
+        inceptionYear = '2015'
+        licenses {
+          license {
+            name = 'Apache-2.0'
+            url = 'https://spdx.org/licenses/Apache-2.0.html'
+          }
         }
+        developers {
+          developer {
+            id = 'jnelson'
+            name = 'Jeff Nelson'
+          }
+        }
+        scm {
+          connection = 'scm:git:https://github.com/cinchapi/accent4j.git'
+          developerConnection = 'scm:git:ssh://github.com/cinchapi/accent4j.git'
+          url = 'https://github.com/cinchapi/accent4j'
+        }
+      }
     }
+  }
 }
 
 signing {
-    required { !mavenVersion.endsWith('SNAPSHOT') }
-    sign publishing.publications.maven
+  required { !mavenVersion.endsWith('SNAPSHOT') }
+  sign publishing.publications.maven
 }
