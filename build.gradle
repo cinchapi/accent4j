@@ -40,9 +40,11 @@ ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
 ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
 ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
 
-// Releases (X.Y.Z, X.Y.Z-rcN) and snapshots (X.Y.Z-SNAPSHOT) go to Maven Central
-// Feature branches go to Cloudsmith only
-ext.publishToMavenCentral = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?(-SNAPSHOT)?$')
+// Only X.Y.Z and X.Y.Z-rcN are real releases
+ext.isRelease = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?$')
+
+// Releases and snapshots go to Maven Central; feature branches go to Cloudsmith only
+ext.publishToMavenCentral = isRelease || mavenVersion.endsWith('-SNAPSHOT')
 
 if (JavaVersion.current().isJava8Compatible()) {
   allprojects {
@@ -85,7 +87,7 @@ publishing {
       name = 'cloudsmith'
       def releasesRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source/"
       def snapshotsRepoUrl = "https://api-g.cloudsmith.io/maven/cinchapi/open-source-snapshots/"
-      url = mavenVersion.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+      url = isRelease ? releasesRepoUrl : snapshotsRepoUrl
       credentials {
         username = System.getenv('CLOUDSMITH_API_USER')
         password = System.getenv('CLOUDSMITH_API_KEY')
