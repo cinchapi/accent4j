@@ -86,7 +86,9 @@ public final class RuntimeDynamics {
                     bytes.length, null, null);
             return anonymous.newInstance();
         }
-        catch (Exception e) {
+        catch (Throwable e) {
+            // Catch Throwable to handle NoSuchMethodError on Java 11+
+            // where sun.misc.Unsafe.defineClass was removed
             return new Object() {};
         }
     }
