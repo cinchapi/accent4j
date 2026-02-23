@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will update the copyright notices on every file to include
-# the current year (e.g. 2013-2014 will become 2013-2015, etc). This only
-# needs to be run once a year. The script is smart enough to get the current
-# year without being told, so it is a noop if it is run multiple times in
-# the same year
-
 version: 2.1
-jobs:
-  build:
+
+# -------------------------------------------------------------------------------------
+# References
+# -------------------------------------------------------------------------------------
+references:
+  cache_key: &cache_key v1-jars-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "~/gradle.lock" }}
+  cache_key_java21: &cache_key_java21 v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "~/gradle.lock" }}
+
+# -------------------------------------------------------------------------------------
+# Executors
+# -------------------------------------------------------------------------------------
+executors:
+  java8-executor:
     docker:
       - image: circleci/openjdk:8-jdk-browsers
     environment:
@@ -28,6 +33,71 @@ jobs:
       TERM: dumb
       CONTAINER_BUILD: "true"
       ORG_GRADLE_PROJECT_signing.secretKeyRingFile: /home/circleci/secring.gpg
+
+  java21-executor:
+    docker:
+      - image: cimg/openjdk:21.0
+    environment:
+      GRADLE_OPTS: "-Xmx1024m"
+      TERM: dumb
+      CONTAINER_BUILD: "true"
+
+# -------------------------------------------------------------------------------------
+# Commands
+# -------------------------------------------------------------------------------------
+commands:
+
+  save_project:
+    steps:
+      - run:
+          name: Save project to workspace
+          command: |
+            rm -rf ~/project
+            cp -a ~/$CIRCLE_PROJECT_REPONAME ~/project
+
+  restore_project:
+    steps:
+      - run:
+          name: Restore project from workspace
+          command: |
+            rm -rf ~/$CIRCLE_PROJECT_REPONAME
+            cp -a ~/project ~/$CIRCLE_PROJECT_REPONAME
+
+  attach_project:
+    steps:
+      - attach_workspace:
+          at: ~/
+      - restore_project
+
+  persist_project:
+    steps:
+      - save_project
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project
+
+  collect_test_results:
+    steps:
+      - run:
+          name: Collect test results
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            mkdir -p ~/junit/
+            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
+          when: always
+      - store_test_results:
+          path: ~/junit
+      - store_artifacts:
+          path: ~/junit
+
+# -------------------------------------------------------------------------------------
+# Jobs
+# -------------------------------------------------------------------------------------
+jobs:
+
+  setup:
+    executor: java8-executor
     steps:
       - checkout:
           path: ~/$CIRCLE_PROJECT_REPONAME
@@ -41,27 +111,73 @@ jobs:
       - run:
           name: Generate gradle.lock
           command: |
-            find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > gradle.lock
+            find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > ~/gradle.lock
+      - save_project
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - gradle.lock
+            - project
+            - secring.gpg
+
+  compile:
+    executor: java8-executor
+    steps:
+      - attach_project
       - restore_cache:
-          key: v1-jars-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
+          key: *cache_key
+      - run:
+          name: Compile
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew compileJava compileTestJava --no-daemon
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: *cache_key
+      - persist_project
+
+  test:
+    executor: java8-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Run Tests
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew test --no-daemon
+      - collect_test_results
+
+  test-java21:
+    executor: java21-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key_java21
+      - run:
+          name: Test RuntimeDynamics on Java 21
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" --no-daemon
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: *cache_key_java21
+      - collect_test_results
+
+  publish:
+    executor: java8-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key
       - run:
           name: Build and Publish
           command: |
             cd ~/$CIRCLE_PROJECT_REPONAME
-            ./gradlew clean build publish closeAndReleaseSonatypeStagingRepository --no-daemon
-      - save_cache:
-          paths:
-            - ~/.gradle
-          key: v1-jars-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
-      - run:
-          name: Save test results
-          command: |
-            cd ~/$CIRCLE_PROJECT_REPONAME
-            mkdir -p ~/junit/
-            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
-          when: always
-      - store_test_results:
-          path: ~/junit
+            ./gradlew build publish closeAndReleaseSonatypeStagingRepository --no-daemon
       - run:
           name: Save artifacts
           command: |
@@ -71,42 +187,23 @@ jobs:
       - store_artifacts:
           path: ~/artifacts
 
-  test-java21:
-    docker:
-      - image: cimg/openjdk:21.0
-    environment:
-      GRADLE_OPTS: "-Xmx1024m"
-      TERM: dumb
-    steps:
-      - checkout:
-          path: ~/$CIRCLE_PROJECT_REPONAME
-      - run:
-          name: Generate gradle.lock
-          command: |
-            find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > gradle.lock
-      - restore_cache:
-          key: v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
-      - run:
-          name: Test RuntimeDynamics on Java 21
-          command: |
-            cd ~/$CIRCLE_PROJECT_REPONAME
-            ./gradlew clean test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" --no-daemon
-      - save_cache:
-          paths:
-            - ~/.gradle
-          key: v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
-      - run:
-          name: Save test results
-          command: |
-            cd ~/$CIRCLE_PROJECT_REPONAME
-            mkdir -p ~/junit/
-            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
-          when: always
-      - store_test_results:
-          path: ~/junit
-
+# -------------------------------------------------------------------------------------
+# Workflows
+# -------------------------------------------------------------------------------------
 workflows:
-  build-and-test:
+  build_test_publish:
     jobs:
-      - build
-      - test-java21
+      - setup
+      - compile:
+          requires:
+            - setup
+      - test:
+          requires:
+            - compile
+      - test-java21:
+          requires:
+            - setup
+      - publish:
+          requires:
+            - test
+            - test-java21
