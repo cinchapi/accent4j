@@ -116,6 +116,23 @@ public final class Application {
     }
 
     /**
+     * Return the major version of the currently running JVM.
+     *
+     * @return the Java major version (e.g., 8, 11, 17, 21)
+     */
+    public static int javaVersion() {
+        String version = System.getProperty("java.specification.version");
+        if(version.startsWith("1.")) {
+            // Java 8 and earlier: "1.8", "1.7", etc.
+            return Integer.parseInt(version.substring(2));
+        }
+        else {
+            // Java 9+: "9", "11", "17", "21", etc.
+            return Integer.parseInt(version);
+        }
+    }
+
+    /**
      * Parse the {@code java.class.path} system property and return an array
      * of {@link URL URLs} representing each classpath entry.
      *
