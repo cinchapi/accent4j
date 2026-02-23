@@ -160,7 +160,7 @@ jobs:
           name: Test RuntimeDynamics on Java 21
           command: |
             cd ~/$CIRCLE_PROJECT_REPONAME
-            ./gradlew test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" --no-daemon
+            ./gradlew test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" -x compileJava -x compileTestJava --no-daemon
       - save_cache:
           paths:
             - ~/.gradle
@@ -202,7 +202,7 @@ workflows:
             - compile
       - test-java21:
           requires:
-            - setup
+            - compile
       - publish:
           requires:
             - test
