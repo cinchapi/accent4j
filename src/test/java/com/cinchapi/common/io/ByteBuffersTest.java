@@ -62,6 +62,25 @@ public class ByteBuffersTest {
     }
     
     @Test
+    public void testGetByteArrayFromSlicedByteBuffer() {
+        ByteBuffer buffer = ByteBuffer.allocate(9);
+        buffer.put((byte) 0x01);
+        buffer.putLong(17);
+        buffer.flip();
+        buffer.get(); // advance past the first byte
+        ByteBuffer slice = buffer.slice();
+        Assert.assertEquals(8, slice.remaining());
+        Assert.assertEquals(8, slice.capacity());
+        byte[] bytes = ByteBuffers.getByteArray(slice);
+        Assert.assertEquals(8, bytes.length);
+        // Verify the slice content matches, not the parent's array
+        ByteBuffer expected = ByteBuffer.allocate(8);
+        expected.putLong(17);
+        expected.flip();
+        Assert.assertArrayEquals(expected.array(), bytes);
+    }
+
+    @Test
     public void testGetByteBufferFromBufferWithoutBackingArray() {
         ByteBuffer buffer = ByteBuffer.allocateDirect(8);
         buffer.putLong(17);
