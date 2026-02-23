@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.16.2 (February 22, 2026)
+* Fixed issue with premature publishing to maven central
+
 #### Version 1.16.1 (February 22, 2026)
 * Fixed a bug in `ByteBuffers#getByteArray` that returned incorrect data for sliced `ByteBuffer` instances. The fast path incorrectly ignored the buffer's `arrayOffset`, causing it to return the parent buffer's full backing array instead of just the slice's content.
 * Fixed `RuntimeDynamics#newAnonymousObject` to work on Java 9+ where `sun.misc.Unsafe#defineClass` was removed. The method now detects the running JVM version and uses `MethodHandles.Lookup#defineClass` (via reflection) on Java 9+, while preserving the original `sun.misc.Unsafe` path for Java 8 compatibility.
