@@ -18,7 +18,7 @@
 # year without being told, so it is a noop if it is run multiple times in
 # the same year
 
-version: 2
+version: 2.1
 jobs:
   build:
     docker:
@@ -70,3 +70,43 @@ jobs:
             find . -type f -regex ".*/build/libs/.*jar" -exec cp {} ~/artifacts/ \;
       - store_artifacts:
           path: ~/artifacts
+
+  test-java21:
+    docker:
+      - image: cimg/openjdk:21.0
+    environment:
+      GRADLE_OPTS: "-Xmx1024m"
+      TERM: dumb
+    steps:
+      - checkout:
+          path: ~/$CIRCLE_PROJECT_REPONAME
+      - run:
+          name: Generate gradle.lock
+          command: |
+            find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > gradle.lock
+      - restore_cache:
+          key: v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
+      - run:
+          name: Test RuntimeDynamics on Java 21
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew clean test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" --no-daemon
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "gradle.lock" }}
+      - run:
+          name: Save test results
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            mkdir -p ~/junit/
+            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
+          when: always
+      - store_test_results:
+          path: ~/junit
+
+workflows:
+  build-and-test:
+    jobs:
+      - build
+      - test-java21
