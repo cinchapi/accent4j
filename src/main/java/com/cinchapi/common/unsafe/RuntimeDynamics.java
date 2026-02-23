@@ -18,6 +18,7 @@ package com.cinchapi.common.unsafe;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.Collections;
@@ -28,6 +29,8 @@ import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
+
+import com.cinchapi.common.runtime.Application;
 
 /**
  * Some runtime hacks with very narrow use cases.
@@ -45,12 +48,19 @@ public final class RuntimeDynamics {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static Object newAnonymousObject() {
         try {
+            int javaVersion = Application.javaVersion();
             StringBuilder source = new StringBuilder();
             String clazz = "A" + System.currentTimeMillis();
+            if(javaVersion >= 9) {
+                source.append("package com.cinchapi.common.unsafe; ");
+            }
             source.append("public class ").append(clazz).append(" {}");
             ByteArrayOutputStream output = new ByteArrayOutputStream();
-            SimpleJavaFileObject file = new SimpleJavaFileObject(
-                    URI.create(clazz + ".java"),
+            URI uri = javaVersion >= 9
+                    ? URI.create(
+                            "com/cinchapi/common/unsafe/" + clazz + ".java")
+                    : URI.create(clazz + ".java");
+            SimpleJavaFileObject file = new SimpleJavaFileObject(uri,
                     javax.tools.JavaFileObject.Kind.SOURCE) {
 
                 @Override
@@ -79,12 +89,25 @@ public final class RuntimeDynamics {
                     null, null, Collections.singletonList(file)).call();
             final byte[] bytes = output.toByteArray();
 
-            final Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-            f.setAccessible(true);
-            final sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
-            final Class<?> anonymous = unsafe.defineClass(clazz, bytes, 0,
-                    bytes.length, null, null);
-            return anonymous.newInstance();
+            Class<?> anonymous;
+            if(javaVersion >= 9) {
+                // Java 9+: MethodHandles.Lookup.defineClass (called
+                // reflectively to maintain Java 8 compilation)
+                MethodHandles.Lookup lookup = MethodHandles.lookup();
+                java.lang.reflect.Method defineClassMethod = lookup.getClass()
+                        .getMethod("defineClass", byte[].class);
+                anonymous = (Class<?>) defineClassMethod.invoke(lookup, bytes);
+            }
+            else {
+                // Java 8: sun.misc.Unsafe.defineClass
+                final Field f = sun.misc.Unsafe.class
+                        .getDeclaredField("theUnsafe");
+                f.setAccessible(true);
+                final sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+                anonymous = unsafe.defineClass(clazz, bytes, 0, bytes.length,
+                        null, null);
+            }
+            return anonymous.getDeclaredConstructor().newInstance();
         }
         catch (Exception e) {
             return new Object() {};
