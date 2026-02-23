@@ -40,6 +40,22 @@ ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
 ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
 ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
 
+// Only X.Y.Z and X.Y.Z-rcN are real releases
+ext.isRelease = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?$')
+
+// Determine the current branch
+def branch = System.getenv('CIRCLE_BRANCH') ?: {
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'git', 'rev-parse', '--abbrev-ref', 'HEAD'
+    standardOutput = stdout
+  }
+  stdout.toString().trim()
+}()
+
+// Only publish to Maven Central from master (releases) and develop (snapshots)
+ext.publishToMavenCentral = (branch == 'master' && isRelease) || (branch == 'develop' && mavenVersion.endsWith('-SNAPSHOT'))
+
 if (JavaVersion.current().isJava8Compatible()) {
   allprojects {
     tasks.withType(Javadoc) {
