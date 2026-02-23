@@ -87,7 +87,13 @@ public abstract class ByteBuffers {
      *         {@code buffer}.
      */
     public static byte[] getByteArray(ByteBuffer buffer) {
-        if(buffer.hasArray() && buffer.remaining() == buffer.capacity()) {
+        if(buffer.hasArray() && buffer.arrayOffset() == 0
+                && buffer.remaining() == buffer.array().length) {
+            // A sliced ByteBuffer shares the parent's backing array but has a
+            // non-zero arrayOffset, so buffer.array() would return the parent's
+            // full array rather than just the slice's content. Only take the
+            // fast path when the remaining content spans the entire backing
+            // array.
             return buffer.array();
         }
         else {
@@ -406,7 +412,7 @@ public abstract class ByteBuffers {
         buffer.position(oldPosition);
         return slice;
     }
-    
+
     /**
      * Return a new {@link ByteBuffer} whose content is a shared subsequence of
      * the content in {@code buffer} starting at it's current position, for
