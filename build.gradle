@@ -29,7 +29,26 @@ def getVersion = { ->
   return stdout.toString().trim()
 }
 
+def getBranch = { ->
+  def branch = System.getenv('CIRCLE_BRANCH')
+      ?: System.getenv('GITHUB_HEAD_REF')
+      ?: System.getenv('GITHUB_REF_NAME')
+      ?: System.getenv('BRANCH_NAME')
+      ?: System.getenv('CI_COMMIT_BRANCH')
+      ?: System.getenv('GIT_BRANCH')
+  if (branch) {
+    return branch
+  }
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'git', 'rev-parse', '--abbrev-ref', 'HEAD'
+    standardOutput = stdout
+  }
+  return stdout.toString().trim()
+}
+
 ext.globalVersion = getVersion()
+ext.currentBranch = getBranch()
 
 group = 'com.cinchapi'
 version = globalVersion
@@ -40,21 +59,10 @@ ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
 ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
 ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
 
-// Only X.Y.Z and X.Y.Z-rcN are real releases
 ext.isRelease = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?$')
+ext.publishToMavenCentral = (currentBranch == 'master' && isRelease) || (currentBranch == 'develop' && mavenVersion.endsWith('-SNAPSHOT'))
 
-// Determine the current branch
-def branch = System.getenv('CIRCLE_BRANCH') ?: {
-  def stdout = new ByteArrayOutputStream()
-  exec {
-    commandLine 'git', 'rev-parse', '--abbrev-ref', 'HEAD'
-    standardOutput = stdout
-  }
-  stdout.toString().trim()
-}()
-
-// Only publish to Maven Central from master (releases) and develop (snapshots)
-ext.publishToMavenCentral = (branch == 'master' && isRelease) || (branch == 'develop' && mavenVersion.endsWith('-SNAPSHOT'))
+logger.lifecycle("Publishing: branch={}, mavenVersion={}, isRelease={}, publishToMavenCentral={}", currentBranch, mavenVersion, isRelease, publishToMavenCentral)
 
 if (JavaVersion.current().isJava8Compatible()) {
   allprojects {
@@ -89,6 +97,13 @@ nexusPublishing {
       password = System.getenv('CENTRAL_TOKEN_PASS')
     }
   }
+}
+
+tasks.matching { it.name.contains('publishToSonatype') }.configureEach {
+  onlyIf { publishToMavenCentral }
+}
+tasks.matching { it.name.contains('closeSonatype') || it.name.contains('releaseSonatype') || it.name.contains('closeAndReleaseSonatype') }.configureEach {
+  onlyIf { publishToMavenCentral && currentBranch == 'master' }
 }
 
 publishing {
@@ -140,9 +155,4 @@ publishing {
 signing {
   required { publishToMavenCentral && !mavenVersion.endsWith('SNAPSHOT') }
   sign publishing.publications.maven
-}
-
-// Skip Maven Central publishing for feature branches
-tasks.matching { it.name.contains('Sonatype') }.configureEach {
-  onlyIf { publishToMavenCentral }
 }

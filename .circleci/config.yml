@@ -1,4 +1,4 @@
-# Copyright (c) 2013-2019 Cinchapi Inc.
+# Copyright (c) 2013-2026 Cinchapi Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,12 +27,11 @@ references:
 executors:
   java8-executor:
     docker:
-      - image: circleci/openjdk:8-jdk-browsers
+      - image: cimg/openjdk:8.0.322
     environment:
       GRADLE_OPTS: "-Djenkins=true -Xmx1024m"
       TERM: dumb
       CONTAINER_BUILD: "true"
-      ORG_GRADLE_PROJECT_signing.secretKeyRingFile: /home/circleci/secring.gpg
 
   java21-executor:
     docker:
@@ -102,13 +101,6 @@ jobs:
       - checkout:
           path: ~/$CIRCLE_PROJECT_REPONAME
       - run:
-          name: Get Sonatype Credentials
-          command: |
-            cd ~/$CIRCLE_PROJECT_REPONAME
-            git clone git@github.com:cinchapi/sonatype-credentials.git
-            cp sonatype-credentials/gradle.properties .
-            cp sonatype-credentials/secring.gpg ~
-      - run:
           name: Generate gradle.lock
           command: |
             find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > ~/gradle.lock
@@ -118,7 +110,6 @@ jobs:
           paths:
             - gradle.lock
             - project
-            - secring.gpg
 
   compile:
     executor: java8-executor
@@ -174,10 +165,10 @@ jobs:
       - restore_cache:
           key: *cache_key
       - run:
-          name: Build and Publish
+          name: Assemble and Publish
           command: |
             cd ~/$CIRCLE_PROJECT_REPONAME
-            ./gradlew build publish closeAndReleaseSonatypeStagingRepository --no-daemon
+            ./gradlew assemble publish closeAndReleaseSonatypeStagingRepository --no-daemon
       - run:
           name: Save artifacts
           command: |
