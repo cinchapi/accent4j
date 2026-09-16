@@ -1,3 +1,3 @@
-[submodule ".agents/skills"]
-	path = .agents/skills
+[submodule ".agents"]
+	path = .agents
 	url = git@github.com:cinchapi/cinchapi-agent-skills.git
