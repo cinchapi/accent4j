@@ -1,5 +1,10 @@
 # Changelog
 
+#### Version 1.17.1 (TBD)
+* Added `Enums#parseNameIgnoreCase` and `Enums#tryParseNameIgnoreCase`, which match an enum constant by name only, in any case, and never read a number as an ordinal. `parseNameIgnoreCase` throws an `IllegalArgumentException` when no constant matches, and `tryParseNameIgnoreCase` returns `null`. Each has an overload that applies custom logic as a last resort, like `Enums#parseIgnoreCase`.
+* Added `Enums#tryParseIgnoreCase`, which looks up a constant the way `Enums#parseIgnoreCase` does but returns `null` instead of throwing when no constant matches. It has an overload that applies custom logic as a last resort.
+* Fixed `Enums#parseIgnoreCase` to throw the documented `IllegalArgumentException` for an ordinal that no constant has, instead of an `ArrayIndexOutOfBoundsException`. The custom logic of the overload is now applied to such a value as a last resort.
+
 #### Version 1.16.2 (February 22, 2026)
 * Fixed issue with premature publishing to maven central
 
