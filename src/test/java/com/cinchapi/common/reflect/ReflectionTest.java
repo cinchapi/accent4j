@@ -1493,8 +1493,8 @@ public class ReflectionTest {
     public static class Payload {}
 
     /**
-     * A class that the class path loads, with a method that accepts any
-     * argument.
+     * A class that the class path loads, with a constructor and a method that
+     * accept any argument.
      *
      * @author Jeff Nelson
      */

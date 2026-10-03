@@ -955,13 +955,14 @@ public final class Reflection {
      * </p>
      *
      * @param clazz the type of instance to construct
-     * @param args the parameters to pass to the constructor; a {@code null}
+     * @param args the arguments to pass to the constructor; a {@code null}
      *            array matches no constructor
      * @return the new instance
      * @throws RuntimeException if no constructor accepts {@code args}, with a
      *             {@link NoSuchMethodException} as its cause, or if the
-     *             constructor fails; an unchecked exception that the
-     *             constructor throws reaches the caller unwrapped
+     *             constructor fails; a {@link RuntimeException} that the
+     *             constructor throws reaches the caller unwrapped, and any
+     *             other exception or error arrives as the cause
      */
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(Class<? extends T> clazz, Object... args) {
@@ -1070,15 +1071,15 @@ public final class Reflection {
 
     /**
      * Return the value that {@code finder} resolves for {@code types}, and
-     * remember it in {@code cache} under {@code key} if each non-null class in
-     * {@code types} meets a loader condition. The condition accepts the
-     * bootstrap loader or the loader of {@code clazz}. It also accepts
-     * ancestors of that loader. When the value is remembered, concurrent calls
-     * for the same key and classes resolve it once.
+     * remember it in {@code cache} under {@code key} if {@code clazz} keeps
+     * each non-null class in {@code types} in memory. When the value is
+     * remembered, concurrent calls for the same key and classes resolve it
+     * once.
      * <p>
-     * {@code cache} holds only entries whose classes meet the condition, so a
-     * caller may use a value that {@link #getCached(Object[], Class[])} finds
-     * in {@code cache} without checking the condition.
+     * {@code cache} holds only entries whose classes {@code clazz} keeps in
+     * memory, so a caller may use a value that
+     * {@link #getCached(Object[], Class[])} finds in {@code cache} without
+     * checking that condition.
      * </p>
      *
      * @param cache the entries of {@code clazz}, by key
@@ -1490,16 +1491,15 @@ public final class Reflection {
      * {@code args}, position by position, made accessible.
      * <p>
      * Repeated lookups with the same class and argument classes share the
-     * result if each non-null argument class meets a loader condition. The
-     * condition accepts the bootstrap loader or the loader of {@code clazz}. It
-     * also accepts ancestors of that loader.
+     * result if {@code clazz} keeps each non-null argument class in memory.
      * </p>
      *
      * @param clazz the {@link Class} whose constructor to return
      * @param args the arguments, any of which may be {@code null}; a
      *            {@code null} array matches no constructor
      * @return the {@link Constructor}, which may be shared, or {@code null} if
-     *         no constructor accepts {@code args}
+     *         no constructor accepts {@code args}; callers must not change its
+     *         accessibility
      * @throws RuntimeException if access configuration fails
      */
     @Nullable
@@ -1631,9 +1631,8 @@ public final class Reflection {
      * for {@code paramTypes}.
      * <p>
      * Repeated lookups with the same name, class, access policy and argument
-     * types share the result if every non-null parameter type meets a loader
-     * condition. The condition accepts the bootstrap loader or the loader of
-     * {@code clazz}. It also accepts ancestors of that loader.
+     * types share the result if {@code clazz} keeps every non-null parameter
+     * type in memory.
      *
      * @param args argument values for failure messages, or {@code null} to
      *            report {@code paramTypes} instead
