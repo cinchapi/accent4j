@@ -98,9 +98,10 @@ public final class Reflection {
     /**
      * The {@link Method Methods} that
      * {@link #getMethod(Object[], boolean, String, Class, Class...)} has
-     * resolved for each {@link Class}, by {@link MethodLookup}.
+     * resolved for each {@link Class}, by a {@link List} of the method name,
+     * whether it ignores access checks, and the {@link List} of argument types.
      */
-    private static final ClassValue<Map<MethodLookup, Method>> METHODS =
+    private static final ClassValue<Map<List<Object>, Method>> METHODS =
             newCache();
 
     /**
@@ -1349,20 +1350,31 @@ public final class Reflection {
      *            {@code null} argument
      * @return the associated {@link Method} object, which repeated lookups with
      *         the same {@code setAccessible}, {@code name}, {@code clazz} and
-     *         {@code paramTypes} share
+     *         {@code paramTypes} share if the class loader of {@code clazz} is,
+     *         or descends from, the class loader of each of the
+     *         {@code paramTypes}
      */
     private static Method getMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
-        Map<MethodLookup, Method> methods = METHODS.get(clazz);
-        MethodLookup lookup = new MethodLookup(name, setAccessible,
-                paramTypes);
-        Method method = methods.get(lookup);
-        if(method == null) {
-            // NOTE: On Java 8, computeIfAbsent locks even when the key is
-            // present, so a lookup that finds the method does not call it.
-            method = methods.computeIfAbsent(lookup, key -> findMethod(args,
-                    setAccessible, name, clazz, paramTypes));
+        Method method;
+        if(isCacheable(clazz, paramTypes)) {
+            Map<List<Object>, Method> methods = METHODS.get(clazz);
+            // NOTE: The key holds only JDK types because the entry lasts as
+            // long as clazz, and a key type from the class loader that loads
+            // Reflection would keep that class loader in memory.
+            List<Object> lookup = Arrays.asList(name, setAccessible,
+                    Arrays.asList(paramTypes.clone()));
+            method = methods.get(lookup);
+            if(method == null) {
+                // NOTE: On Java 8, computeIfAbsent locks even when the key is
+                // present, so a lookup that finds the method does not call it.
+                method = methods.computeIfAbsent(lookup, key -> findMethod(
+                        args, setAccessible, name, clazz, paramTypes));
+            }
+        }
+        else {
+            method = findMethod(args, setAccessible, name, clazz, paramTypes);
         }
         return method;
     }
@@ -1640,6 +1652,36 @@ public final class Reflection {
     }
 
     /**
+     * Return {@code true} if the class loader of {@code clazz} is, or descends
+     * from, the class loader of each non-null {@code type}.
+     * <p>
+     * A cache entry for {@code clazz} lasts as long as {@code clazz}, so it may
+     * hold only classes whose class loaders {@code clazz} already keeps in
+     * memory.
+     * </p>
+     *
+     * @param clazz the {@link Class} whose cache would hold the {@code types}
+     * @param types the classes to check, any of which may be {@code null}
+     * @return {@code true} if a cache entry for {@code clazz} may hold the
+     *         {@code types}
+     */
+    private static boolean isCacheable(Class<?> clazz, Class<?>... types) {
+        boolean cacheable = true;
+        for (int i = 0; cacheable && i < types.length; ++i) {
+            ClassLoader target = types[i] == null ? null
+                    : types[i].getClassLoader();
+            if(target != null) {
+                ClassLoader loader = clazz.getClassLoader();
+                while (loader != null && loader != target) {
+                    loader = loader.getParent();
+                }
+                cacheable = loader != null;
+            }
+        }
+        return cacheable;
+    }
+
+    /**
      * Return a {@link ClassValue} that gives each {@link Class} its own empty,
      * thread-safe {@link Map}.
      *
@@ -1695,75 +1737,6 @@ public final class Reflection {
     }
 
     private Reflection() {/* noinit */}
-
-    /**
-     * The inputs that decide which {@link Method} a lookup by name and argument
-     * types resolves within a {@link Class}.
-     *
-     * @author Jeff Nelson
-     */
-    private static final class MethodLookup {
-
-        /**
-         * The name of the method.
-         */
-        private final String name;
-
-        /**
-         * Whether the resolved {@link Method} ignores the native java language
-         * access rules.
-         */
-        private final boolean setAccessible;
-
-        /**
-         * The type of each argument, or {@code null} for a {@code null}
-         * argument.
-         */
-        private final List<Class<?>> paramTypes;
-
-        /**
-         * The hash code, which is computed once because every lookup hashes a
-         * new instance.
-         */
-        private final int hashCode;
-
-        /**
-         * Construct a new instance.
-         *
-         * @param name the name of the method
-         * @param setAccessible whether the resolved {@link Method} ignores the
-         *            native java language access rules
-         * @param paramTypes the type of each argument, or {@code null} for a
-         *            {@code null} argument; later changes to the array do not
-         *            affect this lookup
-         */
-        MethodLookup(String name, boolean setAccessible,
-                Class<?>[] paramTypes) {
-            this.name = name;
-            this.setAccessible = setAccessible;
-            this.paramTypes = Arrays.asList(paramTypes.clone());
-            this.hashCode = Objects.hash(name, setAccessible, this.paramTypes);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if(obj instanceof MethodLookup) {
-                MethodLookup other = (MethodLookup) obj;
-                return setAccessible == other.setAccessible
-                        && name.equals(other.name)
-                        && paramTypes.equals(other.paramTypes);
-            }
-            else {
-                return false;
-            }
-        }
-
-        @Override
-        public int hashCode() {
-            return hashCode;
-        }
-
-    }
 
     /**
      * A representation of a method signature consisting of the method name and

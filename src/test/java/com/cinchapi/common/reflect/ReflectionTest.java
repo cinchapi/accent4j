@@ -19,9 +19,13 @@ import java.io.FileNotFoundException;
 import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -49,6 +53,107 @@ import com.google.common.collect.Lists;
  */
 @SuppressWarnings("unused")
 public class ReflectionTest {
+
+    /**
+     * Call {@link Reflection#call(Object, String, Object...)} to add an
+     * instance of {@link Payload} that a new {@link ClassLoader} loads to an
+     * {@link ArrayList}, then close that {@link ClassLoader}.
+     *
+     * @param queue the {@link ReferenceQueue} that receives the returned
+     *            {@link WeakReference} after the garbage collector clears it
+     * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
+     *         the argument
+     * @throws Exception if the {@link ClassLoader} cannot load or instantiate
+     *             {@link Payload}
+     */
+    private static WeakReference<ClassLoader> callWithArgumentFromNewLoader(
+            ReferenceQueue<ClassLoader> queue) throws Exception {
+        try (URLClassLoader loader = new URLClassLoader(
+                new URL[] { getLocation(Payload.class) }, null)) {
+            Object arg = loader.loadClass(Payload.class.getName())
+                    .getDeclaredConstructor().newInstance();
+            Reflection.call(new ArrayList<Object>(), "add", arg);
+            return new WeakReference<>(loader, queue);
+        }
+    }
+
+    /**
+     * Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
+     * parent cannot see either of them, call
+     * {@link Reflection#call(Object, String, Object...)} through that copy to
+     * call {@link ArrayList#size()}, then close that {@link ClassLoader}.
+     *
+     * @param queue the {@link ReferenceQueue} that receives the returned
+     *            {@link WeakReference} after the garbage collector clears it
+     * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
+     *         the copy of {@link Reflection}
+     * @throws Exception if the {@link ClassLoader} cannot load
+     *             {@link Reflection} or the call fails
+     */
+    private static WeakReference<ClassLoader> callFromNewLoader(
+            ReferenceQueue<ClassLoader> queue) throws Exception {
+        URL[] locations = { getLocation(Reflection.class),
+                getLocation(Lists.class) };
+        try (URLClassLoader loader = new URLClassLoader(locations,
+                ClassLoader.getSystemClassLoader().getParent())) {
+            loader.loadClass(Reflection.class.getName())
+                    .getMethod("call", Object.class, String.class,
+                            Object[].class)
+                    .invoke(null, new ArrayList<Object>(), "size",
+                            new Object[0]);
+            return new WeakReference<>(loader, queue);
+        }
+    }
+
+    /**
+     * Run {@code action} and return the cause of the {@link RuntimeException}
+     * that it throws.
+     *
+     * @param action the action to run
+     * @return the cause of the {@link RuntimeException}, or {@code null} if
+     *         {@code action} does not throw one
+     */
+    private static Throwable getCauseOfFailure(Runnable action) {
+        Throwable cause = null;
+        try {
+            action.run();
+        }
+        catch (RuntimeException e) {
+            cause = e.getCause();
+        }
+        return cause;
+    }
+
+    /**
+     * Return the class path entry that holds {@code clazz}.
+     *
+     * @param clazz the {@link Class} to locate
+     * @return the {@link URL} of the directory or jar that holds {@code clazz}
+     */
+    private static URL getLocation(Class<?> clazz) {
+        return clazz.getProtectionDomain().getCodeSource().getLocation();
+    }
+
+    /**
+     * Request garbage collection, up to 20 times, until the garbage collector
+     * clears a {@link WeakReference} that is registered with {@code queue}.
+     *
+     * @param queue the {@link ReferenceQueue} that receives the
+     *            {@link WeakReference} after the garbage collector clears it
+     * @return {@code true} if the garbage collector cleared the
+     *         {@link WeakReference}
+     * @throws InterruptedException if the thread is interrupted while it waits
+     *             for {@code queue}
+     */
+    private static boolean isCollected(ReferenceQueue<?> queue)
+            throws InterruptedException {
+        boolean collected = false;
+        for (int i = 0; i < 20 && !collected; ++i) {
+            System.gc();
+            collected = queue.remove(100) != null;
+        }
+        return collected;
+    }
 
     private final Random random = new Random();
 
@@ -589,6 +694,111 @@ public class ReflectionTest {
         Reflection.callIfAccessible(a, "string");
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that reading a field that no class in the
+     * hierarchy declares fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read the {@code missing} field from an {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each read throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchFieldException}.
+     */
+    @Test
+    public void testGetThrowsForMissingFieldOnEveryCall() {
+        A a = new A("foo");
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.get("missing",
+                a)) instanceof NoSuchFieldException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.get("missing",
+                a)) instanceof NoSuchFieldException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method that no class in the
+     * hierarchy declares fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call the {@code missing} method on an {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testCallThrowsForMissingMethodOnEveryCall() {
+        A a = new A("foo");
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.call(a,
+                "missing")) instanceof NoSuchMethodException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.call(a,
+                "missing")) instanceof NoSuchMethodException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method with an argument from
+     * another {@link ClassLoader} does not keep that {@link ClassLoader} in
+     * memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Payload} in a new {@link ClassLoader} that does not
+     * delegate to the class path.</li>
+     * <li>Call {@link ArrayList#add(Object)} with an instance of that
+     * {@link Payload} through
+     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Drop every reference to the {@link ClassLoader} and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The garbage collector clears the
+     * {@link ClassLoader}.
+     */
+    @Test
+    public void testCallDoesNotRetainClassLoaderOfArgument() throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callWithArgumentFromNewLoader(
+                queue);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a JDK method through a copy of
+     * {@link Reflection} that another {@link ClassLoader} loads does not keep
+     * that {@link ClassLoader} in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
+     * parent cannot see them.</li>
+     * <li>Call {@link ArrayList#size()} through that copy of
+     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Drop every reference to the {@link ClassLoader} and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The garbage collector clears the
+     * {@link ClassLoader}.
+     */
+    @Test
+    public void testCallDoesNotRetainClassLoaderOfReflection()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callFromNewLoader(queue);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
     private static class A {
 
         private final String string;
@@ -886,5 +1096,11 @@ public class ReflectionTest {
             return "integer";
         }
     }
+
+    /**
+     * A class that a test loads in its own {@link ClassLoader} to pass as an
+     * argument whose {@link ClassLoader} the class path cannot reach.
+     */
+    public static class Payload {}
 
 }
