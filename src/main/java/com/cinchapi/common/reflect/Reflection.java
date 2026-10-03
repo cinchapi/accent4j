@@ -947,43 +947,27 @@ public final class Reflection {
     /**
      * Given a {@link Class}, create a new instance by calling the appropriate
      * constructor for the given {@code args}.
+     * <p>
+     * The constructor is one that {@code clazz} declares whose parameters
+     * accept {@code args}, position by position. A {@code null} argument
+     * matches any parameter type. When several constructors accept
+     * {@code args}, calls with the same argument classes choose the same one.
+     * </p>
      *
      * @param clazz the type of instance to construct
-     * @param args the parameters to pass to the constructor
+     * @param args the parameters to pass to the constructor; a {@code null}
+     *            array matches no constructor
      * @return the new instance
+     * @throws RuntimeException if no constructor accepts {@code args}, with a
+     *             {@link NoSuchMethodException} as its cause, or if the
+     *             constructor fails; an unchecked exception that the
+     *             constructor throws reaches the caller unwrapped
      */
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(Class<? extends T> clazz, Object... args) {
         try {
-            Constructor<? extends T> toCall = null;
-            outer: for (Constructor<?> constructor : clazz
-                    .getDeclaredConstructors()) {
-                Class<?>[] paramTypes = constructor.getParameterTypes();
-                if(paramTypes == null && args == null) { // Handle no arg
-                                                         // constructors
-                    toCall = (Constructor<? extends T>) constructor;
-                    break;
-                }
-                else if(args == null || paramTypes == null
-                        || args.length != paramTypes.length) {
-                    continue;
-                }
-                else {
-                    for (int i = 0; i < args.length; ++i) {
-                        Object arg = args[i];
-                        Class<?> type = paramTypes[i];
-                        Class<?> altType = getAltType(type);
-                        if(arg != null && !type.isAssignableFrom(arg.getClass())
-                                && !altType.isAssignableFrom(arg.getClass())) {
-                            continue outer;
-                        }
-                    }
-                    toCall = (Constructor<? extends T>) constructor;
-                    break;
-                }
-            }
+            Constructor<?> toCall = getConstructor(clazz, args);
             if(toCall != null) {
-                toCall.setAccessible(true);
                 return (T) toCall.newInstance(args);
             }
             else {
@@ -1177,6 +1161,41 @@ public final class Reflection {
             String methodName, Object... args) {
         Method method = getMethod(setAccessible, methodName, clazz, args);
         return invoke(method, null, args);
+    }
+
+    /**
+     * Search the constructors that {@code clazz} declares for one whose
+     * parameters accept arguments of {@code types}, position by position, and
+     * return it made accessible.
+     *
+     * @param clazz the {@link Class} whose constructors to search
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return a new {@link Constructor} object, or {@code null} if no
+     *         constructor accepts the arguments
+     * @throws RuntimeException if access configuration fails
+     */
+    @Nullable
+    private static Constructor<?> findConstructor(Class<?> clazz,
+            Class<?>[] types) {
+        Constructor<?>[] constructors = clazz.getDeclaredConstructors();
+        Constructor<?> match = null;
+        for (int c = 0; match == null && c < constructors.length; ++c) {
+            Class<?>[] paramTypes = constructors[c].getParameterTypes();
+            boolean accepts = types.length == paramTypes.length;
+            for (int i = 0; accepts && i < types.length; ++i) {
+                Class<?> type = types[i];
+                accepts = type == null || paramTypes[i].isAssignableFrom(type)
+                        || getAltType(paramTypes[i]).isAssignableFrom(type);
+            }
+            if(accepts) {
+                match = constructors[c];
+            }
+        }
+        if(match != null) {
+            match.setAccessible(true);
+        }
+        return match;
     }
 
     /**
@@ -1464,6 +1483,42 @@ public final class Reflection {
             classes[i] = arg == null ? null : arg.getClass();
         }
         return classes;
+    }
+
+    /**
+     * Return a constructor of {@code clazz} whose parameters accept
+     * {@code args}, position by position, made accessible.
+     * <p>
+     * Repeated lookups with the same class and argument classes share the
+     * result if each non-null argument class meets a loader condition. The
+     * condition accepts the bootstrap loader or the loader of {@code clazz}. It
+     * also accepts ancestors of that loader.
+     * </p>
+     *
+     * @param clazz the {@link Class} whose constructor to return
+     * @param args the arguments, any of which may be {@code null}; a
+     *            {@code null} array matches no constructor
+     * @return the {@link Constructor}, which may be shared, or {@code null} if
+     *         no constructor accepts {@code args}
+     * @throws RuntimeException if access configuration fails
+     */
+    @Nullable
+    private static Constructor<?> getConstructor(Class<?> clazz,
+            @Nullable Object[] args) {
+        Constructor<?> constructor;
+        if(args != null) {
+            Class<?>[] types = getClasses(args);
+            Map<Integer, Object[]> constructors = CONSTRUCTORS.get(clazz);
+            constructor = getCached(constructors.get(types.length), types);
+            if(constructor == null) {
+                constructor = cache(constructors, types.length, clazz, types,
+                        () -> findConstructor(clazz, types));
+            }
+        }
+        else {
+            constructor = null;
+        }
+        return constructor;
     }
 
     /**
@@ -1887,6 +1942,14 @@ public final class Reflection {
      * sequence of argument classes.
      */
     private static final ClassValue<Map<String, Object[]>> ACCESS_CHECKED_METHODS =
+            newCache();
+
+    /**
+     * Resolved {@link Constructor Constructors} for each {@link Class}, by
+     * number of arguments. Each value holds one entry per sequence of argument
+     * classes.
+     */
+    private static final ClassValue<Map<Integer, Object[]>> CONSTRUCTORS =
             newCache();
 
     /**

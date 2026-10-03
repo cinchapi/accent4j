@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -65,19 +66,20 @@ public class ReflectionTest {
      *
      * @param queue the queue for the returned reference, or {@code null} for no
      *            queue
+     * @param action the reflective invocation to run with the argument
      * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
      *         the argument, with the loader's resources closed
      * @throws Exception if argument creation, invocation or resource closure
      *             fails
      */
     private static WeakReference<ClassLoader> callWithArgumentFromNewLoader(
-            ReferenceQueue<ClassLoader> queue) throws Exception {
+            ReferenceQueue<ClassLoader> queue, Consumer<Object> action)
+            throws Exception {
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { getLocation(Payload.class) }, null)) {
             Object arg = loader.loadClass(Payload.class.getName())
                     .getDeclaredConstructor().newInstance();
-            Reflection.call(new ArrayList<Object>(), "add", arg);
-            Reflection.call(new Sink(), "accept", arg);
+            action.accept(arg);
             return new WeakReference<>(loader, queue);
         }
     }
@@ -87,39 +89,43 @@ public class ReflectionTest {
      * copy of {@link Payload} in the class path's {@link ClassLoader}.
      *
      * @param queue the queue for the returned reference
+     * @param action the reflective invocation to run with the argument
      * @return a {@link WeakReference} to the hidden class
      * @throws Exception if class definition, instantiation or invocation fails
      */
     private static WeakReference<Class<?>> callWithArgumentOfHiddenClass(
-            ReferenceQueue<Class<?>> queue) throws Exception {
+            ReferenceQueue<Class<?>> queue, Consumer<Object> action)
+            throws Exception {
         Class<?> type = defineHiddenCopyOf(Payload.class);
-        Reflection.call(new Sink(), "accept",
-                type.getDeclaredConstructor().newInstance());
+        action.accept(type.getDeclaredConstructor().newInstance());
         return new WeakReference<>(type, queue);
     }
 
     /**
-     * Exercise invocation of a JDK method through a separately loaded copy of
+     * Exercise a static method of a separately loaded copy of
      * {@link Reflection}.
      *
      * @param queue the queue for the returned reference, or {@code null} for no
      *            queue
+     * @param method the name of the {@link Reflection} method to call
+     * @param types the parameter types of the {@link Reflection} method
+     * @param args the arguments to pass to the {@link Reflection} method; the
+     *            class of each must be one that the bootstrap
+     *            {@link ClassLoader} loads
      * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
      *         the copy of {@link Reflection}, with the loader's resources
      *         closed
      * @throws Exception if loading, invocation or resource closure fails
      */
     private static WeakReference<ClassLoader> callFromNewLoader(
-            ReferenceQueue<ClassLoader> queue) throws Exception {
+            ReferenceQueue<ClassLoader> queue, String method,
+            Class<?>[] types, Object... args) throws Exception {
         URL[] locations = { getLocation(Reflection.class),
                 getLocation(Lists.class) };
         try (URLClassLoader loader = new URLClassLoader(locations,
                 ClassLoader.getSystemClassLoader().getParent())) {
             loader.loadClass(Reflection.class.getName())
-                    .getMethod("call", Object.class, String.class,
-                            Object[].class)
-                    .invoke(null, new ArrayList<Object>(), "size",
-                            new Object[0]);
+                    .getMethod(method, types).invoke(null, args);
             return new WeakReference<>(loader, queue);
         }
     }
@@ -859,7 +865,10 @@ public class ReflectionTest {
     public void testCallDoesNotRetainClassLoaderOfArgument() throws Exception {
         ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
         WeakReference<ClassLoader> loader = callWithArgumentFromNewLoader(
-                queue);
+                queue, arg -> {
+                    Reflection.call(new ArrayList<Object>(), "add", arg);
+                    Reflection.call(new Sink(), "accept", arg);
+                });
         Assert.assertTrue(isCollected(queue));
         Assert.assertNull(loader.get());
     }
@@ -888,7 +897,9 @@ public class ReflectionTest {
     public void testCallDoesNotRetainClassLoaderOfReflection()
             throws Exception {
         ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
-        WeakReference<ClassLoader> loader = callFromNewLoader(queue);
+        WeakReference<ClassLoader> loader = callFromNewLoader(queue, "call",
+                new Class<?>[] { Object.class, String.class, Object[].class },
+                new ArrayList<Object>(), "size", new Object[0]);
         Assert.assertTrue(isCollected(queue));
         Assert.assertNull(loader.get());
     }
@@ -917,7 +928,189 @@ public class ReflectionTest {
     @Test
     public void testCallDoesNotRetainHiddenClassOfArgument() throws Exception {
         ReferenceQueue<Class<?>> queue = new ReferenceQueue<>();
-        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue);
+        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue,
+                arg -> Reflection.call(new Sink(), "accept", arg));
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(type.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance calls the
+     * constructor that matches the type of each argument, in order.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with a {@link String} and an
+     * {@link Integer}, then with an {@link Integer} and a {@link String}, then
+     * with a {@link String} and an {@link Integer} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The instances record the constructors
+     * {@code string, integer}, {@code integer, string}, and
+     * {@code string, integer}.
+     */
+    @Test
+    public void testNewInstanceCallsConstructorThatMatchesEachArgumentType() {
+        Orders orders;
+        orders = Reflection.newInstance(Orders.class, "a", 1);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, 1, "a");
+        Assert.assertEquals("integer, string", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, "b", 2);
+        Assert.assertEquals("string, integer", orders.constructor);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with {@code null}
+     * arguments calls the constructor that matches the type of each non-null
+     * argument at its position.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with a {@link String} and {@code null},
+     * then with {@code null} and a {@link String}, then with a {@link String}
+     * and {@code null} again.</li>
+     * <li>Create an {@link Orders} with one {@code null} argument.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The instances record the constructors
+     * {@code string, integer}, {@code integer, string},
+     * {@code string, integer}, and {@code integer}.
+     */
+    @Test
+    public void testNewInstanceCallsConstructorThatMatchesEachNullArgument() {
+        Orders orders;
+        orders = Reflection.newInstance(Orders.class, "a", null);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, null, "a");
+        Assert.assertEquals("integer, string", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, "b", null);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, (Object) null);
+        Assert.assertEquals("integer", orders.constructor);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with arguments
+     * that no constructor accepts fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with two {@link String} arguments
+     * twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testNewInstanceThrowsWhenNoConstructorMatchesOnEveryCall() {
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Orders.class, "a", "b")) instanceof NoSuchMethodException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Orders.class, "a", "b")) instanceof NoSuchMethodException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with an argument
+     * from another {@link ClassLoader} does not keep that {@link ClassLoader}
+     * in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Payload} in a new {@link ClassLoader} that does not
+     * delegate to the class path.</li>
+     * <li>Pass an instance of that {@link Payload} through
+     * {@link Reflection#newInstance(Class, Object...)} to the
+     * {@link AtomicReference} constructor, which the bootstrap loader loads,
+     * and to the {@code Sink(Object)} constructor, which the class path
+     * loads.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainClassLoaderOfArgument()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callWithArgumentFromNewLoader(
+                queue, arg -> {
+                    Reflection.newInstance(AtomicReference.class, arg);
+                    Reflection.newInstance(Sink.class, arg);
+                });
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating a JDK instance through a copy
+     * of {@link Reflection} that another {@link ClassLoader} loads does not
+     * keep that {@link ClassLoader} in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
+     * parent cannot see them.</li>
+     * <li>Create an {@link ArrayList} through that copy of
+     * {@link Reflection#newInstance(Class, Object...)}.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainClassLoaderOfReflection()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callFromNewLoader(queue,
+                "newInstance", new Class<?>[] { Class.class, Object[].class },
+                ArrayList.class, new Object[0]);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with an argument
+     * whose class Java can unload apart from its {@link ClassLoader} does not
+     * keep that class in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Define a hidden copy of {@link Payload} in the class path's
+     * {@link ClassLoader}, as a VM anonymous class before Java 15.</li>
+     * <li>Pass an instance through
+     * {@link Reflection#newInstance(Class, Object...)} to the
+     * {@code Sink(Object)} constructor, which the class path loads.</li>
+     * <li>Drop all strong references to the hidden class and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainHiddenClassOfArgument()
+            throws Exception {
+        ReferenceQueue<Class<?>> queue = new ReferenceQueue<>();
+        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue,
+                arg -> Reflection.newInstance(Sink.class, arg));
         Assert.assertTrue(isCollected(queue));
         Assert.assertNull(type.get());
     }
@@ -1227,6 +1420,50 @@ public class ReflectionTest {
     }
 
     /**
+     * A class with constructors that accept a {@link String} and an
+     * {@link Integer} in either order, or an {@link Integer} alone, and record
+     * which one created the instance.
+     *
+     * @author Jeff Nelson
+     */
+    private static class Orders {
+
+        /**
+         * The parameter types of the constructor that created this instance.
+         */
+        private final String constructor;
+
+        /**
+         * Create an {@link Orders} that records {@code string, integer}.
+         *
+         * @param string the first argument
+         * @param integer the second argument
+         */
+        Orders(String string, Integer integer) {
+            this.constructor = "string, integer";
+        }
+
+        /**
+         * Create an {@link Orders} that records {@code integer, string}.
+         *
+         * @param integer the first argument
+         * @param string the second argument
+         */
+        Orders(Integer integer, String string) {
+            this.constructor = "integer, string";
+        }
+
+        /**
+         * Create an {@link Orders} that records {@code integer}.
+         *
+         * @param integer the argument
+         */
+        Orders(Integer integer) {
+            this.constructor = "integer";
+        }
+    }
+
+    /**
      * A class that a test loads in its own {@link ClassLoader} to pass as an
      * argument whose {@link ClassLoader} the class path cannot reach.
      *
@@ -1241,6 +1478,18 @@ public class ReflectionTest {
      * @author Jeff Nelson
      */
     private static class Sink {
+
+        /**
+         * Create a {@link Sink}.
+         */
+        Sink() {}
+
+        /**
+         * Create a {@link Sink} and do nothing with {@code value}.
+         *
+         * @param value the argument
+         */
+        Sink(Object value) {}
 
         /**
          * Accept {@code value} and do nothing with it.
