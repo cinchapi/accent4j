@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.17.2 (TBD)
+#### Version 1.17.2 (October 3, 2026)
 * `Reflection` remembers each field and method that it looks up by name, so repeated calls on the same class skip the search of the class hierarchy. This speeds up `get`, `set`, `getStatic`, `call`, `callIf`, `callIfAccessible`, `callStatic`, `callStaticIfAccessible`, `getDeclaredField`, `getMethodUnboxed` and `isDeclaredAnnotationPresentInHierarchy`, most of all for a field that a superclass declares. `getDeclaredField` returns the same `Field` object for repeated lookups, and `getMethodUnboxed` may return a `Method` object that other lookups share, so a caller must not change the accessibility of either.
 * `Reflection#invokeDefaultInterfaceMethod` remembers the method handle that it builds for each default method, so repeated calls for the same method are much faster, most of all on Java 8. Each call still runs the method on its own target with its own arguments.
 * `Reflection#newInstance` remembers the constructor that it chooses for a class and the classes of the arguments, so repeated calls with the same argument classes skip the search of the class's constructors. A call that no constructor accepts throws on every call.
