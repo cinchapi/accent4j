@@ -856,19 +856,8 @@ public final class Reflection {
         Preconditions.checkArgument(declaringClass.isInterface());
         Preconditions.checkArgument(declaringClass.isInstance(target));
         try {
-            MethodHandles.Lookup lookup;
-            try {
-                // Java 9+
-                lookup = callStatic(MethodHandles.class, "privateLookupIn",
-                        declaringClass, MethodHandles.lookup());
-            }
-            catch (Exception e) {
-                // Java 8 fallback
-                lookup = newInstance(MethodHandles.Lookup.class, declaringClass,
-                        MethodHandles.Lookup.PRIVATE);
-            }
-            MethodHandle handle = lookup
-                    .unreflectSpecial(method, declaringClass).bindTo(target);
+            MethodHandle handle = getDefaultMethodHandle(method)
+                    .bindTo(target);
             return handle.invokeWithArguments(args);
         }
         catch (Throwable t) {
@@ -1131,6 +1120,36 @@ public final class Reflection {
     }
 
     /**
+     * Build a {@link MethodHandle} that runs the body of the default
+     * {@code method} that its interface declares, for any target.
+     *
+     * @param method a default method of an interface
+     * @return a new handle that is not bound to a target; its first argument is
+     *         the target
+     * @throws RuntimeException if the handle cannot be built
+     */
+    private static MethodHandle findDefaultMethodHandle(Method method) {
+        Class<?> declaringClass = method.getDeclaringClass();
+        MethodHandles.Lookup lookup;
+        try {
+            // Java 9+
+            lookup = callStatic(MethodHandles.class, "privateLookupIn",
+                    declaringClass, MethodHandles.lookup());
+        }
+        catch (Exception e) {
+            // Java 8 fallback
+            lookup = newInstance(MethodHandles.Lookup.class, declaringClass,
+                    MethodHandles.Lookup.PRIVATE);
+        }
+        try {
+            return lookup.unreflectSpecial(method, declaringClass);
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
      * Search the hierarchy of {@code clazz} for the {@link Field} called
      * {@code name}, and return the one that {@code clazz} or its nearest
      * ancestor declares, made accessible.
@@ -1338,6 +1357,28 @@ public final class Reflection {
         }
         while (!nextLevel.isEmpty());
         return classes;
+    }
+
+    /**
+     * Return a {@link MethodHandle} that runs the body of the default
+     * {@code method} that its interface declares, for any target.
+     *
+     * @param method a default method of an interface
+     * @return a handle that is not bound to a target, which repeated calls for
+     *         the same {@code method} share; its first argument is the target
+     * @throws RuntimeException if the handle cannot be built
+     */
+    private static MethodHandle getDefaultMethodHandle(Method method) {
+        Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
+                .get(method.getDeclaringClass());
+        MethodHandle handle = handles.get(method);
+        if(handle == null) {
+            // NOTE: On Java 8, computeIfAbsent locks even when the key is
+            // present, so a call that finds the handle does not call it.
+            handle = handles.computeIfAbsent(method,
+                    key -> findDefaultMethodHandle(method));
+        }
+        return handle;
     }
 
     /**
@@ -1740,6 +1781,13 @@ public final class Reflection {
             return clazz;
         }
     }
+
+    /**
+     * The {@link MethodHandle} for each default method of each interface, not
+     * bound to a target.
+     */
+    private static final ClassValue<Map<Method, MethodHandle>> DEFAULT_METHOD_HANDLES =
+            newCache();
 
     /**
      * Resolved {@link Field Fields} for each lookup {@link Class} and field

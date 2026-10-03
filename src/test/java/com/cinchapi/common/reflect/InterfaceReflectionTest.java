@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.reflect;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
@@ -117,6 +118,67 @@ public class InterfaceReflectionTest {
 
     class SimpleClass {
         // No interfaces implemented
+    }
+
+    /**
+     * An interface whose default methods read the state of their target, take
+     * arguments, and throw the exceptions they receive.
+     */
+    public interface Greeter {
+
+        /**
+         * Return the name of this {@link Greeter}.
+         *
+         * @return the name
+         */
+        String name();
+
+        /**
+         * Return {@code greeting} followed by the {@link #name()} of this
+         * {@link Greeter}.
+         *
+         * @param greeting the greeting
+         * @return the greeting and the name, separated by a comma
+         */
+        default String greet(String greeting) {
+            return greeting + ", " + name();
+        }
+
+        /**
+         * Throw {@code exception}.
+         *
+         * @param exception the exception to throw
+         * @return nothing, because the method always throws
+         * @throws Exception always, {@code exception} itself
+         */
+        default String fail(Exception exception) throws Exception {
+            throw exception;
+        }
+    }
+
+    /**
+     * A {@link Greeter} with a fixed name.
+     */
+    class Person implements Greeter {
+
+        /**
+         * The name that {@link #name()} returns.
+         */
+        private final String name;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param name the name of this {@link Person}
+         */
+        Person(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
     }
 
     @Test
@@ -468,6 +530,135 @@ public class InterfaceReflectionTest {
         Method siblingMethod = SiblingInterface.class.getDeclaredMethod("siblingDefaultMethod");
         Object siblingResult = Reflection.invokeDefaultInterfaceMethod(obj, siblingMethod);
         Assert.assertEquals("sibling_default", siblingResult);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that repeated invocations of one default
+     * method each run on their own target with their own arguments.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Invoke {@code Greeter.greet} on a {@link Person} named {@code Ada}
+     * with {@code Hello}.</li>
+     * <li>Invoke it on a {@link Person} named {@code Grace} with
+     * {@code Hi}.</li>
+     * <li>Invoke it on the first {@link Person} again with {@code Hey}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The invocations return {@code Hello, Ada},
+     * {@code Hi, Grace}, and {@code Hey, Ada}.
+     */
+    @Test
+    public void testInvokeDefaultInterfaceMethodRunsOnEachTargetWithItsArguments()
+            throws Exception {
+        Method greet = Greeter.class.getDeclaredMethod("greet", String.class);
+        Person ada = new Person("Ada");
+        Person grace = new Person("Grace");
+        Assert.assertEquals("Hello, Ada",
+                Reflection.invokeDefaultInterfaceMethod(ada, greet, "Hello"));
+        Assert.assertEquals("Hi, Grace",
+                Reflection.invokeDefaultInterfaceMethod(grace, greet, "Hi"));
+        Assert.assertEquals("Hey, Ada",
+                Reflection.invokeDefaultInterfaceMethod(ada, greet, "Hey"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that invoking default methods with the same
+     * name from different interfaces runs the body that each interface
+     * declares.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Invoke {@code overridableMethod} of {@link ExtendedInterface}, then
+     * of {@link SiblingInterface}, then of {@link BaseInterface}, on one
+     * {@link ChildClass}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The invocations return
+     * {@code extended_overridable}, {@code sibling_overridable}, and
+     * {@code base_overridable}.
+     */
+    @Test
+    public void testInvokeDefaultInterfaceMethodRunsBodyOfEachDeclaringInterface()
+            throws Exception {
+        ChildClass obj = new ChildClass();
+        Method extended = ExtendedInterface.class
+                .getDeclaredMethod("overridableMethod");
+        Method sibling = SiblingInterface.class
+                .getDeclaredMethod("overridableMethod");
+        Method base = BaseInterface.class
+                .getDeclaredMethod("overridableMethod");
+        Assert.assertEquals("extended_overridable",
+                Reflection.invokeDefaultInterfaceMethod(obj, extended));
+        Assert.assertEquals("sibling_overridable",
+                Reflection.invokeDefaultInterfaceMethod(obj, sibling));
+        Assert.assertEquals("base_overridable",
+                Reflection.invokeDefaultInterfaceMethod(obj, base));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that an unchecked exception that a default
+     * method throws reaches the caller unchanged.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Invoke {@code Greeter.fail} on a {@link Person} with an
+     * {@link IllegalStateException}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The invocation throws that same
+     * {@link IllegalStateException}.
+     */
+    @Test
+    public void testInvokeDefaultInterfaceMethodThrowsUncheckedExceptionOfMethod()
+            throws Exception {
+        Method fail = Greeter.class.getDeclaredMethod("fail", Exception.class);
+        IllegalStateException expected = new IllegalStateException();
+        try {
+            Reflection.invokeDefaultInterfaceMethod(new Person("Ada"), fail,
+                    expected);
+            Assert.fail("Expected an IllegalStateException");
+        }
+        catch (IllegalStateException e) {
+            Assert.assertSame(expected, e);
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a checked exception that a default
+     * method throws reaches the caller as the cause of a
+     * {@link RuntimeException}.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Invoke {@code Greeter.fail} on a {@link Person} with an
+     * {@link IOException}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The invocation throws a
+     * {@link RuntimeException} whose cause is that same {@link IOException}.
+     */
+    @Test
+    public void testInvokeDefaultInterfaceMethodWrapsCheckedExceptionOfMethod()
+            throws Exception {
+        Method fail = Greeter.class.getDeclaredMethod("fail", Exception.class);
+        IOException expected = new IOException();
+        try {
+            Reflection.invokeDefaultInterfaceMethod(new Person("Ada"), fail,
+                    expected);
+            Assert.fail("Expected a RuntimeException");
+        }
+        catch (RuntimeException e) {
+            Assert.assertSame(expected, e.getCause());
+        }
     }
 
 }
