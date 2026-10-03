@@ -16,9 +16,12 @@
 package com.cinchapi.common.reflect;
 
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
@@ -40,11 +43,13 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import com.cinchapi.common.base.Array;
+import com.cinchapi.common.runtime.Application;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
 
 /**
  * Unit tests for the {@link Reflection} utility class.
@@ -78,6 +83,22 @@ public class ReflectionTest {
     }
 
     /**
+     * Exercise reflective invocation with an argument whose class is a hidden
+     * copy of {@link Payload} in the class path's {@link ClassLoader}.
+     *
+     * @param queue the queue for the returned reference
+     * @return a {@link WeakReference} to the hidden class
+     * @throws Exception if class definition, instantiation or invocation fails
+     */
+    private static WeakReference<Class<?>> callWithArgumentOfHiddenClass(
+            ReferenceQueue<Class<?>> queue) throws Exception {
+        Class<?> type = defineHiddenCopyOf(Payload.class);
+        Reflection.call(new Sink(), "accept",
+                type.getDeclaredConstructor().newInstance());
+        return new WeakReference<>(type, queue);
+    }
+
+    /**
      * Exercise invocation of a JDK method through a separately loaded copy of
      * {@link Reflection}.
      *
@@ -100,6 +121,55 @@ public class ReflectionTest {
                     .invoke(null, new ArrayList<Object>(), "size",
                             new Object[0]);
             return new WeakReference<>(loader, queue);
+        }
+    }
+
+    /**
+     * Define a class from the bytecode of {@code clazz} that Java can unload
+     * while the {@link ClassLoader} of {@code clazz} stays in memory.
+     * <p>
+     * On Java 15 and later the result is a hidden class. On earlier versions it
+     * is a VM anonymous class. Both report the {@link ClassLoader} of
+     * {@code clazz}.
+     * </p>
+     *
+     * @param clazz a class in the package of {@link ReflectionTest} whose class
+     *            file is on the class path
+     * @return the new class
+     * @throws Exception if the class file cannot be read or the definition
+     *             fails
+     */
+    private static Class<?> defineHiddenCopyOf(Class<?> clazz)
+            throws Exception {
+        String file = clazz.getName()
+                .substring(clazz.getName().lastIndexOf('.') + 1) + ".class";
+        byte[] bytes;
+        try (InputStream input = clazz.getResourceAsStream(file)) {
+            bytes = ByteStreams.toByteArray(input);
+        }
+        if(Application.javaVersion() >= 15) {
+            // NOTE: The tests compile on Java 8, which has no
+            // defineHiddenClass, so this calls it reflectively.
+            Class<?> option = Class.forName(
+                    "java.lang.invoke.MethodHandles$Lookup$ClassOption");
+            Object options = java.lang.reflect.Array.newInstance(option, 0);
+            Lookup lookup = (Lookup) Lookup.class
+                    .getMethod("defineHiddenClass", byte[].class,
+                            boolean.class, options.getClass())
+                    .invoke(MethodHandles.lookup(), bytes, true, options);
+            return lookup.lookupClass();
+        }
+        else {
+            // NOTE: Java 17 and later have no defineAnonymousClass, so this
+            // calls it reflectively to keep the tests compilable there.
+            Field field = Class.forName("sun.misc.Unsafe")
+                    .getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            Object unsafe = field.get(null);
+            return (Class<?>) unsafe.getClass()
+                    .getMethod("defineAnonymousClass", Class.class,
+                            byte[].class, Object[].class)
+                    .invoke(unsafe, ReflectionTest.class, bytes, null);
         }
     }
 
@@ -794,6 +864,35 @@ public class ReflectionTest {
         WeakReference<ClassLoader> loader = callFromNewLoader(queue);
         Assert.assertTrue(isCollected(queue));
         Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method with an argument
+     * whose class Java can unload apart from its {@link ClassLoader} does not
+     * keep that class in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Define a hidden copy of {@link Payload} in the class path's
+     * {@link ClassLoader}, as a VM anonymous class before Java 15.</li>
+     * <li>Pass an instance through
+     * {@link Reflection#call(Object, String, Object...)} to
+     * {@code Sink#accept(Object)}, which the class path loads.</li>
+     * <li>Drop all strong references to the hidden class and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testCallDoesNotRetainHiddenClassOfArgument() throws Exception {
+        ReferenceQueue<Class<?>> queue = new ReferenceQueue<>();
+        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(type.get());
     }
 
     private static class A {

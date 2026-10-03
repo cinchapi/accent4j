@@ -1529,12 +1529,14 @@ public final class Reflection {
     }
 
     /**
-     * Return {@code true} if the class loader of {@code clazz} is, or descends
-     * from, the class loader of each non-null {@code type}.
+     * Return {@code true} if {@code clazz} keeps each non-null {@code type} in
+     * memory. A type qualifies when the class loader of {@code clazz} is, or
+     * descends from, the type's class loader, and Java cannot unload the type
+     * while that class loader stays in memory. A hidden class, or a VM
+     * anonymous class on Java 8, never qualifies.
      * <p>
      * A cache entry for {@code clazz} lasts as long as {@code clazz}, so it may
-     * hold only classes whose class loaders {@code clazz} already keeps in
-     * memory.
+     * hold only classes that {@code clazz} already keeps in memory.
      * </p>
      *
      * @param clazz the {@link Class} whose cache would hold the {@code types}
@@ -1545,14 +1547,25 @@ public final class Reflection {
     private static boolean isCacheable(Class<?> clazz, Class<?>... types) {
         boolean cacheable = true;
         for (int i = 0; cacheable && i < types.length; ++i) {
-            ClassLoader target = types[i] == null ? null
-                    : types[i].getClassLoader();
-            if(target != null) {
-                ClassLoader loader = clazz.getClassLoader();
-                while (loader != null && loader != target) {
-                    loader = loader.getParent();
+            Class<?> type = types[i];
+            if(type != null && type.getName().indexOf('/') >= 0) {
+                // NOTE: Only a hidden class, an array of one, or a VM anonymous
+                // class on Java 8 has a '/' in its name. Java 8 has no API to
+                // detect these classes.
+                // TODO: Use Class#isHidden() once the minimum Java version is
+                // 15 or later.
+                cacheable = false;
+            }
+            else {
+                ClassLoader target = type == null ? null
+                        : type.getClassLoader();
+                if(target != null) {
+                    ClassLoader loader = clazz.getClassLoader();
+                    while (loader != null && loader != target) {
+                        loader = loader.getParent();
+                    }
+                    cacheable = loader != null;
                 }
-                cacheable = loader != null;
             }
         }
         return cacheable;
