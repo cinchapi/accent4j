@@ -731,14 +731,8 @@ public final class Reflection {
      * Return the method named {@code method} from {@code clazz} or its
      * hierarchy, allowing primitive and wrapper parameter matches.
      * <p>
-     * Repeated lookups with the same arguments share the result if every
-     * non-null parameter type meets a loader condition. The condition accepts
-     * the bootstrap loader or the loader of {@code clazz}. It also accepts
-     * ancestors of that loader. Other repeated lookups may return distinct
-     * {@link Method} objects.
-     * </p>
-     * <p>
-     * Callers must not change the result's accessibility.
+     * Other lookups of the same method may return the same {@link Method}
+     * object, so callers must not change its accessibility.
      * </p>
      *
      * @param clazz the class instance in which the method is contained
