@@ -145,6 +145,19 @@ public class InterfaceReflectionTest {
         }
 
         /**
+         * Return {@code greeting} followed by the {@link #name()} of this
+         * {@link Greeter} and then {@code punctuation}.
+         *
+         * @param greeting the greeting
+         * @param punctuation the text to append
+         * @return the greeting and the name, separated by a comma, followed by
+         *         the punctuation
+         */
+        default String greet(String greeting, String punctuation) {
+            return greet(greeting) + punctuation;
+        }
+
+        /**
          * Throw {@code exception}.
          *
          * @param exception the exception to throw
@@ -598,6 +611,37 @@ public class InterfaceReflectionTest {
                 Reflection.invokeDefaultInterfaceMethod(obj, sibling));
         Assert.assertEquals("base_overridable",
                 Reflection.invokeDefaultInterfaceMethod(obj, base));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that invoking overloads of one default
+     * method runs the body of each overload.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Invoke {@code Greeter.greet(String)} on a {@link Person} named
+     * {@code Ada} with {@code Hello}.</li>
+     * <li>Invoke {@code Greeter.greet(String, String)} on the same
+     * {@link Person} with {@code Hello} and {@code !}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The invocations return {@code Hello, Ada} and
+     * {@code Hello, Ada!}.
+     */
+    @Test
+    public void testInvokeDefaultInterfaceMethodRunsBodyOfEachOverload()
+            throws Exception {
+        Method one = Greeter.class.getDeclaredMethod("greet", String.class);
+        Method two = Greeter.class.getDeclaredMethod("greet", String.class,
+                String.class);
+        Person ada = new Person("Ada");
+        Assert.assertEquals("Hello, Ada",
+                Reflection.invokeDefaultInterfaceMethod(ada, one, "Hello"));
+        Assert.assertEquals("Hello, Ada!",
+                Reflection.invokeDefaultInterfaceMethod(ada, two, "Hello",
+                        "!"));
     }
 
     /**
