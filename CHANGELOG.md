@@ -1,5 +1,8 @@
 # Changelog
 
+#### Version 1.17.2 (TBD)
+* `Reflection` remembers each field and method that it looks up by name, so repeated calls on the same class skip the search of the class hierarchy. This speeds up `get`, `set`, `getStatic`, `call`, `callIf`, `callIfAccessible`, `callStatic`, `callStaticIfAccessible`, `getDeclaredField`, `getMethodUnboxed` and `isDeclaredAnnotationPresentInHierarchy`, most of all for a field that a superclass declares. `getDeclaredField` returns the same `Field` object for repeated lookups, and `getMethodUnboxed` may return a `Method` object that other lookups share, so a caller must not change the accessibility of either.
+
 #### Version 1.17.1 (TBD)
 * Added `Enums#parseNameIgnoreCase` and `Enums#tryParseNameIgnoreCase`, which match an enum constant by name only, in any case, and never read a number as an ordinal. `parseNameIgnoreCase` throws an `IllegalArgumentException` when no constant matches, and `tryParseNameIgnoreCase` returns `null`. Each has an overload that applies custom logic as a last resort, like `Enums#parseIgnoreCase`.
 * Added `Enums#tryParseIgnoreCase`, which looks up a constant the way `Enums#parseIgnoreCase` does but returns `null` instead of throwing when no constant matches. It has an overload that applies custom logic as a last resort.

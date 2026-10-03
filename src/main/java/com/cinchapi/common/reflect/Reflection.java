@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -127,13 +128,13 @@ public final class Reflection {
      * {@code args} if and only if the {@code evaluate} function returns
      * {@code true}.
      *
-     * @param evaluate the {@link Function} that is given the (possibly cached)
-     *            {@link Method} instance that corresponds to {@code methodName}
-     *            ; use this to evaluate whether the method should be called
-     * @param obj the Object on which the method is called
+     * @param evaluate the decision function; receives a possibly shared
+     *            {@link Method} and must not change its accessibility
+     * @param obj the object on which the method is called
      * @param methodName the name of the method to call
      * @param args the args to pass to the method
      * @return the result of calling the method
+     * @throws IllegalStateException if {@code evaluate} returns {@code false}
      */
     @SuppressWarnings("unchecked")
     public static <T> T callIf(Function<Method, Boolean> evaluate, Object obj,
@@ -580,6 +581,11 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the class or class
      * hierarchy.
+     * <p>
+     * Repeated lookups of the same field in the same class return the same
+     * accessible {@link Field} object, so callers must not change its
+     * accessibility.
+     * </p>
      *
      * @param name the field name
      * @param clazz the class that contains the field
@@ -592,6 +598,11 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the {@code obj}'s
      * class or class hierarchy.
+     * <p>
+     * Repeated lookups of the same field in the same class return the same
+     * accessible {@link Field} object, so callers must not change its
+     * accessibility.
+     * </p>
      *
      * @param name the field name
      * @param obj the object whose class contains the field
@@ -703,14 +714,20 @@ public final class Reflection {
     }
 
     /**
-     * Return a {@link Method} instance from {@code clazz} named {@code method}
-     * (that takes arguments of {@code paramTypes} respectively)
-     * while making a best effort attempt to unbox primitive parameter types
+     * Return the method named {@code method} from {@code clazz} or its
+     * hierarchy, allowing primitive and wrapper parameter matches.
+     * <p>
+     * Other lookups of the same method may return the same {@link Method}
+     * object, so callers must not change its accessibility.
+     * </p>
      *
      * @param clazz the class instance in which the method is contained
      * @param method the name of the method
-     * @param paramTypes the types for the respective paramters
+     * @param paramTypes the argument types; entries may be {@code null}
      * @return a {@link Method} instance that has been set to be accessible
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if method resolution or access configuration
+     *             fails
      */
     public static Method getMethodUnboxed(Class<?> clazz, String method,
             Class<?>... paramTypes) {
@@ -1114,85 +1131,16 @@ public final class Reflection {
     }
 
     /**
-     * Return the boxed version of {@code clazz} if it is a primitive, or the
-     * unboxed version if it is a wrapper.
-     *
-     * @param clazz the class for which the alt type is returned
-     * @return the alt type
-     */
-    private static Class<?> getAltType(Class<?> clazz) {
-        if(clazz.isPrimitive()) {
-            if(clazz == int.class) {
-                return Integer.class;
-            }
-            else if(clazz == long.class) {
-                return Long.class;
-            }
-            else if(clazz == float.class) {
-                return Float.class;
-            }
-            else if(clazz == double.class) {
-                return Double.class;
-            }
-            else if(clazz == short.class) {
-                return Short.class;
-            }
-            else if(clazz == byte.class) {
-                return Byte.class;
-            }
-            else if(clazz == char.class) {
-                return Character.class;
-            }
-            else if(clazz == boolean.class) {
-                return Boolean.class;
-            }
-            else {
-                return clazz;
-            }
-        }
-        else {
-            return unbox(clazz);
-        }
-    }
-
-    /**
-     * Get all the ancestors for {@code clazz} in an ordered set.
-     *
-     * @param clazz
-     * @return the ancestors of {@code clazz}
-     */
-    private static Set<Class<?>> getClassAncestors(Class<?> clazz) {
-        Preconditions.checkArgument(clazz != null);
-        Set<Class<?>> classes = Sets.newLinkedHashSet();
-        Set<Class<?>> nextLevel = Sets.newLinkedHashSet();
-        nextLevel.add(clazz);
-        do {
-            classes.addAll(nextLevel);
-            Set<Class<?>> thisLevel = Sets.newLinkedHashSet(nextLevel);
-            nextLevel.clear();
-            for (Class<?> each : thisLevel) {
-                Class<?> superClass = each.getSuperclass();
-                if(superClass != null && superClass != Object.class) {
-                    nextLevel.add(superClass);
-                }
-                for (Class<?> eachInt : each.getInterfaces()) {
-                    nextLevel.add(eachInt);
-                }
-            }
-        }
-        while (!nextLevel.isEmpty());
-        return classes;
-    }
-
-    /**
-     * Return the value of the {@link Field} called {@code name} in
-     * {@code clazz} from the specified {@code obj}.
+     * Search the hierarchy of {@code clazz} for the {@link Field} called
+     * {@code name}, and return the one that {@code clazz} or its nearest
+     * ancestor declares, made accessible.
      *
      * @param name the name of the field
      * @param clazz the {@link Class} in which the field is defined
-     * @return the associated {@link Field} object
+     * @return a new {@link Field} object
+     * @throws RuntimeException if no class in the hierarchy declares the field
      */
-    private static Field getField(String name, Class<?> clazz) {
+    private static Field findField(String name, Class<?> clazz) {
         try {
             Field field = null;
             while (clazz != null && field == null) {
@@ -1219,83 +1167,23 @@ public final class Reflection {
     }
 
     /**
-     * Return the {@link Field} object that holds the variable with {@code name}
-     * in {@code obj}, if it exists. Otherwise a
-     * NoSuchFieldException is thrown.
-     * <p>
-     * This method will take care of making the field accessible.
-     * </p>
+     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
+     * for {@code paramTypes}.
      *
-     * @param name the name of the field to get
-     * @param obj the object from which to get the field
-     * @return the {@link Field} object
-     * @throws NoSuchFieldException
-     */
-    private static Field getField(String name, Object obj) {
-        return getField(name, obj.getClass());
-    }
-
-    /**
-     * Return a set of classes that are considered to be interchangeable with
-     * {@code clazz}.
-     *
-     * @param clazz
-     * @return a set of classes
-     */
-    private static Set<Class<?>> getInterchangeableClasses(Class<?> clazz) {
-        if(clazz == int.class) {
-            return Sets.newHashSet(long.class, Long.class, Integer.class);
-        }
-        else if(clazz == Integer.class) {
-            return Sets.newHashSet(long.class, Long.class, int.class);
-        }
-        else if(clazz == long.class) {
-            return Sets.newHashSet(int.class, Long.class, Integer.class);
-        }
-        else if(clazz == Long.class) {
-            return Sets.newHashSet(long.class, int.class, Integer.class);
-        }
-        else {
-            return Collections.emptySet();
-        }
-    }
-
-    /**
-     * Return the {@link Method} object called {@code name} in {@code clazz}
-     * that accepts the specified {@code args} and optionally ignore the native
-     * java language access rules.
-     *
-     * @param setAccessible a flag that indicates whether the native java
-     *            language access rules should be ignored
+     * @param args argument values for failure messages, or {@code null} to
+     *            report {@code paramTypes} instead
+     * @param setAccessible whether the result bypasses Java language access
+     *            checks
      * @param name the method name
      * @param clazz the {@link Class} in which the method is defined
-     * @param args the parameters defined in the method's signature
-     * @return the associated {@link Method} object
+     * @param paramTypes the type of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return a new {@link Method} object
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if no method matches or access configuration
+     *             fails
      */
-    private static Method getMethod(boolean setAccessible, String name,
-            Class<?> clazz, Object... args) {
-        Class<?>[] paramTypes = new Class<?>[args.length];
-        for (int i = 0; i < paramTypes.length; ++i) {
-            Object arg = args[i];
-            paramTypes[i] = arg == null ? null : arg.getClass();
-        }
-        return getMethod(args, setAccessible, name, clazz, paramTypes);
-    }
-
-    /**
-     * Return the {@link Method} object called {@code name} in {@code clazz}
-     * that accepts the specified {@code args} and optionally ignore the native
-     * java language access rules.
-     *
-     * @param args (optional) args to plug into the params
-     * @param setAccessible a flag that indicates whether the native java
-     *            language access rules should be ignored
-     * @param name the method name
-     * @param clazz the {@link Class} in which the method is defined
-     * @param paramType the parameters defined in the method's signature
-     * @return the associated {@link Method} object
-     */
-    private static Method getMethod(@Nullable Object[] args,
+    private static Method findMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
         List<Method> potential = Lists.newArrayListWithCapacity(1);
@@ -1382,6 +1270,211 @@ public final class Reflection {
     }
 
     /**
+     * Return the boxed version of {@code clazz} if it is a primitive, or the
+     * unboxed version if it is a wrapper.
+     *
+     * @param clazz the class for which the alt type is returned
+     * @return the alt type
+     */
+    private static Class<?> getAltType(Class<?> clazz) {
+        if(clazz.isPrimitive()) {
+            if(clazz == int.class) {
+                return Integer.class;
+            }
+            else if(clazz == long.class) {
+                return Long.class;
+            }
+            else if(clazz == float.class) {
+                return Float.class;
+            }
+            else if(clazz == double.class) {
+                return Double.class;
+            }
+            else if(clazz == short.class) {
+                return Short.class;
+            }
+            else if(clazz == byte.class) {
+                return Byte.class;
+            }
+            else if(clazz == char.class) {
+                return Character.class;
+            }
+            else if(clazz == boolean.class) {
+                return Boolean.class;
+            }
+            else {
+                return clazz;
+            }
+        }
+        else {
+            return unbox(clazz);
+        }
+    }
+
+    /**
+     * Get all the ancestors for {@code clazz} in an ordered set.
+     *
+     * @param clazz
+     * @return the ancestors of {@code clazz}
+     */
+    private static Set<Class<?>> getClassAncestors(Class<?> clazz) {
+        Preconditions.checkArgument(clazz != null);
+        Set<Class<?>> classes = Sets.newLinkedHashSet();
+        Set<Class<?>> nextLevel = Sets.newLinkedHashSet();
+        nextLevel.add(clazz);
+        do {
+            classes.addAll(nextLevel);
+            Set<Class<?>> thisLevel = Sets.newLinkedHashSet(nextLevel);
+            nextLevel.clear();
+            for (Class<?> each : thisLevel) {
+                Class<?> superClass = each.getSuperclass();
+                if(superClass != null && superClass != Object.class) {
+                    nextLevel.add(superClass);
+                }
+                for (Class<?> eachInt : each.getInterfaces()) {
+                    nextLevel.add(eachInt);
+                }
+            }
+        }
+        while (!nextLevel.isEmpty());
+        return classes;
+    }
+
+    /**
+     * Return the {@link Field} called {@code name} that {@code clazz} or its
+     * nearest ancestor declares, made accessible.
+     *
+     * @param name the name of the field
+     * @param clazz the {@link Class} in which the field is defined
+     * @return the {@link Field}, which repeated lookups of the same field in
+     *         the same {@link Class} share
+     * @throws RuntimeException if no class in the hierarchy declares the field
+     */
+    private static Field getField(String name, Class<?> clazz) {
+        Map<String, Field> fields = FIELDS.get(clazz);
+        Field field = fields.get(name);
+        if(field == null) {
+            // NOTE: On Java 8, computeIfAbsent locks even when the key is
+            // present, so a lookup that finds the field does not call it.
+            field = fields.computeIfAbsent(name,
+                    key -> findField(name, clazz));
+        }
+        return field;
+    }
+
+    /**
+     * Return the {@link Field} object that holds the variable with {@code name}
+     * in {@code obj}, if it exists. Otherwise a
+     * NoSuchFieldException is thrown.
+     * <p>
+     * This method will take care of making the field accessible.
+     * </p>
+     *
+     * @param name the name of the field to get
+     * @param obj the object from which to get the field
+     * @return the {@link Field} object
+     * @throws NoSuchFieldException
+     */
+    private static Field getField(String name, Object obj) {
+        return getField(name, obj.getClass());
+    }
+
+    /**
+     * Return a set of classes that are considered to be interchangeable with
+     * {@code clazz}.
+     *
+     * @param clazz
+     * @return a set of classes
+     */
+    private static Set<Class<?>> getInterchangeableClasses(Class<?> clazz) {
+        if(clazz == int.class) {
+            return Sets.newHashSet(long.class, Long.class, Integer.class);
+        }
+        else if(clazz == Integer.class) {
+            return Sets.newHashSet(long.class, Long.class, int.class);
+        }
+        else if(clazz == long.class) {
+            return Sets.newHashSet(int.class, Long.class, Integer.class);
+        }
+        else if(clazz == Long.class) {
+            return Sets.newHashSet(long.class, int.class, Integer.class);
+        }
+        else {
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * Return the {@link Method} object called {@code name} in {@code clazz}
+     * that accepts the specified {@code args} and optionally ignore the native
+     * java language access rules.
+     *
+     * @param setAccessible a flag that indicates whether the native java
+     *            language access rules should be ignored
+     * @param name the method name
+     * @param clazz the {@link Class} in which the method is defined
+     * @param args the parameters defined in the method's signature
+     * @return the associated {@link Method} object
+     */
+    private static Method getMethod(boolean setAccessible, String name,
+            Class<?> clazz, Object... args) {
+        Class<?>[] paramTypes = new Class<?>[args.length];
+        for (int i = 0; i < paramTypes.length; ++i) {
+            Object arg = args[i];
+            paramTypes[i] = arg == null ? null : arg.getClass();
+        }
+        return getMethod(args, setAccessible, name, clazz, paramTypes);
+    }
+
+    /**
+     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
+     * for {@code paramTypes}.
+     * <p>
+     * Repeated lookups with the same name, class, access policy and argument
+     * types share the result if every non-null parameter type meets a loader
+     * condition. The condition accepts the bootstrap loader or the loader of
+     * {@code clazz}. It also accepts ancestors of that loader.
+     *
+     * @param args argument values for failure messages, or {@code null} to
+     *            report {@code paramTypes} instead
+     * @param setAccessible whether the result bypasses Java language access
+     *            checks
+     * @param name the method name
+     * @param clazz the {@link Class} in which the method is defined
+     * @param paramTypes the type of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return the resolved {@link Method}, which may be shared; callers must
+     *         not change its accessibility
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if method resolution or access configuration
+     *             fails
+     */
+    private static Method getMethod(@Nullable Object[] args,
+            boolean setAccessible, String name, Class<?> clazz,
+            Class<?>... paramTypes) {
+        Method method;
+        if(isCacheable(clazz, paramTypes)) {
+            Map<List<Object>, Method> methods = METHODS.get(clazz);
+            // NOTE: The key holds only JDK types because the entry lasts as
+            // long as clazz, and a key type from the class loader that loads
+            // Reflection would keep that class loader in memory.
+            List<Object> lookup = Arrays.asList(name, setAccessible,
+                    Arrays.asList(paramTypes.clone()));
+            method = methods.get(lookup);
+            if(method == null) {
+                // NOTE: On Java 8, computeIfAbsent locks even when the key is
+                // present, so a lookup that finds the method does not call it.
+                method = methods.computeIfAbsent(lookup, key -> findMethod(
+                        args, setAccessible, name, clazz, paramTypes));
+            }
+        }
+        else {
+            method = findMethod(args, setAccessible, name, clazz, paramTypes);
+        }
+        return method;
+    }
+
+    /**
      * Invoke {@code method} with {@code args}. If {@code object} is
      * {@code null}, this is a static invocation.
      *
@@ -1433,6 +1526,49 @@ public final class Reflection {
             }
             throw CheckedExceptions.wrapAsRuntimeException(ex);
         }
+    }
+
+    /**
+     * Return {@code true} if {@code clazz} keeps each non-null {@code type} in
+     * memory. A type qualifies when the class loader of {@code clazz} is, or
+     * descends from, the type's class loader, and Java cannot unload the type
+     * while that class loader stays in memory. A hidden class, or a VM
+     * anonymous class on Java 8, never qualifies.
+     * <p>
+     * A cache entry for {@code clazz} lasts as long as {@code clazz}, so it may
+     * hold only classes that {@code clazz} already keeps in memory.
+     * </p>
+     *
+     * @param clazz the {@link Class} whose cache would hold the {@code types}
+     * @param types the classes to check, any of which may be {@code null}
+     * @return {@code true} if a cache entry for {@code clazz} may hold the
+     *         {@code types}
+     */
+    private static boolean isCacheable(Class<?> clazz, Class<?>... types) {
+        boolean cacheable = true;
+        for (int i = 0; cacheable && i < types.length; ++i) {
+            Class<?> type = types[i];
+            if(type != null && type.getName().indexOf('/') >= 0) {
+                // NOTE: Only a hidden class, an array of one, or a VM anonymous
+                // class on Java 8 has a '/' in its name. Java 8 has no API to
+                // detect these classes.
+                // TODO: Use Class#isHidden() once the minimum Java version is
+                // 15 or later.
+                cacheable = false;
+            }
+            else {
+                ClassLoader target = type == null ? null
+                        : type.getClassLoader();
+                if(target != null) {
+                    ClassLoader loader = clazz.getClassLoader();
+                    while (loader != null && loader != target) {
+                        loader = loader.getParent();
+                    }
+                    cacheable = loader != null;
+                }
+            }
+        }
+        return cacheable;
     }
 
     /**
@@ -1551,6 +1687,23 @@ public final class Reflection {
     }
 
     /**
+     * Return a {@link ClassValue} that gives each {@link Class} its own empty,
+     * thread-safe {@link Map}.
+     *
+     * @return the {@link ClassValue}
+     */
+    private static <K, V> ClassValue<Map<K, V>> newCache() {
+        return new ClassValue<Map<K, V>>() {
+
+            @Override
+            protected Map<K, V> computeValue(Class<?> type) {
+                return new ConcurrentHashMap<>();
+            }
+
+        };
+    }
+
+    /**
      * Return the unboxed version of the input {@code clazz}. This is usually
      * a class that represents a primitive for an autoboxed wrapper class.
      * Otherwise, the input {@code clazz} is returned.
@@ -1587,6 +1740,20 @@ public final class Reflection {
             return clazz;
         }
     }
+
+    /**
+     * Resolved {@link Field Fields} for each lookup {@link Class} and field
+     * name.
+     */
+    private static final ClassValue<Map<String, Field>> FIELDS = newCache();
+
+    /**
+     * Resolved {@link Method Methods} for each lookup {@link Class} and method
+     * name. Each result applies to one access policy and ordered sequence of
+     * argument types.
+     */
+    private static final ClassValue<Map<List<Object>, Method>> METHODS =
+            newCache();
 
     private Reflection() {/* noinit */}
 
