@@ -55,16 +55,15 @@ import com.google.common.collect.Lists;
 public class ReflectionTest {
 
     /**
-     * Call {@link Reflection#call(Object, String, Object...)} to add an
-     * instance of {@link Payload} that a new {@link ClassLoader} loads to an
-     * {@link ArrayList}, then close that {@link ClassLoader}.
+     * Exercise reflective invocation with an argument from a separate
+     * {@link ClassLoader}.
      *
-     * @param queue the {@link ReferenceQueue} that receives the returned
-     *            {@link WeakReference} after the garbage collector clears it
+     * @param queue the queue for the returned reference, or {@code null} for no
+     *            queue
      * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
-     *         the argument
-     * @throws Exception if the {@link ClassLoader} cannot load or instantiate
-     *             {@link Payload}
+     *         the argument, with the loader's resources closed
+     * @throws Exception if argument creation, invocation or resource closure
+     *             fails
      */
     private static WeakReference<ClassLoader> callWithArgumentFromNewLoader(
             ReferenceQueue<ClassLoader> queue) throws Exception {
@@ -78,17 +77,15 @@ public class ReflectionTest {
     }
 
     /**
-     * Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
-     * parent cannot see either of them, call
-     * {@link Reflection#call(Object, String, Object...)} through that copy to
-     * call {@link ArrayList#size()}, then close that {@link ClassLoader}.
+     * Exercise invocation of a JDK method through a separately loaded copy of
+     * {@link Reflection}.
      *
-     * @param queue the {@link ReferenceQueue} that receives the returned
-     *            {@link WeakReference} after the garbage collector clears it
+     * @param queue the queue for the returned reference, or {@code null} for no
+     *            queue
      * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
-     *         the copy of {@link Reflection}
-     * @throws Exception if the {@link ClassLoader} cannot load
-     *             {@link Reflection} or the call fails
+     *         the copy of {@link Reflection}, with the loader's resources
+     *         closed
+     * @throws Exception if loading, invocation or resource closure fails
      */
     private static WeakReference<ClassLoader> callFromNewLoader(
             ReferenceQueue<ClassLoader> queue) throws Exception {
@@ -127,21 +124,19 @@ public class ReflectionTest {
     /**
      * Return the class path entry that holds {@code clazz}.
      *
-     * @param clazz the {@link Class} to locate
-     * @return the {@link URL} of the directory or jar that holds {@code clazz}
+     * @param clazz the class to locate; must have a non-null code source
+     * @return the {@link URL} of its code source, which may be {@code null}
      */
     private static URL getLocation(Class<?> clazz) {
         return clazz.getProtectionDomain().getCodeSource().getLocation();
     }
 
     /**
-     * Request garbage collection, up to 20 times, until the garbage collector
-     * clears a {@link WeakReference} that is registered with {@code queue}.
+     * Request garbage collection and wait for a reference in {@code queue}.
      *
-     * @param queue the {@link ReferenceQueue} that receives the
-     *            {@link WeakReference} after the garbage collector clears it
-     * @return {@code true} if the garbage collector cleared the
-     *         {@link WeakReference}
+     * @param queue the queue to observe
+     * @return {@code true} if a reference is removed from {@code queue}, or
+     *         {@code false} if the wait ends without one
      * @throws InterruptedException if the thread is interrupted while it waits
      *             for {@code queue}
      */
@@ -754,12 +749,12 @@ public class ReflectionTest {
      * <li>Call {@link ArrayList#add(Object)} with an instance of that
      * {@link Payload} through
      * {@link Reflection#call(Object, String, Object...)}.</li>
-     * <li>Drop every reference to the {@link ClassLoader} and request garbage
-     * collection.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
      * </ul>
      * <p>
-     * <strong>Expected:</strong> The garbage collector clears the
-     * {@link ClassLoader}.
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
      */
     @Test
     public void testCallDoesNotRetainClassLoaderOfArgument() throws Exception {
@@ -783,12 +778,12 @@ public class ReflectionTest {
      * parent cannot see them.</li>
      * <li>Call {@link ArrayList#size()} through that copy of
      * {@link Reflection#call(Object, String, Object...)}.</li>
-     * <li>Drop every reference to the {@link ClassLoader} and request garbage
-     * collection.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
      * </ul>
      * <p>
-     * <strong>Expected:</strong> The garbage collector clears the
-     * {@link ClassLoader}.
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
      */
     @Test
     public void testCallDoesNotRetainClassLoaderOfReflection()
@@ -1049,6 +1044,8 @@ public class ReflectionTest {
 
     /**
      * A class whose {@code name} field a subclass shadows.
+     *
+     * @author Jeff Nelson
      */
     private static class ShadowedParent {
 
@@ -1061,6 +1058,8 @@ public class ReflectionTest {
     /**
      * A class that declares a field with the same name as a field of its
      * parent.
+     *
+     * @author Jeff Nelson
      */
     private static class ShadowingChild extends ShadowedParent {
 
@@ -1073,6 +1072,8 @@ public class ReflectionTest {
     /**
      * A class with an overloaded method whose overloads take one argument of
      * different types.
+     *
+     * @author Jeff Nelson
      */
     private static class Overloads {
 
@@ -1100,6 +1101,8 @@ public class ReflectionTest {
     /**
      * A class that a test loads in its own {@link ClassLoader} to pass as an
      * argument whose {@link ClassLoader} the class path cannot reach.
+     *
+     * @author Jeff Nelson
      */
     public static class Payload {}
 

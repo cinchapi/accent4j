@@ -90,16 +90,15 @@ import com.google.common.reflect.TypeToken;
 public final class Reflection {
 
     /**
-     * The {@link Field Fields} that {@link #getField(String, Class)} has found
-     * for each {@link Class}, by name.
+     * Resolved {@link Field Fields} for each lookup {@link Class} and field
+     * name.
      */
     private static final ClassValue<Map<String, Field>> FIELDS = newCache();
 
     /**
-     * The {@link Method Methods} that
-     * {@link #getMethod(Object[], boolean, String, Class, Class...)} has
-     * resolved for each {@link Class}, by a {@link List} of the method name,
-     * whether it ignores access checks, and the {@link List} of argument types.
+     * Resolved {@link Method Methods} for each lookup {@link Class} and method
+     * name. Each result applies to one access policy and ordered sequence of
+     * argument types.
      */
     private static final ClassValue<Map<List<Object>, Method>> METHODS =
             newCache();
@@ -143,13 +142,13 @@ public final class Reflection {
      * {@code args} if and only if the {@code evaluate} function returns
      * {@code true}.
      *
-     * @param evaluate the {@link Function} that is given the (possibly cached)
-     *            {@link Method} instance that corresponds to {@code methodName}
-     *            ; use this to evaluate whether the method should be called
-     * @param obj the Object on which the method is called
+     * @param evaluate the decision function; receives a possibly shared
+     *            {@link Method} and must not change its accessibility
+     * @param obj the object on which the method is called
      * @param methodName the name of the method to call
      * @param args the args to pass to the method
      * @return the result of calling the method
+     * @throws IllegalStateException if {@code evaluate} returns {@code false}
      */
     @SuppressWarnings("unchecked")
     public static <T> T callIf(Function<Method, Boolean> evaluate, Object obj,
@@ -729,18 +728,26 @@ public final class Reflection {
     }
 
     /**
-     * Return a {@link Method} instance from {@code clazz} named {@code method}
-     * (that takes arguments of {@code paramTypes} respectively)
-     * while making a best effort attempt to unbox primitive parameter types
+     * Return the method named {@code method} from {@code clazz} or its
+     * hierarchy, allowing primitive and wrapper parameter matches.
      * <p>
-     * Repeated lookups with the same arguments return the same {@link Method}
-     * object, so callers must not change its accessibility.
+     * Repeated lookups with the same arguments share the result if every
+     * non-null parameter type meets a loader condition. The condition accepts
+     * the bootstrap loader or the loader of {@code clazz}. It also accepts
+     * ancestors of that loader. Other repeated lookups may return distinct
+     * {@link Method} objects.
+     * </p>
+     * <p>
+     * Callers must not change the result's accessibility.
      * </p>
      *
      * @param clazz the class instance in which the method is contained
      * @param method the name of the method
-     * @param paramTypes the types for the respective paramters
+     * @param paramTypes the argument types; entries may be {@code null}
      * @return a {@link Method} instance that has been set to be accessible
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if method resolution or access configuration
+     *             fails
      */
     public static Method getMethodUnboxed(Class<?> clazz, String method,
             Class<?>... paramTypes) {
@@ -1337,22 +1344,27 @@ public final class Reflection {
     }
 
     /**
-     * Return the {@link Method} object called {@code name} in {@code clazz}
-     * that accepts the specified {@code args} and optionally ignore the native
-     * java language access rules.
+     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
+     * for {@code paramTypes}.
+     * <p>
+     * Repeated lookups with the same name, class, access policy and argument
+     * types share the result if every non-null parameter type meets a loader
+     * condition. The condition accepts the bootstrap loader or the loader of
+     * {@code clazz}. It also accepts ancestors of that loader.
      *
-     * @param args (optional) args to plug into the params
-     * @param setAccessible a flag that indicates whether the native java
-     *            language access rules should be ignored
+     * @param args argument values for failure messages, or {@code null} to
+     *            report {@code paramTypes} instead
+     * @param setAccessible whether the result bypasses Java language access
+     *            checks
      * @param name the method name
      * @param clazz the {@link Class} in which the method is defined
      * @param paramTypes the type of each argument, or {@code null} for a
      *            {@code null} argument
-     * @return the associated {@link Method} object, which repeated lookups with
-     *         the same {@code setAccessible}, {@code name}, {@code clazz} and
-     *         {@code paramTypes} share if the class loader of {@code clazz} is,
-     *         or descends from, the class loader of each of the
-     *         {@code paramTypes}
+     * @return the resolved {@link Method}, which may be shared; callers must
+     *         not change its accessibility
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if method resolution or access configuration
+     *             fails
      */
     private static Method getMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
@@ -1380,21 +1392,21 @@ public final class Reflection {
     }
 
     /**
-     * Search {@code clazz}, its superclasses and its interfaces for the
-     * {@link Method} called {@code name} that accepts arguments of
-     * {@code paramTypes}, and optionally ignore the native java language access
-     * rules.
+     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
+     * for {@code paramTypes}.
      *
-     * @param args (optional) args to plug into the params
-     * @param setAccessible a flag that indicates whether the native java
-     *            language access rules should be ignored
+     * @param args argument values for failure messages, or {@code null} to
+     *            report {@code paramTypes} instead
+     * @param setAccessible whether the result bypasses Java language access
+     *            checks
      * @param name the method name
      * @param clazz the {@link Class} in which the method is defined
      * @param paramTypes the type of each argument, or {@code null} for a
      *            {@code null} argument
      * @return a new {@link Method} object
-     * @throws RuntimeException if no method matches, or if more than one method
-     *             matches because of {@code null} arguments
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if no method matches or access configuration
+     *             fails
      */
     private static Method findMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
