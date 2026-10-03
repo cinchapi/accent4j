@@ -1372,8 +1372,9 @@ public final class Reflection {
         Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
                 .get(method.getDeclaringClass());
         // NOTE: computeIfAbsent can take a lock even when the map has the key,
-        // which makes concurrent callers wait on each other, so a plain get
-        // comes first and handles the common case.
+        // which makes concurrent callers wait on each other. A plain get comes
+        // first, so every call after the one that caches the value skips the
+        // lock.
         MethodHandle handle = handles.get(method);
         if(handle == null) {
             handle = handles.computeIfAbsent(method,
@@ -1395,8 +1396,9 @@ public final class Reflection {
     private static Field getField(String name, Class<?> clazz) {
         Map<String, Field> fields = FIELDS.get(clazz);
         // NOTE: computeIfAbsent can take a lock even when the map has the key,
-        // which makes concurrent callers wait on each other, so a plain get
-        // comes first and handles the common case.
+        // which makes concurrent callers wait on each other. A plain get comes
+        // first, so every call after the one that caches the value skips the
+        // lock.
         Field field = fields.get(name);
         if(field == null) {
             field = fields.computeIfAbsent(name,
@@ -1504,8 +1506,9 @@ public final class Reflection {
             List<Object> lookup = Arrays.asList(name, setAccessible,
                     Arrays.asList(paramTypes.clone()));
             // NOTE: computeIfAbsent can take a lock even when the map has the
-            // key, which makes concurrent callers wait on each other, so a
-            // plain get comes first and handles the common case.
+            // key, which makes concurrent callers wait on each other. A plain
+            // get comes first, so every call after the one that caches the
+            // value skips the lock.
             method = methods.get(lookup);
             if(method == null) {
                 method = methods.computeIfAbsent(lookup, key -> findMethod(
