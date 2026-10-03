@@ -1371,10 +1371,11 @@ public final class Reflection {
     private static MethodHandle getDefaultMethodHandle(Method method) {
         Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
                 .get(method.getDeclaringClass());
+        // NOTE: computeIfAbsent can take a lock even when the map has the key,
+        // which makes concurrent callers wait on each other, so a plain get
+        // comes first and handles the common case.
         MethodHandle handle = handles.get(method);
         if(handle == null) {
-            // NOTE: On Java 8, computeIfAbsent locks even when the key is
-            // present, so a call that finds the handle does not call it.
             handle = handles.computeIfAbsent(method,
                     key -> findDefaultMethodHandle(method));
         }
@@ -1393,10 +1394,11 @@ public final class Reflection {
      */
     private static Field getField(String name, Class<?> clazz) {
         Map<String, Field> fields = FIELDS.get(clazz);
+        // NOTE: computeIfAbsent can take a lock even when the map has the key,
+        // which makes concurrent callers wait on each other, so a plain get
+        // comes first and handles the common case.
         Field field = fields.get(name);
         if(field == null) {
-            // NOTE: On Java 8, computeIfAbsent locks even when the key is
-            // present, so a lookup that finds the field does not call it.
             field = fields.computeIfAbsent(name,
                     key -> findField(name, clazz));
         }
@@ -1501,10 +1503,11 @@ public final class Reflection {
             // Reflection would keep that class loader in memory.
             List<Object> lookup = Arrays.asList(name, setAccessible,
                     Arrays.asList(paramTypes.clone()));
+            // NOTE: computeIfAbsent can take a lock even when the map has the
+            // key, which makes concurrent callers wait on each other, so a
+            // plain get comes first and handles the common case.
             method = methods.get(lookup);
             if(method == null) {
-                // NOTE: On Java 8, computeIfAbsent locks even when the key is
-                // present, so a lookup that finds the method does not call it.
                 method = methods.computeIfAbsent(lookup, key -> findMethod(
                         args, setAccessible, name, clazz, paramTypes));
             }
