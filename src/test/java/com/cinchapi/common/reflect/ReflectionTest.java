@@ -19,6 +19,7 @@ import java.io.FileNotFoundException;
 import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -467,6 +468,127 @@ public class ReflectionTest {
         Assert.assertNull(f.label);
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that repeated lookups of a field return the
+     * same {@link Field} object.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string} field, which {@link A} declares, in
+     * {@link B} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Field}.
+     */
+    @Test
+    public void testGetDeclaredFieldReturnsSameFieldForRepeatedLookups() {
+        Field first = Reflection.getDeclaredField("string", B.class);
+        Field second = Reflection.getDeclaredField("string", B.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that repeated lookups of a method return
+     * the same {@link Method} object.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string(int)} method of {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Method}.
+     */
+    @Test
+    public void testGetMethodUnboxedReturnsSameMethodForRepeatedLookups() {
+        Method first = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Method second = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that reading a field by name reads the
+     * field that the object's own class declares when a subclass shadows a
+     * field of its parent.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read {@code name} from a {@link ShadowedParent} and from a
+     * {@link ShadowingChild}, then from the {@link ShadowedParent} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each read returns the value of the field that
+     * the object's class declares: {@code parent}, {@code child}, and then
+     * {@code parent}.
+     */
+    @Test
+    public void testGetReadsFieldThatEachClassDeclares() {
+        ShadowedParent parent = new ShadowedParent();
+        ShadowingChild child = new ShadowingChild();
+        Assert.assertEquals("parent", Reflection.get("name", parent));
+        Assert.assertEquals("child", Reflection.get("name", child));
+        Assert.assertEquals("parent", Reflection.get("name", parent));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling an overloaded method by name
+     * calls the overload that matches the type of each argument.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@code describe} on an {@link Overloads} with a {@link String},
+     * then with an {@link Integer}, then with a {@link String} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The calls return {@code string},
+     * {@code integer}, and {@code string}.
+     */
+    @Test
+    public void testCallCallsOverloadThatMatchesEachArgumentType() {
+        Overloads overloads = new Overloads();
+        Assert.assertEquals("string",
+                Reflection.call(overloads, "describe", "a"));
+        Assert.assertEquals("integer",
+                Reflection.call(overloads, "describe", 1));
+        Assert.assertEquals("string",
+                Reflection.call(overloads, "describe", "b"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a private method stays inaccessible to
+     * {@link Reflection#callIfAccessible(Object, String, Object...)} after
+     * {@link Reflection#call(Object, String, Object...)} calls it.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call the private {@code string()} method of an {@link A} with
+     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Call the same method with
+     * {@link Reflection#callIfAccessible(Object, String, Object...)}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first call returns the value; the second
+     * throws a {@link RuntimeException}.
+     */
+    @Test
+    public void testCallIfAccessibleFailsForPrivateMethodAfterCall() {
+        A a = new A("foo");
+        Assert.assertEquals("foo", Reflection.call(a, "string"));
+        expectedException.expect(RuntimeException.class);
+        Reflection.callIfAccessible(a, "string");
+    }
+
     private static class A {
 
         private final String string;
@@ -712,6 +834,56 @@ public class ReflectionTest {
             this.string = string;
             this.dvalue = value;
             this.tag = tag;
+        }
+    }
+
+    /**
+     * A class whose {@code name} field a subclass shadows.
+     */
+    private static class ShadowedParent {
+
+        /**
+         * The name, which {@link ShadowingChild} shadows.
+         */
+        private final String name = "parent";
+    }
+
+    /**
+     * A class that declares a field with the same name as a field of its
+     * parent.
+     */
+    private static class ShadowingChild extends ShadowedParent {
+
+        /**
+         * The name, which shadows the field of {@link ShadowedParent}.
+         */
+        private final String name = "child";
+    }
+
+    /**
+     * A class with an overloaded method whose overloads take one argument of
+     * different types.
+     */
+    private static class Overloads {
+
+        /**
+         * Describe a {@link String} argument.
+         *
+         * @param value the argument
+         * @return {@code string}
+         */
+        public String describe(String value) {
+            return "string";
+        }
+
+        /**
+         * Describe an {@link Integer} argument.
+         *
+         * @param value the argument
+         * @return {@code integer}
+         */
+        public String describe(Integer value) {
+            return "integer";
         }
     }
 

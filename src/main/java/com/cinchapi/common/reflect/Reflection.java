@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -87,6 +88,20 @@ import com.google.common.reflect.TypeToken;
  * @author Jeff Nelson
  */
 public final class Reflection {
+
+    /**
+     * The {@link Field Fields} that {@link #getField(String, Class)} has found
+     * for each {@link Class}, by name.
+     */
+    private static final ClassValue<Map<String, Field>> FIELDS = newCache();
+
+    /**
+     * The {@link Method Methods} that
+     * {@link #getMethod(Object[], boolean, String, Class, Class...)} has
+     * resolved for each {@link Class}, by {@link MethodLookup}.
+     */
+    private static final ClassValue<Map<MethodLookup, Method>> METHODS =
+            newCache();
 
     /**
      * Use reflection to call an instance method on {@code obj} with the
@@ -580,6 +595,11 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the class or class
      * hierarchy.
+     * <p>
+     * Repeated lookups of the same field in the same class return the same
+     * accessible {@link Field} object, so callers must not change its
+     * accessibility.
+     * </p>
      *
      * @param name the field name
      * @param clazz the class that contains the field
@@ -592,6 +612,11 @@ public final class Reflection {
     /**
      * Return the field with {@code name} that is declared in the {@code obj}'s
      * class or class hierarchy.
+     * <p>
+     * Repeated lookups of the same field in the same class return the same
+     * accessible {@link Field} object, so callers must not change its
+     * accessibility.
+     * </p>
      *
      * @param name the field name
      * @param obj the object whose class contains the field
@@ -706,6 +731,10 @@ public final class Reflection {
      * Return a {@link Method} instance from {@code clazz} named {@code method}
      * (that takes arguments of {@code paramTypes} respectively)
      * while making a best effort attempt to unbox primitive parameter types
+     * <p>
+     * Repeated lookups with the same arguments return the same {@link Method}
+     * object, so callers must not change its accessibility.
+     * </p>
      *
      * @param clazz the class instance in which the method is contained
      * @param method the name of the method
@@ -1185,14 +1214,38 @@ public final class Reflection {
     }
 
     /**
-     * Return the value of the {@link Field} called {@code name} in
-     * {@code clazz} from the specified {@code obj}.
+     * Return the {@link Field} called {@code name} that {@code clazz} or its
+     * nearest ancestor declares, made accessible.
      *
      * @param name the name of the field
      * @param clazz the {@link Class} in which the field is defined
-     * @return the associated {@link Field} object
+     * @return the {@link Field}, which repeated lookups of the same field in
+     *         the same {@link Class} share
+     * @throws RuntimeException if no class in the hierarchy declares the field
      */
     private static Field getField(String name, Class<?> clazz) {
+        Map<String, Field> fields = FIELDS.get(clazz);
+        Field field = fields.get(name);
+        if(field == null) {
+            // NOTE: On Java 8, computeIfAbsent locks even when the key is
+            // present, so a lookup that finds the field does not call it.
+            field = fields.computeIfAbsent(name,
+                    key -> findField(name, clazz));
+        }
+        return field;
+    }
+
+    /**
+     * Search the hierarchy of {@code clazz} for the {@link Field} called
+     * {@code name}, and return the one that {@code clazz} or its nearest
+     * ancestor declares, made accessible.
+     *
+     * @param name the name of the field
+     * @param clazz the {@link Class} in which the field is defined
+     * @return a new {@link Field} object
+     * @throws RuntimeException if no class in the hierarchy declares the field
+     */
+    private static Field findField(String name, Class<?> clazz) {
         try {
             Field field = null;
             while (clazz != null && field == null) {
@@ -1292,10 +1345,46 @@ public final class Reflection {
      *            language access rules should be ignored
      * @param name the method name
      * @param clazz the {@link Class} in which the method is defined
-     * @param paramType the parameters defined in the method's signature
-     * @return the associated {@link Method} object
+     * @param paramTypes the type of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return the associated {@link Method} object, which repeated lookups with
+     *         the same {@code setAccessible}, {@code name}, {@code clazz} and
+     *         {@code paramTypes} share
      */
     private static Method getMethod(@Nullable Object[] args,
+            boolean setAccessible, String name, Class<?> clazz,
+            Class<?>... paramTypes) {
+        Map<MethodLookup, Method> methods = METHODS.get(clazz);
+        MethodLookup lookup = new MethodLookup(name, setAccessible,
+                paramTypes);
+        Method method = methods.get(lookup);
+        if(method == null) {
+            // NOTE: On Java 8, computeIfAbsent locks even when the key is
+            // present, so a lookup that finds the method does not call it.
+            method = methods.computeIfAbsent(lookup, key -> findMethod(args,
+                    setAccessible, name, clazz, paramTypes));
+        }
+        return method;
+    }
+
+    /**
+     * Search {@code clazz}, its superclasses and its interfaces for the
+     * {@link Method} called {@code name} that accepts arguments of
+     * {@code paramTypes}, and optionally ignore the native java language access
+     * rules.
+     *
+     * @param args (optional) args to plug into the params
+     * @param setAccessible a flag that indicates whether the native java
+     *            language access rules should be ignored
+     * @param name the method name
+     * @param clazz the {@link Class} in which the method is defined
+     * @param paramTypes the type of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return a new {@link Method} object
+     * @throws RuntimeException if no method matches, or if more than one method
+     *             matches because of {@code null} arguments
+     */
+    private static Method findMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
         List<Method> potential = Lists.newArrayListWithCapacity(1);
@@ -1551,6 +1640,23 @@ public final class Reflection {
     }
 
     /**
+     * Return a {@link ClassValue} that gives each {@link Class} its own empty,
+     * thread-safe {@link Map}.
+     *
+     * @return the {@link ClassValue}
+     */
+    private static <K, V> ClassValue<Map<K, V>> newCache() {
+        return new ClassValue<Map<K, V>>() {
+
+            @Override
+            protected Map<K, V> computeValue(Class<?> type) {
+                return new ConcurrentHashMap<>();
+            }
+
+        };
+    }
+
+    /**
      * Return the unboxed version of the input {@code clazz}. This is usually
      * a class that represents a primitive for an autoboxed wrapper class.
      * Otherwise, the input {@code clazz} is returned.
@@ -1589,6 +1695,75 @@ public final class Reflection {
     }
 
     private Reflection() {/* noinit */}
+
+    /**
+     * The inputs that decide which {@link Method} a lookup by name and argument
+     * types resolves within a {@link Class}.
+     *
+     * @author Jeff Nelson
+     */
+    private static final class MethodLookup {
+
+        /**
+         * The name of the method.
+         */
+        private final String name;
+
+        /**
+         * Whether the resolved {@link Method} ignores the native java language
+         * access rules.
+         */
+        private final boolean setAccessible;
+
+        /**
+         * The type of each argument, or {@code null} for a {@code null}
+         * argument.
+         */
+        private final List<Class<?>> paramTypes;
+
+        /**
+         * The hash code, which is computed once because every lookup hashes a
+         * new instance.
+         */
+        private final int hashCode;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param name the name of the method
+         * @param setAccessible whether the resolved {@link Method} ignores the
+         *            native java language access rules
+         * @param paramTypes the type of each argument, or {@code null} for a
+         *            {@code null} argument; later changes to the array do not
+         *            affect this lookup
+         */
+        MethodLookup(String name, boolean setAccessible,
+                Class<?>[] paramTypes) {
+            this.name = name;
+            this.setAccessible = setAccessible;
+            this.paramTypes = Arrays.asList(paramTypes.clone());
+            this.hashCode = Objects.hash(name, setAccessible, this.paramTypes);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if(obj instanceof MethodLookup) {
+                MethodLookup other = (MethodLookup) obj;
+                return setAccessible == other.setAccessible
+                        && name.equals(other.name)
+                        && paramTypes.equals(other.paramTypes);
+            }
+            else {
+                return false;
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return hashCode;
+        }
+
+    }
 
     /**
      * A representation of a method signature consisting of the method name and
