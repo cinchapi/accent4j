@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
@@ -1084,6 +1085,65 @@ public final class Reflection {
     }
 
     /**
+     * Return the value that {@code finder} resolves for {@code types}, and
+     * remember it in {@code cache} under {@code key} if each non-null class in
+     * {@code types} meets a loader condition. The condition accepts the
+     * bootstrap loader or the loader of {@code clazz}. It also accepts
+     * ancestors of that loader. When the value is remembered, concurrent calls
+     * for the same key and classes resolve it once.
+     * <p>
+     * {@code cache} holds only entries whose classes meet the condition, so a
+     * caller may use a value that {@link #getCached(Object[], Class[])} finds
+     * in {@code cache} without checking the condition.
+     * </p>
+     *
+     * @param cache the entries of {@code clazz}, by key
+     * @param key the key whose entries hold the value
+     * @param clazz the {@link Class} that owns {@code cache}
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument; this method does not keep the array
+     * @param finder resolves the value, or returns {@code null} if none exists
+     * @return the value, or {@code null} if {@code finder} finds none
+     * @throws RuntimeException any exception that {@code finder} throws, after
+     *             which {@code cache} is unchanged
+     */
+    @Nullable
+    private static <K, V> V cache(Map<K, Object[]> cache, K key,
+            Class<?> clazz, Class<?>[] types, Supplier<V> finder) {
+        V value;
+        if(isCacheable(clazz, types)) {
+            Object[] entries = cache.compute(key, (k, current) -> {
+                Object[] updated = current;
+                if(getCached(current, types) == null) {
+                    V found = finder.get();
+                    if(found != null) {
+                        // NOTE: The entry is an Object[] because it lasts as
+                        // long as clazz, and a type from the class loader that
+                        // loads Reflection would keep that class loader in
+                        // memory. It holds a copy of types because a caller may
+                        // change that array later.
+                        Object[] entry = { types.clone(), found };
+                        if(current == null) {
+                            updated = new Object[] { entry };
+                        }
+                        else {
+                            updated = Arrays.copyOf(current,
+                                    current.length + 1);
+                            updated[current.length] = entry;
+                        }
+                    }
+                }
+                return updated;
+            });
+            value = getCached(entries, types);
+        }
+        else {
+            value = finder.get();
+        }
+        return value;
+    }
+
+    /**
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args}.
      *
@@ -1331,6 +1391,37 @@ public final class Reflection {
     }
 
     /**
+     * Return the value that {@code entries} holds for argument classes that are
+     * the same as {@code types}, position by position.
+     *
+     * @param entries the entries for one key of a cache, or {@code null} if the
+     *            key has none
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return the value, or {@code null} if no entry has the same classes
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static <V> V getCached(@Nullable Object[] entries,
+            Class<?>[] types) {
+        V value = null;
+        if(entries != null) {
+            for (int e = 0; value == null && e < entries.length; ++e) {
+                Object[] entry = (Object[]) entries[e];
+                Class<?>[] cached = (Class<?>[]) entry[0];
+                boolean same = cached.length == types.length;
+                for (int i = 0; same && i < types.length; ++i) {
+                    same = cached[i] == types[i];
+                }
+                if(same) {
+                    value = (V) entry[1];
+                }
+            }
+        }
+        return value;
+    }
+
+    /**
      * Get all the ancestors for {@code clazz} in an ordered set.
      *
      * @param clazz
@@ -1356,6 +1447,22 @@ public final class Reflection {
             }
         }
         while (!nextLevel.isEmpty());
+        return classes;
+    }
+
+    /**
+     * Return the class of each of {@code args}, position by position.
+     *
+     * @param args the arguments, any of which may be {@code null}
+     * @return a new array that holds the class of each argument, or
+     *         {@code null} for a {@code null} argument
+     */
+    private static Class<?>[] getClasses(Object[] args) {
+        Class<?>[] classes = new Class<?>[args.length];
+        for (int i = 0; i < classes.length; ++i) {
+            Object arg = args[i];
+            classes[i] = arg == null ? null : arg.getClass();
+        }
         return classes;
     }
 
@@ -1461,12 +1568,7 @@ public final class Reflection {
      */
     private static Method getMethod(boolean setAccessible, String name,
             Class<?> clazz, Object... args) {
-        Class<?>[] paramTypes = new Class<?>[args.length];
-        for (int i = 0; i < paramTypes.length; ++i) {
-            Object arg = args[i];
-            paramTypes[i] = arg == null ? null : arg.getClass();
-        }
-        return getMethod(args, setAccessible, name, clazz, paramTypes);
+        return getMethod(args, setAccessible, name, clazz, getClasses(args));
     }
 
     /**
@@ -1495,25 +1597,12 @@ public final class Reflection {
     private static Method getMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
-        Method method;
-        if(isCacheable(clazz, paramTypes)) {
-            Map<List<Object>, Method> methods = METHODS.get(clazz);
-            // NOTE: The key holds only JDK types because the entry lasts as
-            // long as clazz, and a key type from the class loader that loads
-            // Reflection would keep that class loader in memory.
-            List<Object> lookup = Arrays.asList(name, setAccessible,
-                    Arrays.asList(paramTypes.clone()));
-            // Here, we do an opportunistic #get before the #computeIfAbsent
-            // below to avoid the lock that it can take, even when the map has
-            // the key (forcing concurrent callers to wait on each other).
-            method = methods.get(lookup);
-            if(method == null) {
-                method = methods.computeIfAbsent(lookup, key -> findMethod(
-                        args, setAccessible, name, clazz, paramTypes));
-            }
-        }
-        else {
-            method = findMethod(args, setAccessible, name, clazz, paramTypes);
+        Map<String, Object[]> methods = (setAccessible ? ACCESSIBLE_METHODS
+                : ACCESS_CHECKED_METHODS).get(clazz);
+        Method method = getCached(methods.get(name), paramTypes);
+        if(method == null) {
+            method = cache(methods, name, clazz, paramTypes, () -> findMethod(
+                    args, setAccessible, name, clazz, paramTypes));
         }
         return method;
     }
@@ -1786,6 +1875,21 @@ public final class Reflection {
     }
 
     /**
+     * Resolved accessible {@link Method Methods} for each lookup {@link Class},
+     * by name. Each value holds one entry per sequence of argument classes.
+     */
+    private static final ClassValue<Map<String, Object[]>> ACCESSIBLE_METHODS =
+            newCache();
+
+    /**
+     * Resolved {@link Method Methods} that keep Java language access checks,
+     * for each lookup {@link Class}, by name. Each value holds one entry per
+     * sequence of argument classes.
+     */
+    private static final ClassValue<Map<String, Object[]>> ACCESS_CHECKED_METHODS =
+            newCache();
+
+    /**
      * The {@link MethodHandle} for each default method of each interface, not
      * bound to a target.
      */
@@ -1797,14 +1901,6 @@ public final class Reflection {
      * name.
      */
     private static final ClassValue<Map<String, Field>> FIELDS = newCache();
-
-    /**
-     * Resolved {@link Method Methods} for each lookup {@link Class} and method
-     * name. Each result applies to one access policy and ordered sequence of
-     * argument types.
-     */
-    private static final ClassValue<Map<List<Object>, Method>> METHODS =
-            newCache();
 
     private Reflection() {/* noinit */}
 

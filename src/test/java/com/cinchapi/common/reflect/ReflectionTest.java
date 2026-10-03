@@ -683,6 +683,33 @@ public class ReflectionTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a change to the parameter type array
+     * after a method lookup does not change what later lookups return.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string(int)} method of {@link A} with an array
+     * that holds {@code int.class}.</li>
+     * <li>Replace the element of that array with {@link String
+     * String.class}.</li>
+     * <li>Look up {@code string(int)} again with a new array.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Method}.
+     */
+    @Test
+    public void testGetMethodUnboxedReturnsSameMethodAfterCallerChangesTypes() {
+        Class<?>[] types = { int.class };
+        Method first = Reflection.getMethodUnboxed(A.class, "string", types);
+        types[0] = String.class;
+        Method second = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that reading a field by name reads the
      * field that the object's own class declares when a subclass shadows a
      * field of its parent.
