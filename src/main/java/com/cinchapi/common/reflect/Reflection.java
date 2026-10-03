@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
@@ -946,43 +947,28 @@ public final class Reflection {
     /**
      * Given a {@link Class}, create a new instance by calling the appropriate
      * constructor for the given {@code args}.
+     * <p>
+     * The constructor is one that {@code clazz} declares whose parameters
+     * accept {@code args}, position by position. A {@code null} argument
+     * matches any parameter type. When several constructors accept
+     * {@code args}, calls with the same argument classes choose the same one.
+     * </p>
      *
      * @param clazz the type of instance to construct
-     * @param args the parameters to pass to the constructor
+     * @param args the arguments to pass to the constructor; a {@code null}
+     *            array matches no constructor
      * @return the new instance
+     * @throws RuntimeException if no constructor accepts {@code args}, with a
+     *             {@link NoSuchMethodException} as its cause, or if the
+     *             constructor fails; a {@link RuntimeException} that the
+     *             constructor throws reaches the caller unwrapped, and any
+     *             other exception or error arrives as the cause
      */
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(Class<? extends T> clazz, Object... args) {
         try {
-            Constructor<? extends T> toCall = null;
-            outer: for (Constructor<?> constructor : clazz
-                    .getDeclaredConstructors()) {
-                Class<?>[] paramTypes = constructor.getParameterTypes();
-                if(paramTypes == null && args == null) { // Handle no arg
-                                                         // constructors
-                    toCall = (Constructor<? extends T>) constructor;
-                    break;
-                }
-                else if(args == null || paramTypes == null
-                        || args.length != paramTypes.length) {
-                    continue;
-                }
-                else {
-                    for (int i = 0; i < args.length; ++i) {
-                        Object arg = args[i];
-                        Class<?> type = paramTypes[i];
-                        Class<?> altType = getAltType(type);
-                        if(arg != null && !type.isAssignableFrom(arg.getClass())
-                                && !altType.isAssignableFrom(arg.getClass())) {
-                            continue outer;
-                        }
-                    }
-                    toCall = (Constructor<? extends T>) constructor;
-                    break;
-                }
-            }
+            Constructor<?> toCall = getConstructor(clazz, args);
             if(toCall != null) {
-                toCall.setAccessible(true);
                 return (T) toCall.newInstance(args);
             }
             else {
@@ -1084,6 +1070,65 @@ public final class Reflection {
     }
 
     /**
+     * Return the value that {@code finder} resolves for {@code types}, and
+     * remember it in {@code cache} under {@code key} if {@code clazz} keeps
+     * each non-null class in {@code types} in memory. When the value is
+     * remembered, concurrent calls for the same key and classes resolve it
+     * once.
+     * <p>
+     * {@code cache} holds only entries whose classes {@code clazz} keeps in
+     * memory, so a caller may use a value that
+     * {@link #getCached(Object[], Class[])} finds in {@code cache} without
+     * checking that condition.
+     * </p>
+     *
+     * @param cache the entries of {@code clazz}, by key
+     * @param key the key whose entries hold the value
+     * @param clazz the {@link Class} that owns {@code cache}
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument; this method does not keep the array
+     * @param finder resolves the value, or returns {@code null} if none exists
+     * @return the value, or {@code null} if {@code finder} finds none
+     * @throws RuntimeException any exception that {@code finder} throws, after
+     *             which {@code cache} is unchanged
+     */
+    @Nullable
+    private static <K, V> V cache(Map<K, Object[]> cache, K key,
+            Class<?> clazz, Class<?>[] types, Supplier<V> finder) {
+        V value;
+        if(isCacheable(clazz, types)) {
+            Object[] entries = cache.compute(key, (k, current) -> {
+                Object[] updated = current;
+                if(getCached(current, types) == null) {
+                    V found = finder.get();
+                    if(found != null) {
+                        // NOTE: The entry is an Object[] because it lasts as
+                        // long as clazz, and a type from the class loader that
+                        // loads Reflection would keep that class loader in
+                        // memory. It holds a copy of types because a caller may
+                        // change that array later.
+                        Object[] entry = { types.clone(), found };
+                        if(current == null) {
+                            updated = new Object[] { entry };
+                        }
+                        else {
+                            updated = Arrays.copyOf(current,
+                                    current.length + 1);
+                            updated[current.length] = entry;
+                        }
+                    }
+                }
+                return updated;
+            });
+            value = getCached(entries, types);
+        }
+        else {
+            value = finder.get();
+        }
+        return value;
+    }
+
+    /**
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args}.
      *
@@ -1117,6 +1162,41 @@ public final class Reflection {
             String methodName, Object... args) {
         Method method = getMethod(setAccessible, methodName, clazz, args);
         return invoke(method, null, args);
+    }
+
+    /**
+     * Search the constructors that {@code clazz} declares for one whose
+     * parameters accept arguments of {@code types}, position by position, and
+     * return it made accessible.
+     *
+     * @param clazz the {@link Class} whose constructors to search
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return a new {@link Constructor} object, or {@code null} if no
+     *         constructor accepts the arguments
+     * @throws RuntimeException if access configuration fails
+     */
+    @Nullable
+    private static Constructor<?> findConstructor(Class<?> clazz,
+            Class<?>[] types) {
+        Constructor<?>[] constructors = clazz.getDeclaredConstructors();
+        Constructor<?> match = null;
+        for (int c = 0; match == null && c < constructors.length; ++c) {
+            Class<?>[] paramTypes = constructors[c].getParameterTypes();
+            boolean accepts = types.length == paramTypes.length;
+            for (int i = 0; accepts && i < types.length; ++i) {
+                Class<?> type = types[i];
+                accepts = type == null || paramTypes[i].isAssignableFrom(type)
+                        || getAltType(paramTypes[i]).isAssignableFrom(type);
+            }
+            if(accepts) {
+                match = constructors[c];
+            }
+        }
+        if(match != null) {
+            match.setAccessible(true);
+        }
+        return match;
     }
 
     /**
@@ -1331,6 +1411,37 @@ public final class Reflection {
     }
 
     /**
+     * Return the value that {@code entries} holds for argument classes that are
+     * the same as {@code types}, position by position.
+     *
+     * @param entries the entries for one key of a cache, or {@code null} if the
+     *            key has none
+     * @param types the class of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return the value, or {@code null} if no entry has the same classes
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static <V> V getCached(@Nullable Object[] entries,
+            Class<?>[] types) {
+        V value = null;
+        if(entries != null) {
+            for (int e = 0; value == null && e < entries.length; ++e) {
+                Object[] entry = (Object[]) entries[e];
+                Class<?>[] cached = (Class<?>[]) entry[0];
+                boolean same = cached.length == types.length;
+                for (int i = 0; same && i < types.length; ++i) {
+                    same = cached[i] == types[i];
+                }
+                if(same) {
+                    value = (V) entry[1];
+                }
+            }
+        }
+        return value;
+    }
+
+    /**
      * Get all the ancestors for {@code clazz} in an ordered set.
      *
      * @param clazz
@@ -1357,6 +1468,57 @@ public final class Reflection {
         }
         while (!nextLevel.isEmpty());
         return classes;
+    }
+
+    /**
+     * Return the class of each of {@code args}, position by position.
+     *
+     * @param args the arguments, any of which may be {@code null}
+     * @return a new array that holds the class of each argument, or
+     *         {@code null} for a {@code null} argument
+     */
+    private static Class<?>[] getClasses(Object[] args) {
+        Class<?>[] classes = new Class<?>[args.length];
+        for (int i = 0; i < classes.length; ++i) {
+            Object arg = args[i];
+            classes[i] = arg == null ? null : arg.getClass();
+        }
+        return classes;
+    }
+
+    /**
+     * Return a constructor of {@code clazz} whose parameters accept
+     * {@code args}, position by position, made accessible.
+     * <p>
+     * Repeated lookups with the same class and argument classes share the
+     * result if {@code clazz} keeps each non-null argument class in memory.
+     * </p>
+     *
+     * @param clazz the {@link Class} whose constructor to return
+     * @param args the arguments, any of which may be {@code null}; a
+     *            {@code null} array matches no constructor
+     * @return the {@link Constructor}, which may be shared, or {@code null} if
+     *         no constructor accepts {@code args}; callers must not change its
+     *         accessibility
+     * @throws RuntimeException if access configuration fails
+     */
+    @Nullable
+    private static Constructor<?> getConstructor(Class<?> clazz,
+            @Nullable Object[] args) {
+        Constructor<?> constructor;
+        if(args != null) {
+            Class<?>[] types = getClasses(args);
+            Map<Integer, Object[]> constructors = CONSTRUCTORS.get(clazz);
+            constructor = getCached(constructors.get(types.length), types);
+            if(constructor == null) {
+                constructor = cache(constructors, types.length, clazz, types,
+                        () -> findConstructor(clazz, types));
+            }
+        }
+        else {
+            constructor = null;
+        }
+        return constructor;
     }
 
     /**
@@ -1461,12 +1623,7 @@ public final class Reflection {
      */
     private static Method getMethod(boolean setAccessible, String name,
             Class<?> clazz, Object... args) {
-        Class<?>[] paramTypes = new Class<?>[args.length];
-        for (int i = 0; i < paramTypes.length; ++i) {
-            Object arg = args[i];
-            paramTypes[i] = arg == null ? null : arg.getClass();
-        }
-        return getMethod(args, setAccessible, name, clazz, paramTypes);
+        return getMethod(args, setAccessible, name, clazz, getClasses(args));
     }
 
     /**
@@ -1474,9 +1631,8 @@ public final class Reflection {
      * for {@code paramTypes}.
      * <p>
      * Repeated lookups with the same name, class, access policy and argument
-     * types share the result if every non-null parameter type meets a loader
-     * condition. The condition accepts the bootstrap loader or the loader of
-     * {@code clazz}. It also accepts ancestors of that loader.
+     * types share the result if {@code clazz} keeps every non-null parameter
+     * type in memory.
      *
      * @param args argument values for failure messages, or {@code null} to
      *            report {@code paramTypes} instead
@@ -1495,25 +1651,12 @@ public final class Reflection {
     private static Method getMethod(@Nullable Object[] args,
             boolean setAccessible, String name, Class<?> clazz,
             Class<?>... paramTypes) {
-        Method method;
-        if(isCacheable(clazz, paramTypes)) {
-            Map<List<Object>, Method> methods = METHODS.get(clazz);
-            // NOTE: The key holds only JDK types because the entry lasts as
-            // long as clazz, and a key type from the class loader that loads
-            // Reflection would keep that class loader in memory.
-            List<Object> lookup = Arrays.asList(name, setAccessible,
-                    Arrays.asList(paramTypes.clone()));
-            // Here, we do an opportunistic #get before the #computeIfAbsent
-            // below to avoid the lock that it can take, even when the map has
-            // the key (forcing concurrent callers to wait on each other).
-            method = methods.get(lookup);
-            if(method == null) {
-                method = methods.computeIfAbsent(lookup, key -> findMethod(
-                        args, setAccessible, name, clazz, paramTypes));
-            }
-        }
-        else {
-            method = findMethod(args, setAccessible, name, clazz, paramTypes);
+        Map<String, Object[]> methods = (setAccessible ? ACCESSIBLE_METHODS
+                : ACCESS_CHECKED_METHODS).get(clazz);
+        Method method = getCached(methods.get(name), paramTypes);
+        if(method == null) {
+            method = cache(methods, name, clazz, paramTypes, () -> findMethod(
+                    args, setAccessible, name, clazz, paramTypes));
         }
         return method;
     }
@@ -1786,6 +1929,29 @@ public final class Reflection {
     }
 
     /**
+     * Resolved accessible {@link Method Methods} for each lookup {@link Class},
+     * by name. Each value holds one entry per sequence of argument classes.
+     */
+    private static final ClassValue<Map<String, Object[]>> ACCESSIBLE_METHODS =
+            newCache();
+
+    /**
+     * Resolved {@link Method Methods} that keep Java language access checks,
+     * for each lookup {@link Class}, by name. Each value holds one entry per
+     * sequence of argument classes.
+     */
+    private static final ClassValue<Map<String, Object[]>> ACCESS_CHECKED_METHODS =
+            newCache();
+
+    /**
+     * Resolved {@link Constructor Constructors} for each {@link Class}, by
+     * number of arguments. Each value holds one entry per sequence of argument
+     * classes.
+     */
+    private static final ClassValue<Map<Integer, Object[]>> CONSTRUCTORS =
+            newCache();
+
+    /**
      * The {@link MethodHandle} for each default method of each interface, not
      * bound to a target.
      */
@@ -1797,14 +1963,6 @@ public final class Reflection {
      * name.
      */
     private static final ClassValue<Map<String, Field>> FIELDS = newCache();
-
-    /**
-     * Resolved {@link Method Methods} for each lookup {@link Class} and method
-     * name. Each result applies to one access policy and ordered sequence of
-     * argument types.
-     */
-    private static final ClassValue<Map<List<Object>, Method>> METHODS =
-            newCache();
 
     private Reflection() {/* noinit */}
 
