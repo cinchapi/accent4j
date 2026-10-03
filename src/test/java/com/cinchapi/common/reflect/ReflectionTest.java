@@ -72,6 +72,7 @@ public class ReflectionTest {
             Object arg = loader.loadClass(Payload.class.getName())
                     .getDeclaredConstructor().newInstance();
             Reflection.call(new ArrayList<Object>(), "add", arg);
+            Reflection.call(new Sink(), "accept", arg);
             return new WeakReference<>(loader, queue);
         }
     }
@@ -746,9 +747,10 @@ public class ReflectionTest {
      * <ul>
      * <li>Load {@link Payload} in a new {@link ClassLoader} that does not
      * delegate to the class path.</li>
-     * <li>Call {@link ArrayList#add(Object)} with an instance of that
-     * {@link Payload} through
-     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Pass an instance of that {@link Payload} through
+     * {@link Reflection#call(Object, String, Object...)} to
+     * {@link ArrayList#add(Object)}, which the bootstrap loader loads, and to
+     * {@code Sink#accept(Object)}, which the class path loads.</li>
      * <li>Drop all strong references to the {@link ClassLoader} and request
      * garbage collection.</li>
      * </ul>
@@ -1105,5 +1107,21 @@ public class ReflectionTest {
      * @author Jeff Nelson
      */
     public static class Payload {}
+
+    /**
+     * A class that the class path loads, with a method that accepts any
+     * argument.
+     *
+     * @author Jeff Nelson
+     */
+    private static class Sink {
+
+        /**
+         * Accept {@code value} and do nothing with it.
+         *
+         * @param value the argument
+         */
+        public void accept(Object value) {}
+    }
 
 }
