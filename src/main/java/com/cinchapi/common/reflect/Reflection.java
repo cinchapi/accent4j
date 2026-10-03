@@ -90,20 +90,6 @@ import com.google.common.reflect.TypeToken;
 public final class Reflection {
 
     /**
-     * Resolved {@link Field Fields} for each lookup {@link Class} and field
-     * name.
-     */
-    private static final ClassValue<Map<String, Field>> FIELDS = newCache();
-
-    /**
-     * Resolved {@link Method Methods} for each lookup {@link Class} and method
-     * name. Each result applies to one access policy and ordered sequence of
-     * argument types.
-     */
-    private static final ClassValue<Map<List<Object>, Method>> METHODS =
-            newCache();
-
-    /**
      * Use reflection to call an instance method on {@code obj} with the
      * specified {@code args}.
      *
@@ -1145,6 +1131,145 @@ public final class Reflection {
     }
 
     /**
+     * Search the hierarchy of {@code clazz} for the {@link Field} called
+     * {@code name}, and return the one that {@code clazz} or its nearest
+     * ancestor declares, made accessible.
+     *
+     * @param name the name of the field
+     * @param clazz the {@link Class} in which the field is defined
+     * @return a new {@link Field} object
+     * @throws RuntimeException if no class in the hierarchy declares the field
+     */
+    private static Field findField(String name, Class<?> clazz) {
+        try {
+            Field field = null;
+            while (clazz != null && field == null) {
+                try {
+                    field = clazz.getDeclaredField(name);
+                }
+                catch (NoSuchFieldException e) { // check the parent to see if
+                                                 // the field was defined there
+                    clazz = clazz.getSuperclass();
+                }
+            }
+            if(field != null) {
+                field.setAccessible(true);
+                return field;
+            }
+            else {
+                throw new NoSuchFieldException("No field name " + name
+                        + " exists in the hirearchy of " + clazz);
+            }
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
+     * for {@code paramTypes}.
+     *
+     * @param args argument values for failure messages, or {@code null} to
+     *            report {@code paramTypes} instead
+     * @param setAccessible whether the result bypasses Java language access
+     *            checks
+     * @param name the method name
+     * @param clazz the {@link Class} in which the method is defined
+     * @param paramTypes the type of each argument, or {@code null} for a
+     *            {@code null} argument
+     * @return a new {@link Method} object
+     * @throws IllegalArgumentException if the lookup is ambiguous
+     * @throws RuntimeException if no method matches or access configuration
+     *             fails
+     */
+    private static Method findMethod(@Nullable Object[] args,
+            boolean setAccessible, String name, Class<?> clazz,
+            Class<?>... paramTypes) {
+        List<Method> potential = Lists.newArrayListWithCapacity(1);
+        List<Method> deferred = Lists.newArrayListWithCapacity(1);
+        Deque<Class<?>> queue = new ArrayDeque<>();
+        queue.add(clazz);
+        try {
+            while ((clazz = queue.poll()) != null) {
+                for (Method method : Arrays.stream(clazz.getDeclaredMethods())
+                        .filter(method -> method.getName().equals(name))
+                        .collect(Collectors.toList())) {
+                    TernaryTruth callable = isDefinitelyCallableWith(method,
+                            paramTypes);
+                    if(callable == TernaryTruth.TRUE && method
+                            .getParameterCount() == paramTypes.length) {
+                        potential.add(method);
+                    }
+                    else if(callable != TernaryTruth.FALSE
+                            && deferred.isEmpty()) {
+                        // This means that an expected parameter is of type
+                        // Object, which is callable, but let's defer to see if
+                        // there is another method that has a more specific
+                        // expected parameter type that might match.
+                        deferred.add(method);
+                    }
+                }
+                if(potential.isEmpty()) {
+                    Class<?> superClass = clazz.getSuperclass();
+                    if(superClass != null) {
+                        queue.add(superClass);
+                    }
+                    for (Class<?> iface : clazz.getInterfaces()) {
+                        // Account for default interface methods that are not
+                        // explicitly overridden in the the #clazz.
+                        queue.add(iface);
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            if(potential.size() == 2) {
+                // UTIL-12: Handle a corner case where an overloaded method
+                // takes corresponding boxable parameters
+                List<Class<?>> paramTypesA = Arrays
+                        .stream(potential.get(0).getParameterTypes())
+                        .map(Reflection::unbox).collect(Collectors.toList());
+                List<Class<?>> paramTypesB = Arrays
+                        .stream(potential.get(1).getParameterTypes())
+                        .map(Reflection::unbox).collect(Collectors.toList());
+                if(paramTypesA.equals(paramTypesB)) {
+                    potential.remove(1);
+                }
+            }
+            int matches = potential.size();
+            Method method;
+            if(matches < 1) {
+                if(deferred.size() == 1) {
+                    method = deferred.get(0);
+                }
+                else {
+                    throw new NoSuchMethodException("Could not find method '"
+                            + name + "' that is invokable with: "
+                            + Arrays.asList(args != null ? args : paramTypes));
+                }
+            }
+            else if(matches > 1) {
+                throw new IllegalArgumentException("Trying to invoke method "
+                        + "'" + name + "' with "
+                        + Arrays.asList(args != null ? args : paramTypes)
+                        + " isn't possible because there are too many null "
+                        + "values and it is impossible to decide which "
+                        + "method is desired");
+            }
+            else {
+                method = potential.get(0);
+            }
+            method.setAccessible(setAccessible);
+            return method;
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
      * Return the boxed version of {@code clazz} if it is a primitive, or the
      * unboxed version if it is a wrapper.
      *
@@ -1235,42 +1360,6 @@ public final class Reflection {
                     key -> findField(name, clazz));
         }
         return field;
-    }
-
-    /**
-     * Search the hierarchy of {@code clazz} for the {@link Field} called
-     * {@code name}, and return the one that {@code clazz} or its nearest
-     * ancestor declares, made accessible.
-     *
-     * @param name the name of the field
-     * @param clazz the {@link Class} in which the field is defined
-     * @return a new {@link Field} object
-     * @throws RuntimeException if no class in the hierarchy declares the field
-     */
-    private static Field findField(String name, Class<?> clazz) {
-        try {
-            Field field = null;
-            while (clazz != null && field == null) {
-                try {
-                    field = clazz.getDeclaredField(name);
-                }
-                catch (NoSuchFieldException e) { // check the parent to see if
-                                                 // the field was defined there
-                    clazz = clazz.getSuperclass();
-                }
-            }
-            if(field != null) {
-                field.setAccessible(true);
-                return field;
-            }
-            else {
-                throw new NoSuchFieldException("No field name " + name
-                        + " exists in the hirearchy of " + clazz);
-            }
-        }
-        catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.wrapAsRuntimeException(e);
-        }
     }
 
     /**
@@ -1386,109 +1475,6 @@ public final class Reflection {
     }
 
     /**
-     * Resolve the method named {@code name} in the hierarchy of {@code clazz}
-     * for {@code paramTypes}.
-     *
-     * @param args argument values for failure messages, or {@code null} to
-     *            report {@code paramTypes} instead
-     * @param setAccessible whether the result bypasses Java language access
-     *            checks
-     * @param name the method name
-     * @param clazz the {@link Class} in which the method is defined
-     * @param paramTypes the type of each argument, or {@code null} for a
-     *            {@code null} argument
-     * @return a new {@link Method} object
-     * @throws IllegalArgumentException if the lookup is ambiguous
-     * @throws RuntimeException if no method matches or access configuration
-     *             fails
-     */
-    private static Method findMethod(@Nullable Object[] args,
-            boolean setAccessible, String name, Class<?> clazz,
-            Class<?>... paramTypes) {
-        List<Method> potential = Lists.newArrayListWithCapacity(1);
-        List<Method> deferred = Lists.newArrayListWithCapacity(1);
-        Deque<Class<?>> queue = new ArrayDeque<>();
-        queue.add(clazz);
-        try {
-            while ((clazz = queue.poll()) != null) {
-                for (Method method : Arrays.stream(clazz.getDeclaredMethods())
-                        .filter(method -> method.getName().equals(name))
-                        .collect(Collectors.toList())) {
-                    TernaryTruth callable = isDefinitelyCallableWith(method,
-                            paramTypes);
-                    if(callable == TernaryTruth.TRUE && method
-                            .getParameterCount() == paramTypes.length) {
-                        potential.add(method);
-                    }
-                    else if(callable != TernaryTruth.FALSE
-                            && deferred.isEmpty()) {
-                        // This means that an expected parameter is of type
-                        // Object, which is callable, but let's defer to see if
-                        // there is another method that has a more specific
-                        // expected parameter type that might match.
-                        deferred.add(method);
-                    }
-                }
-                if(potential.isEmpty()) {
-                    Class<?> superClass = clazz.getSuperclass();
-                    if(superClass != null) {
-                        queue.add(superClass);
-                    }
-                    for (Class<?> iface : clazz.getInterfaces()) {
-                        // Account for default interface methods that are not
-                        // explicitly overridden in the the #clazz.
-                        queue.add(iface);
-                    }
-                }
-                else {
-                    break;
-                }
-            }
-            if(potential.size() == 2) {
-                // UTIL-12: Handle a corner case where an overloaded method
-                // takes corresponding boxable parameters
-                List<Class<?>> paramTypesA = Arrays
-                        .stream(potential.get(0).getParameterTypes())
-                        .map(Reflection::unbox).collect(Collectors.toList());
-                List<Class<?>> paramTypesB = Arrays
-                        .stream(potential.get(1).getParameterTypes())
-                        .map(Reflection::unbox).collect(Collectors.toList());
-                if(paramTypesA.equals(paramTypesB)) {
-                    potential.remove(1);
-                }
-            }
-            int matches = potential.size();
-            Method method;
-            if(matches < 1) {
-                if(deferred.size() == 1) {
-                    method = deferred.get(0);
-                }
-                else {
-                    throw new NoSuchMethodException("Could not find method '"
-                            + name + "' that is invokable with: "
-                            + Arrays.asList(args != null ? args : paramTypes));
-                }
-            }
-            else if(matches > 1) {
-                throw new IllegalArgumentException("Trying to invoke method "
-                        + "'" + name + "' with "
-                        + Arrays.asList(args != null ? args : paramTypes)
-                        + " isn't possible because there are too many null "
-                        + "values and it is impossible to decide which "
-                        + "method is desired");
-            }
-            else {
-                method = potential.get(0);
-            }
-            method.setAccessible(setAccessible);
-            return method;
-        }
-        catch (ReflectiveOperationException e) {
-            throw CheckedExceptions.wrapAsRuntimeException(e);
-        }
-    }
-
-    /**
      * Invoke {@code method} with {@code args}. If {@code object} is
      * {@code null}, this is a static invocation.
      *
@@ -1540,6 +1526,36 @@ public final class Reflection {
             }
             throw CheckedExceptions.wrapAsRuntimeException(ex);
         }
+    }
+
+    /**
+     * Return {@code true} if the class loader of {@code clazz} is, or descends
+     * from, the class loader of each non-null {@code type}.
+     * <p>
+     * A cache entry for {@code clazz} lasts as long as {@code clazz}, so it may
+     * hold only classes whose class loaders {@code clazz} already keeps in
+     * memory.
+     * </p>
+     *
+     * @param clazz the {@link Class} whose cache would hold the {@code types}
+     * @param types the classes to check, any of which may be {@code null}
+     * @return {@code true} if a cache entry for {@code clazz} may hold the
+     *         {@code types}
+     */
+    private static boolean isCacheable(Class<?> clazz, Class<?>... types) {
+        boolean cacheable = true;
+        for (int i = 0; cacheable && i < types.length; ++i) {
+            ClassLoader target = types[i] == null ? null
+                    : types[i].getClassLoader();
+            if(target != null) {
+                ClassLoader loader = clazz.getClassLoader();
+                while (loader != null && loader != target) {
+                    loader = loader.getParent();
+                }
+                cacheable = loader != null;
+            }
+        }
+        return cacheable;
     }
 
     /**
@@ -1658,36 +1674,6 @@ public final class Reflection {
     }
 
     /**
-     * Return {@code true} if the class loader of {@code clazz} is, or descends
-     * from, the class loader of each non-null {@code type}.
-     * <p>
-     * A cache entry for {@code clazz} lasts as long as {@code clazz}, so it may
-     * hold only classes whose class loaders {@code clazz} already keeps in
-     * memory.
-     * </p>
-     *
-     * @param clazz the {@link Class} whose cache would hold the {@code types}
-     * @param types the classes to check, any of which may be {@code null}
-     * @return {@code true} if a cache entry for {@code clazz} may hold the
-     *         {@code types}
-     */
-    private static boolean isCacheable(Class<?> clazz, Class<?>... types) {
-        boolean cacheable = true;
-        for (int i = 0; cacheable && i < types.length; ++i) {
-            ClassLoader target = types[i] == null ? null
-                    : types[i].getClassLoader();
-            if(target != null) {
-                ClassLoader loader = clazz.getClassLoader();
-                while (loader != null && loader != target) {
-                    loader = loader.getParent();
-                }
-                cacheable = loader != null;
-            }
-        }
-        return cacheable;
-    }
-
-    /**
      * Return a {@link ClassValue} that gives each {@link Class} its own empty,
      * thread-safe {@link Map}.
      *
@@ -1741,6 +1727,20 @@ public final class Reflection {
             return clazz;
         }
     }
+
+    /**
+     * Resolved {@link Field Fields} for each lookup {@link Class} and field
+     * name.
+     */
+    private static final ClassValue<Map<String, Field>> FIELDS = newCache();
+
+    /**
+     * Resolved {@link Method Methods} for each lookup {@link Class} and method
+     * name. Each result applies to one access policy and ordered sequence of
+     * argument types.
+     */
+    private static final ClassValue<Map<List<Object>, Method>> METHODS =
+            newCache();
 
     private Reflection() {/* noinit */}
 
