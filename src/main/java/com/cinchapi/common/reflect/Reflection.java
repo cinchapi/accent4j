@@ -856,19 +856,8 @@ public final class Reflection {
         Preconditions.checkArgument(declaringClass.isInterface());
         Preconditions.checkArgument(declaringClass.isInstance(target));
         try {
-            MethodHandles.Lookup lookup;
-            try {
-                // Java 9+
-                lookup = callStatic(MethodHandles.class, "privateLookupIn",
-                        declaringClass, MethodHandles.lookup());
-            }
-            catch (Exception e) {
-                // Java 8 fallback
-                lookup = newInstance(MethodHandles.Lookup.class, declaringClass,
-                        MethodHandles.Lookup.PRIVATE);
-            }
-            MethodHandle handle = lookup
-                    .unreflectSpecial(method, declaringClass).bindTo(target);
+            MethodHandle handle = getDefaultMethodHandle(method)
+                    .bindTo(target);
             return handle.invokeWithArguments(args);
         }
         catch (Throwable t) {
@@ -1131,6 +1120,36 @@ public final class Reflection {
     }
 
     /**
+     * Build a {@link MethodHandle} that runs the body of the default
+     * {@code method} that its interface declares, for any target.
+     *
+     * @param method a default method of an interface
+     * @return a new handle that is not bound to a target; its first argument is
+     *         the target
+     * @throws RuntimeException if the handle cannot be built
+     */
+    private static MethodHandle findDefaultMethodHandle(Method method) {
+        Class<?> declaringClass = method.getDeclaringClass();
+        MethodHandles.Lookup lookup;
+        try {
+            // Java 9+
+            lookup = callStatic(MethodHandles.class, "privateLookupIn",
+                    declaringClass, MethodHandles.lookup());
+        }
+        catch (Exception e) {
+            // Java 8 fallback
+            lookup = newInstance(MethodHandles.Lookup.class, declaringClass,
+                    MethodHandles.Lookup.PRIVATE);
+        }
+        try {
+            return lookup.unreflectSpecial(method, declaringClass);
+        }
+        catch (ReflectiveOperationException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
      * Search the hierarchy of {@code clazz} for the {@link Field} called
      * {@code name}, and return the one that {@code clazz} or its nearest
      * ancestor declares, made accessible.
@@ -1341,6 +1360,29 @@ public final class Reflection {
     }
 
     /**
+     * Return a {@link MethodHandle} that runs the body of the default
+     * {@code method} that its interface declares, for any target.
+     *
+     * @param method a default method of an interface
+     * @return a handle that is not bound to a target, which repeated calls for
+     *         the same {@code method} share; its first argument is the target
+     * @throws RuntimeException if the handle cannot be built
+     */
+    private static MethodHandle getDefaultMethodHandle(Method method) {
+        Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
+                .get(method.getDeclaringClass());
+        // Here, we do an opportunistic #get before the #computeIfAbsent below
+        // to avoid the lock that it can take, even when the map has the key
+        // (forcing concurrent callers to wait on each other).
+        MethodHandle handle = handles.get(method);
+        if(handle == null) {
+            handle = handles.computeIfAbsent(method,
+                    key -> findDefaultMethodHandle(method));
+        }
+        return handle;
+    }
+
+    /**
      * Return the {@link Field} called {@code name} that {@code clazz} or its
      * nearest ancestor declares, made accessible.
      *
@@ -1352,10 +1394,11 @@ public final class Reflection {
      */
     private static Field getField(String name, Class<?> clazz) {
         Map<String, Field> fields = FIELDS.get(clazz);
+        // Here, we do an opportunistic #get before the #computeIfAbsent below
+        // to avoid the lock that it can take, even when the map has the key
+        // (forcing concurrent callers to wait on each other).
         Field field = fields.get(name);
         if(field == null) {
-            // NOTE: On Java 8, computeIfAbsent locks even when the key is
-            // present, so a lookup that finds the field does not call it.
             field = fields.computeIfAbsent(name,
                     key -> findField(name, clazz));
         }
@@ -1460,10 +1503,11 @@ public final class Reflection {
             // Reflection would keep that class loader in memory.
             List<Object> lookup = Arrays.asList(name, setAccessible,
                     Arrays.asList(paramTypes.clone()));
+            // Here, we do an opportunistic #get before the #computeIfAbsent
+            // below to avoid the lock that it can take, even when the map has
+            // the key (forcing concurrent callers to wait on each other).
             method = methods.get(lookup);
             if(method == null) {
-                // NOTE: On Java 8, computeIfAbsent locks even when the key is
-                // present, so a lookup that finds the method does not call it.
                 method = methods.computeIfAbsent(lookup, key -> findMethod(
                         args, setAccessible, name, clazz, paramTypes));
             }
@@ -1740,6 +1784,13 @@ public final class Reflection {
             return clazz;
         }
     }
+
+    /**
+     * The {@link MethodHandle} for each default method of each interface, not
+     * bound to a target.
+     */
+    private static final ClassValue<Map<Method, MethodHandle>> DEFAULT_METHOD_HANDLES =
+            newCache();
 
     /**
      * Resolved {@link Field Fields} for each lookup {@link Class} and field
