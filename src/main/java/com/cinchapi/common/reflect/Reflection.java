@@ -1371,9 +1371,9 @@ public final class Reflection {
     private static MethodHandle getDefaultMethodHandle(Method method) {
         Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
                 .get(method.getDeclaringClass());
-        // NOTE: The computeIfAbsent below also returns an existing value, but
-        // it can take a lock to do so, which makes concurrent callers wait. So
-        // do an opportunistic get first.
+        // Here, we do an opportunistic #get before the #computeIfAbsent below
+        // to avoid the lock that it can take, even when the map has the key
+        // (forcing concurrent callers to wait on each other).
         MethodHandle handle = handles.get(method);
         if(handle == null) {
             handle = handles.computeIfAbsent(method,
@@ -1394,9 +1394,9 @@ public final class Reflection {
      */
     private static Field getField(String name, Class<?> clazz) {
         Map<String, Field> fields = FIELDS.get(clazz);
-        // NOTE: The computeIfAbsent below also returns an existing value, but
-        // it can take a lock to do so, which makes concurrent callers wait. So
-        // do an opportunistic get first.
+        // Here, we do an opportunistic #get before the #computeIfAbsent below
+        // to avoid the lock that it can take, even when the map has the key
+        // (forcing concurrent callers to wait on each other).
         Field field = fields.get(name);
         if(field == null) {
             field = fields.computeIfAbsent(name,
@@ -1503,9 +1503,9 @@ public final class Reflection {
             // Reflection would keep that class loader in memory.
             List<Object> lookup = Arrays.asList(name, setAccessible,
                     Arrays.asList(paramTypes.clone()));
-            // NOTE: The computeIfAbsent below also returns an existing value,
-            // but it can take a lock to do so, which makes concurrent callers
-            // wait. So do an opportunistic get first.
+            // Here, we do an opportunistic #get before the #computeIfAbsent
+            // below to avoid the lock that it can take, even when the map has
+            // the key (forcing concurrent callers to wait on each other).
             method = methods.get(lookup);
             if(method == null) {
                 method = methods.computeIfAbsent(lookup, key -> findMethod(
