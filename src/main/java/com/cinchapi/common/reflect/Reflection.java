@@ -1371,10 +1371,9 @@ public final class Reflection {
     private static MethodHandle getDefaultMethodHandle(Method method) {
         Map<Method, MethodHandle> handles = DEFAULT_METHOD_HANDLES
                 .get(method.getDeclaringClass());
-        // NOTE: computeIfAbsent can take a lock even when the map has the key,
-        // which makes concurrent callers wait on each other. A plain get comes
-        // first, so every call after the one that caches the value skips the
-        // lock.
+        // NOTE: The computeIfAbsent below also returns an existing value, but
+        // it can take a lock to do so, which makes concurrent callers wait. So
+        // do an opportunistic get first.
         MethodHandle handle = handles.get(method);
         if(handle == null) {
             handle = handles.computeIfAbsent(method,
@@ -1395,10 +1394,9 @@ public final class Reflection {
      */
     private static Field getField(String name, Class<?> clazz) {
         Map<String, Field> fields = FIELDS.get(clazz);
-        // NOTE: computeIfAbsent can take a lock even when the map has the key,
-        // which makes concurrent callers wait on each other. A plain get comes
-        // first, so every call after the one that caches the value skips the
-        // lock.
+        // NOTE: The computeIfAbsent below also returns an existing value, but
+        // it can take a lock to do so, which makes concurrent callers wait. So
+        // do an opportunistic get first.
         Field field = fields.get(name);
         if(field == null) {
             field = fields.computeIfAbsent(name,
@@ -1505,10 +1503,9 @@ public final class Reflection {
             // Reflection would keep that class loader in memory.
             List<Object> lookup = Arrays.asList(name, setAccessible,
                     Arrays.asList(paramTypes.clone()));
-            // NOTE: computeIfAbsent can take a lock even when the map has the
-            // key, which makes concurrent callers wait on each other. A plain
-            // get comes first, so every call after the one that caches the
-            // value skips the lock.
+            // NOTE: The computeIfAbsent below also returns an existing value,
+            // but it can take a lock to do so, which makes concurrent callers
+            // wait. So do an opportunistic get first.
             method = methods.get(lookup);
             if(method == null) {
                 method = methods.computeIfAbsent(lookup, key -> findMethod(
