@@ -16,11 +16,19 @@
 package com.cinchapi.common.reflect;
 
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -28,6 +36,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.junit.Assert;
 import org.junit.Rule;
@@ -35,11 +44,13 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import com.cinchapi.common.base.Array;
+import com.cinchapi.common.runtime.Application;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
 
 /**
  * Unit tests for the {@link Reflection} utility class.
@@ -48,6 +59,173 @@ import com.google.common.collect.Lists;
  */
 @SuppressWarnings("unused")
 public class ReflectionTest {
+
+    /**
+     * Exercise reflective invocation with an argument from a separate
+     * {@link ClassLoader}.
+     *
+     * @param queue the queue for the returned reference, or {@code null} for no
+     *            queue
+     * @param action the reflective invocation to run with the argument
+     * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
+     *         the argument, with the loader's resources closed
+     * @throws Exception if argument creation, invocation or resource closure
+     *             fails
+     */
+    private static WeakReference<ClassLoader> callWithArgumentFromNewLoader(
+            ReferenceQueue<ClassLoader> queue, Consumer<Object> action)
+            throws Exception {
+        try (URLClassLoader loader = new URLClassLoader(
+                new URL[] { getLocation(Payload.class) }, null)) {
+            Object arg = loader.loadClass(Payload.class.getName())
+                    .getDeclaredConstructor().newInstance();
+            action.accept(arg);
+            return new WeakReference<>(loader, queue);
+        }
+    }
+
+    /**
+     * Exercise reflective invocation with an argument whose class is a hidden
+     * copy of {@link Payload} in the class path's {@link ClassLoader}.
+     *
+     * @param queue the queue for the returned reference
+     * @param action the reflective invocation to run with the argument
+     * @return a {@link WeakReference} to the hidden class
+     * @throws Exception if class definition, instantiation or invocation fails
+     */
+    private static WeakReference<Class<?>> callWithArgumentOfHiddenClass(
+            ReferenceQueue<Class<?>> queue, Consumer<Object> action)
+            throws Exception {
+        Class<?> type = defineHiddenCopyOf(Payload.class);
+        action.accept(type.getDeclaredConstructor().newInstance());
+        return new WeakReference<>(type, queue);
+    }
+
+    /**
+     * Exercise a static method of a separately loaded copy of
+     * {@link Reflection}.
+     *
+     * @param queue the queue for the returned reference, or {@code null} for no
+     *            queue
+     * @param method the name of the {@link Reflection} method to call
+     * @param types the parameter types of the {@link Reflection} method
+     * @param args the arguments to pass to the {@link Reflection} method; the
+     *            class of each must be one that the bootstrap
+     *            {@link ClassLoader} loads
+     * @return a {@link WeakReference} to the {@link ClassLoader} that loaded
+     *         the copy of {@link Reflection}, with the loader's resources
+     *         closed
+     * @throws Exception if loading, invocation or resource closure fails
+     */
+    private static WeakReference<ClassLoader> callFromNewLoader(
+            ReferenceQueue<ClassLoader> queue, String method,
+            Class<?>[] types, Object... args) throws Exception {
+        URL[] locations = { getLocation(Reflection.class),
+                getLocation(Lists.class) };
+        try (URLClassLoader loader = new URLClassLoader(locations,
+                ClassLoader.getSystemClassLoader().getParent())) {
+            loader.loadClass(Reflection.class.getName())
+                    .getMethod(method, types).invoke(null, args);
+            return new WeakReference<>(loader, queue);
+        }
+    }
+
+    /**
+     * Define a class from the bytecode of {@code clazz} that Java can unload
+     * while the {@link ClassLoader} of {@code clazz} stays in memory.
+     * <p>
+     * On Java 15 and later the result is a hidden class. On earlier versions it
+     * is a VM anonymous class. Both report the {@link ClassLoader} of
+     * {@code clazz}.
+     * </p>
+     *
+     * @param clazz a class in the package of {@link ReflectionTest} whose class
+     *            file is on the class path
+     * @return the new class
+     * @throws Exception if the class file cannot be read or the definition
+     *             fails
+     */
+    private static Class<?> defineHiddenCopyOf(Class<?> clazz)
+            throws Exception {
+        String file = clazz.getName()
+                .substring(clazz.getName().lastIndexOf('.') + 1) + ".class";
+        byte[] bytes;
+        try (InputStream input = clazz.getResourceAsStream(file)) {
+            bytes = ByteStreams.toByteArray(input);
+        }
+        if(Application.javaVersion() >= 15) {
+            // NOTE: The tests compile on Java 8, which has no
+            // defineHiddenClass, so this calls it reflectively.
+            Class<?> option = Class.forName(
+                    "java.lang.invoke.MethodHandles$Lookup$ClassOption");
+            Object options = java.lang.reflect.Array.newInstance(option, 0);
+            Lookup lookup = (Lookup) Lookup.class
+                    .getMethod("defineHiddenClass", byte[].class,
+                            boolean.class, options.getClass())
+                    .invoke(MethodHandles.lookup(), bytes, true, options);
+            return lookup.lookupClass();
+        }
+        else {
+            // NOTE: Java 17 and later have no defineAnonymousClass, so this
+            // calls it reflectively to keep the tests compilable there.
+            Field field = Class.forName("sun.misc.Unsafe")
+                    .getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            Object unsafe = field.get(null);
+            return (Class<?>) unsafe.getClass()
+                    .getMethod("defineAnonymousClass", Class.class,
+                            byte[].class, Object[].class)
+                    .invoke(unsafe, ReflectionTest.class, bytes, null);
+        }
+    }
+
+    /**
+     * Run {@code action} and return the cause of the {@link RuntimeException}
+     * that it throws.
+     *
+     * @param action the action to run
+     * @return the cause of the {@link RuntimeException}, or {@code null} if
+     *         {@code action} does not throw one
+     */
+    private static Throwable getCauseOfFailure(Runnable action) {
+        Throwable cause = null;
+        try {
+            action.run();
+        }
+        catch (RuntimeException e) {
+            cause = e.getCause();
+        }
+        return cause;
+    }
+
+    /**
+     * Return the class path entry that holds {@code clazz}.
+     *
+     * @param clazz the class to locate; must have a non-null code source
+     * @return the {@link URL} of its code source, which may be {@code null}
+     */
+    private static URL getLocation(Class<?> clazz) {
+        return clazz.getProtectionDomain().getCodeSource().getLocation();
+    }
+
+    /**
+     * Request garbage collection and wait for a reference in {@code queue}.
+     *
+     * @param queue the queue to observe
+     * @return {@code true} if a reference is removed from {@code queue}, or
+     *         {@code false} if the wait ends without one
+     * @throws InterruptedException if the thread is interrupted while it waits
+     *             for {@code queue}
+     */
+    private static boolean isCollected(ReferenceQueue<?> queue)
+            throws InterruptedException {
+        boolean collected = false;
+        for (int i = 0; i < 20 && !collected; ++i) {
+            System.gc();
+            collected = queue.remove(100) != null;
+        }
+        return collected;
+    }
 
     private final Random random = new Random();
 
@@ -467,6 +645,497 @@ public class ReflectionTest {
         Assert.assertNull(f.label);
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that repeated lookups of a field return the
+     * same {@link Field} object.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string} field, which {@link A} declares, in
+     * {@link B} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Field}.
+     */
+    @Test
+    public void testGetDeclaredFieldReturnsSameFieldForRepeatedLookups() {
+        Field first = Reflection.getDeclaredField("string", B.class);
+        Field second = Reflection.getDeclaredField("string", B.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that repeated lookups of a method return
+     * the same {@link Method} object.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string(int)} method of {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Method}.
+     */
+    @Test
+    public void testGetMethodUnboxedReturnsSameMethodForRepeatedLookups() {
+        Method first = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Method second = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a change to the parameter type array
+     * after a method lookup does not change what later lookups return.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Look up the {@code string(int)} method of {@link A} with an array
+     * that holds {@code int.class}.</li>
+     * <li>Replace the element of that array with {@link String
+     * String.class}.</li>
+     * <li>Look up {@code string(int)} again with a new array.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both lookups return the same {@link Method}.
+     */
+    @Test
+    public void testGetMethodUnboxedReturnsSameMethodAfterCallerChangesTypes() {
+        Class<?>[] types = { int.class };
+        Method first = Reflection.getMethodUnboxed(A.class, "string", types);
+        types[0] = String.class;
+        Method second = Reflection.getMethodUnboxed(A.class, "string",
+                int.class);
+        Assert.assertSame(first, second);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that reading a field by name reads the
+     * field that the object's own class declares when a subclass shadows a
+     * field of its parent.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read {@code name} from a {@link ShadowedParent} and from a
+     * {@link ShadowingChild}, then from the {@link ShadowedParent} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each read returns the value of the field that
+     * the object's class declares: {@code parent}, {@code child}, and then
+     * {@code parent}.
+     */
+    @Test
+    public void testGetReadsFieldThatEachClassDeclares() {
+        ShadowedParent parent = new ShadowedParent();
+        ShadowingChild child = new ShadowingChild();
+        Assert.assertEquals("parent", Reflection.get("name", parent));
+        Assert.assertEquals("child", Reflection.get("name", child));
+        Assert.assertEquals("parent", Reflection.get("name", parent));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling an overloaded method by name
+     * calls the overload that matches the type of each argument.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@code describe} on an {@link Overloads} with a {@link String},
+     * then with an {@link Integer}, then with a {@link String} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The calls return {@code string},
+     * {@code integer}, and {@code string}.
+     */
+    @Test
+    public void testCallCallsOverloadThatMatchesEachArgumentType() {
+        Overloads overloads = new Overloads();
+        Assert.assertEquals("string",
+                Reflection.call(overloads, "describe", "a"));
+        Assert.assertEquals("integer",
+                Reflection.call(overloads, "describe", 1));
+        Assert.assertEquals("string",
+                Reflection.call(overloads, "describe", "b"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a private method stays inaccessible to
+     * {@link Reflection#callIfAccessible(Object, String, Object...)} after
+     * {@link Reflection#call(Object, String, Object...)} calls it.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call the private {@code string()} method of an {@link A} with
+     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Call the same method with
+     * {@link Reflection#callIfAccessible(Object, String, Object...)}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first call returns the value; the second
+     * throws a {@link RuntimeException}.
+     */
+    @Test
+    public void testCallIfAccessibleFailsForPrivateMethodAfterCall() {
+        A a = new A("foo");
+        Assert.assertEquals("foo", Reflection.call(a, "string"));
+        expectedException.expect(RuntimeException.class);
+        Reflection.callIfAccessible(a, "string");
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that reading a field that no class in the
+     * hierarchy declares fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read the {@code missing} field from an {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each read throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchFieldException}.
+     */
+    @Test
+    public void testGetThrowsForMissingFieldOnEveryCall() {
+        A a = new A("foo");
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.get("missing",
+                a)) instanceof NoSuchFieldException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.get("missing",
+                a)) instanceof NoSuchFieldException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method that no class in the
+     * hierarchy declares fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call the {@code missing} method on an {@link A} twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testCallThrowsForMissingMethodOnEveryCall() {
+        A a = new A("foo");
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.call(a,
+                "missing")) instanceof NoSuchMethodException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.call(a,
+                "missing")) instanceof NoSuchMethodException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method with an argument from
+     * another {@link ClassLoader} does not keep that {@link ClassLoader} in
+     * memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Payload} in a new {@link ClassLoader} that does not
+     * delegate to the class path.</li>
+     * <li>Pass an instance of that {@link Payload} through
+     * {@link Reflection#call(Object, String, Object...)} to
+     * {@link ArrayList#add(Object)}, which the bootstrap loader loads, and to
+     * {@code Sink#accept(Object)}, which the class path loads.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testCallDoesNotRetainClassLoaderOfArgument() throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callWithArgumentFromNewLoader(
+                queue, arg -> {
+                    Reflection.call(new ArrayList<Object>(), "add", arg);
+                    Reflection.call(new Sink(), "accept", arg);
+                });
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a JDK method through a copy of
+     * {@link Reflection} that another {@link ClassLoader} loads does not keep
+     * that {@link ClassLoader} in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
+     * parent cannot see them.</li>
+     * <li>Call {@link ArrayList#size()} through that copy of
+     * {@link Reflection#call(Object, String, Object...)}.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testCallDoesNotRetainClassLoaderOfReflection()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callFromNewLoader(queue, "call",
+                new Class<?>[] { Object.class, String.class, Object[].class },
+                new ArrayList<Object>(), "size", new Object[0]);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that calling a method with an argument
+     * whose class Java can unload apart from its {@link ClassLoader} does not
+     * keep that class in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Define a hidden copy of {@link Payload} in the class path's
+     * {@link ClassLoader}, as a VM anonymous class before Java 15.</li>
+     * <li>Pass an instance through
+     * {@link Reflection#call(Object, String, Object...)} to
+     * {@code Sink#accept(Object)}, which the class path loads.</li>
+     * <li>Drop all strong references to the hidden class and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testCallDoesNotRetainHiddenClassOfArgument() throws Exception {
+        ReferenceQueue<Class<?>> queue = new ReferenceQueue<>();
+        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue,
+                arg -> Reflection.call(new Sink(), "accept", arg));
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(type.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance calls the
+     * constructor that matches the type of each argument, in order.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with a {@link String} and an
+     * {@link Integer}, then with an {@link Integer} and a {@link String}, then
+     * with a {@link String} and an {@link Integer} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The instances record the constructors
+     * {@code string, integer}, {@code integer, string}, and
+     * {@code string, integer}.
+     */
+    @Test
+    public void testNewInstanceCallsConstructorThatMatchesEachArgumentType() {
+        Orders orders;
+        orders = Reflection.newInstance(Orders.class, "a", 1);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, 1, "a");
+        Assert.assertEquals("integer, string", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, "b", 2);
+        Assert.assertEquals("string, integer", orders.constructor);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with {@code null}
+     * arguments calls the constructor that matches the type of each non-null
+     * argument at its position.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with a {@link String} and {@code null},
+     * then with {@code null} and a {@link String}, then with a {@link String}
+     * and {@code null} again.</li>
+     * <li>Create an {@link Orders} with one {@code null} argument.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The instances record the constructors
+     * {@code string, integer}, {@code integer, string},
+     * {@code string, integer}, and {@code integer}.
+     */
+    @Test
+    public void testNewInstanceCallsConstructorThatMatchesEachNullArgument() {
+        Orders orders;
+        orders = Reflection.newInstance(Orders.class, "a", null);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, null, "a");
+        Assert.assertEquals("integer, string", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, "b", null);
+        Assert.assertEquals("string, integer", orders.constructor);
+        orders = Reflection.newInstance(Orders.class, (Object) null);
+        Assert.assertEquals("integer", orders.constructor);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with arguments
+     * that no constructor accepts fails on every call.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create an {@link Orders} with two {@link String} arguments
+     * twice.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testNewInstanceThrowsWhenNoConstructorMatchesOnEveryCall() {
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Orders.class, "a", "b")) instanceof NoSuchMethodException);
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Orders.class, "a", "b")) instanceof NoSuchMethodException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with a
+     * {@code null} argument array fails, even for a class with a no-argument
+     * constructor.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create a {@link Sink} with a {@code null} argument array.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testNewInstanceThrowsForNullArgumentArray() {
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Sink.class, (Object[]) null)) instanceof NoSuchMethodException);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with an argument
+     * from another {@link ClassLoader} does not keep that {@link ClassLoader}
+     * in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Payload} in a new {@link ClassLoader} that does not
+     * delegate to the class path.</li>
+     * <li>Pass an instance of that {@link Payload} through
+     * {@link Reflection#newInstance(Class, Object...)} to the
+     * {@link AtomicReference} constructor, which the bootstrap loader loads,
+     * and to the {@code Sink(Object)} constructor, which the class path
+     * loads.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainClassLoaderOfArgument()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callWithArgumentFromNewLoader(
+                queue, arg -> {
+                    Reflection.newInstance(AtomicReference.class, arg);
+                    Reflection.newInstance(Sink.class, arg);
+                });
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating a JDK instance through a copy
+     * of {@link Reflection} that another {@link ClassLoader} loads does not
+     * keep that {@link ClassLoader} in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Load {@link Reflection} and Guava in a new {@link ClassLoader} whose
+     * parent cannot see them.</li>
+     * <li>Create an {@link ArrayList} through that copy of
+     * {@link Reflection#newInstance(Class, Object...)}.</li>
+     * <li>Drop all strong references to the {@link ClassLoader} and request
+     * garbage collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainClassLoaderOfReflection()
+            throws Exception {
+        ReferenceQueue<ClassLoader> queue = new ReferenceQueue<>();
+        WeakReference<ClassLoader> loader = callFromNewLoader(queue,
+                "newInstance", new Class<?>[] { Class.class, Object[].class },
+                ArrayList.class, new Object[0]);
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(loader.get());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that creating an instance with an argument
+     * whose class Java can unload apart from its {@link ClassLoader} does not
+     * keep that class in memory.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Define a hidden copy of {@link Payload} in the class path's
+     * {@link ClassLoader}, as a VM anonymous class before Java 15.</li>
+     * <li>Pass an instance through
+     * {@link Reflection#newInstance(Class, Object...)} to the
+     * {@code Sink(Object)} constructor, which the class path loads.</li>
+     * <li>Drop all strong references to the hidden class and request garbage
+     * collection.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The weak reference is enqueued, and its
+     * referent is {@code null}.
+     */
+    @Test
+    public void testNewInstanceDoesNotRetainHiddenClassOfArgument()
+            throws Exception {
+        ReferenceQueue<Class<?>> queue = new ReferenceQueue<>();
+        WeakReference<Class<?>> type = callWithArgumentOfHiddenClass(queue,
+                arg -> Reflection.newInstance(Sink.class, arg));
+        Assert.assertTrue(isCollected(queue));
+        Assert.assertNull(type.get());
+    }
+
     private static class A {
 
         private final String string;
@@ -713,6 +1382,142 @@ public class ReflectionTest {
             this.dvalue = value;
             this.tag = tag;
         }
+    }
+
+    /**
+     * A class whose {@code name} field a subclass shadows.
+     *
+     * @author Jeff Nelson
+     */
+    private static class ShadowedParent {
+
+        /**
+         * The name, which {@link ShadowingChild} shadows.
+         */
+        private final String name = "parent";
+    }
+
+    /**
+     * A class that declares a field with the same name as a field of its
+     * parent.
+     *
+     * @author Jeff Nelson
+     */
+    private static class ShadowingChild extends ShadowedParent {
+
+        /**
+         * The name, which shadows the field of {@link ShadowedParent}.
+         */
+        private final String name = "child";
+    }
+
+    /**
+     * A class with an overloaded method whose overloads take one argument of
+     * different types.
+     *
+     * @author Jeff Nelson
+     */
+    private static class Overloads {
+
+        /**
+         * Describe a {@link String} argument.
+         *
+         * @param value the argument
+         * @return {@code string}
+         */
+        public String describe(String value) {
+            return "string";
+        }
+
+        /**
+         * Describe an {@link Integer} argument.
+         *
+         * @param value the argument
+         * @return {@code integer}
+         */
+        public String describe(Integer value) {
+            return "integer";
+        }
+    }
+
+    /**
+     * A class with constructors that accept a {@link String} and an
+     * {@link Integer} in either order, or an {@link Integer} alone, and record
+     * which one created the instance.
+     *
+     * @author Jeff Nelson
+     */
+    private static class Orders {
+
+        /**
+         * The parameter types of the constructor that created this instance.
+         */
+        private final String constructor;
+
+        /**
+         * Create an {@link Orders} that records {@code string, integer}.
+         *
+         * @param string the first argument
+         * @param integer the second argument
+         */
+        Orders(String string, Integer integer) {
+            this.constructor = "string, integer";
+        }
+
+        /**
+         * Create an {@link Orders} that records {@code integer, string}.
+         *
+         * @param integer the first argument
+         * @param string the second argument
+         */
+        Orders(Integer integer, String string) {
+            this.constructor = "integer, string";
+        }
+
+        /**
+         * Create an {@link Orders} that records {@code integer}.
+         *
+         * @param integer the argument
+         */
+        Orders(Integer integer) {
+            this.constructor = "integer";
+        }
+    }
+
+    /**
+     * A class that a test loads in its own {@link ClassLoader} to pass as an
+     * argument whose {@link ClassLoader} the class path cannot reach.
+     *
+     * @author Jeff Nelson
+     */
+    public static class Payload {}
+
+    /**
+     * A class that the class path loads, with a constructor and a method that
+     * accept any argument.
+     *
+     * @author Jeff Nelson
+     */
+    private static class Sink {
+
+        /**
+         * Create a {@link Sink}.
+         */
+        Sink() {}
+
+        /**
+         * Create a {@link Sink} and do nothing with {@code value}.
+         *
+         * @param value the argument
+         */
+        Sink(Object value) {}
+
+        /**
+         * Accept {@code value} and do nothing with it.
+         *
+         * @param value the argument
+         */
+        public void accept(Object value) {}
     }
 
 }
