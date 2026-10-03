@@ -1018,6 +1018,27 @@ public class ReflectionTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that creating an instance with a
+     * {@code null} argument array fails, even for a class with a no-argument
+     * constructor.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create a {@link Sink} with a {@code null} argument array.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws a {@link RuntimeException}
+     * whose cause is a {@link NoSuchMethodException}.
+     */
+    @Test
+    public void testNewInstanceThrowsForNullArgumentArray() {
+        Assert.assertTrue(getCauseOfFailure(() -> Reflection.newInstance(
+                Sink.class, (Object[]) null)) instanceof NoSuchMethodException);
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that creating an instance with an argument
      * from another {@link ClassLoader} does not keep that {@link ClassLoader}
      * in memory.
