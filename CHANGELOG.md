@@ -6,6 +6,10 @@
   result held only one of those keys, mapped to the value of the last one. The
   returned map compares its keys with the map's `Comparator`, so it holds each
   coalesced key with its own value, in the map's order.
+* Fixed a bug in `CoalescableTreeMap#coalesce` that threw a
+  `NullPointerException` when a coalesced neighbor of the lookup key mapped to
+  `null`. The result omits each key that maps to `null`, and the neighbors
+  beyond that key still coalesce.
 
 #### Version 1.17.2 (October 3, 2026)
 * `Reflection` remembers each field and method that it looks up by name, so

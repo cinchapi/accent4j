@@ -64,6 +64,12 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      * every key that this map keeps apart, even keys that are
      * {@link Object#equals(Object) equal} to each other.
      * </p>
+     * <p>
+     * The returned {@link Map} omits each key that maps to {@code null},
+     * including {@code key}. A neighbor that maps to {@code null} does not end
+     * the range, so the keys beyond it coalesce when the {@code matcher}
+     * accepts them.
+     * </p>
      *
      * @param key
      * @param matcher a {@link BiPredicate} that takes the lookup {@code key}
@@ -81,12 +87,16 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
         }
         Entry<K, V> entry = lowerEntry(key);
         while (entry != null && matcher.test(key, entry.getKey())) {
-            coalesced.put(entry.getKey(), entry.getValue());
+            if(entry.getValue() != null) {
+                coalesced.put(entry.getKey(), entry.getValue());
+            }
             entry = lowerEntry(entry.getKey());
         }
         entry = higherEntry(key);
         while (entry != null && matcher.test(key, entry.getKey())) {
-            coalesced.put(entry.getKey(), entry.getValue());
+            if(entry.getValue() != null) {
+                coalesced.put(entry.getKey(), entry.getValue());
+            }
             entry = higherEntry(entry.getKey());
         }
         return coalesced;

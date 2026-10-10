@@ -137,6 +137,37 @@ public class CoalescableTreeMapTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that coalescing omits each key that maps to
+     * {@code null} and still coalesces the keys beyond it.
+     * <p>
+     * <strong>Start state:</strong> A map, created without a
+     * {@link Comparator}, from the integers 1 through 5 to their text, except
+     * that 2 and 4 map to {@code null}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Coalesce the key 4 with a matcher that accepts every key.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The result maps 1, 3 and 5, in that order, to
+     * their text.
+     */
+    @Test
+    public void testCoalesceOmitsKeysThatMapToNull() {
+        CoalescableTreeMap<Integer, String> map = new CoalescableTreeMap<>();
+        map.put(1, "1");
+        map.put(2, null);
+        map.put(3, "3");
+        map.put(4, null);
+        map.put(5, "5");
+        Map<Integer, String> data = map.coalesce(4, (key, candidate) -> true);
+        Assert.assertEquals(Lists.newArrayList(1, 3, 5),
+                Lists.newArrayList(data.keySet()));
+        Assert.assertEquals(Lists.newArrayList("1", "3", "5"),
+                Lists.newArrayList(data.values()));
+    }
+
+    /**
      * A key whose equality looks only at its {@link #text}, so two
      * {@link Label Labels} with the same text and different {@link #kind
      * kinds} are equal but sort apart in {@link #ORDER}.
