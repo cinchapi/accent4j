@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.17.3 (TBD)
+#### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
   map's `Comparator` kept apart two keys that are `equal` to each other. The
   result held only one of those keys, mapped to the value of the last one. The
