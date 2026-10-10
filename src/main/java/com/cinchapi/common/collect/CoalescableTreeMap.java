@@ -15,16 +15,11 @@
  */
 package com.cinchapi.common.collect;
 
-import java.util.Map.Entry;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.function.BiPredicate;
-import java.util.stream.Collectors;
-
-import com.google.common.collect.Lists;
 
 /**
  * A {@link TreeMap} that contains {@link #coalesce(Object, BiPredicate)
@@ -44,6 +39,11 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
         super();
     }
 
+    /**
+     * Construct a new instance that orders its keys with {@code comparator}.
+     *
+     * @param comparator the {@link Comparator} that orders the keys
+     */
     public CoalescableTreeMap(Comparator<K> comparator) {
         super(comparator);
     }
@@ -55,10 +55,16 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      * <p>
      * This method only coalesces consecutive ranges of entries that are
      * immediately "lower" or "higher" than the lookup {@code key}. This method
-     * evaluates keys on both side of {@code key} until it reaches on that the
+     * evaluates keys on both sides of {@code key} until it reaches one that the
      * {@code matcher} determines is not similar enough.
      * </p>
-     * 
+     * <p>
+     * The returned {@link Map} is a copy in the order of this map. It compares
+     * keys with the {@link #comparator() comparator} of this map, so it keeps
+     * every key that this map keeps apart, even keys that are
+     * {@link Object#equals(Object) equal} to each other.
+     * </p>
+     *
      * @param key
      * @param matcher a {@link BiPredicate} that takes the lookup {@code key}
      *            and a potentially coalescible key and returns a boolean that
@@ -68,35 +74,22 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      *         {@code key}
      */
     public Map<K, V> coalesce(K key, BiPredicate<K, K> matcher) {
+        Map<K, V> coalesced = new TreeMap<>(comparator());
         V matched = get(key);
-        List<Entry<K, V>> coalesced = Lists.newArrayList();
-        K current = key;
-        while (current != null) {
-            Entry<K, V> next = lowerEntry(current);
-            if(next != null && matcher.test(key, next.getKey())) {
-                coalesced.add(0, next);
-                current = next.getKey();
-            }
-            else {
-                current = null;
-            }
-        }
         if(matched != null) {
-            coalesced.add(new SimpleImmutableEntry<>(key, matched));
+            coalesced.put(key, matched);
         }
-        current = key;
-        while (current != null) {
-            Entry<K, V> next = higherEntry(current);
-            if(next != null && matcher.test(key, next.getKey())) {
-                coalesced.add(next);
-                current = next.getKey();
-            }
-            else {
-                current = null;
-            }
+        Entry<K, V> entry = lowerEntry(key);
+        while (entry != null && matcher.test(key, entry.getKey())) {
+            coalesced.put(entry.getKey(), entry.getValue());
+            entry = lowerEntry(entry.getKey());
         }
-        return coalesced.stream().collect(Collectors.toMap(Entry::getKey,
-                Entry::getValue, (m1, m2) -> m2, LinkedHashMap::new));
+        entry = higherEntry(key);
+        while (entry != null && matcher.test(key, entry.getKey())) {
+            coalesced.put(entry.getKey(), entry.getValue());
+            entry = higherEntry(entry.getKey());
+        }
+        return coalesced;
     }
 
 }
