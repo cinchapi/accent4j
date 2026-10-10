@@ -29,7 +29,7 @@
   classes skip the search of the class's constructors. A call that no
   constructor accepts throws on every call.
 
-#### Version 1.17.1 (TBD)
+#### Version 1.17.1 (September 18, 2026)
 * Added `Enums#parseNameIgnoreCase` and `Enums#tryParseNameIgnoreCase`, which
   match an enum constant by name only, in any case, and never read a number as
   an ordinal. `parseNameIgnoreCase` throws an `IllegalArgumentException` when no
