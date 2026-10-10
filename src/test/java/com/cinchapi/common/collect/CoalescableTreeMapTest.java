@@ -168,6 +168,97 @@ public class CoalescableTreeMapTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that coalescing includes the lookup key
+     * even when the matcher rejects it.
+     * <p>
+     * <strong>Start state:</strong> A map, created without a
+     * {@link Comparator}, from the integers 1 through 5 to their text.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Coalesce the key 3 with a matcher that rejects every key.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The result maps only 3 to its text.
+     */
+    @Test
+    public void testCoalesceIncludesKeyThatMatcherRejects() {
+        CoalescableTreeMap<Integer, String> map = new CoalescableTreeMap<>();
+        for (int i = 1; i <= 5; ++i) {
+            map.put(i, Integer.toString(i));
+        }
+        Map<Integer, String> data = map.coalesce(3, (key, candidate) -> false);
+        Assert.assertEquals(Lists.newArrayList(3),
+                Lists.newArrayList(data.keySet()));
+        Assert.assertEquals("3", data.get(3));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that coalescing a key that the map does
+     * not hold returns the neighbors on each side that the matcher accepts.
+     * <p>
+     * <strong>Start state:</strong> A map, created without a
+     * {@link Comparator}, from the integers 1, 2, 4 and 5 to their text.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Coalesce the key 3 with a matcher that accepts a key within 1 of
+     * it.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The result maps 2 and 4, in that order, to
+     * their text.
+     */
+    @Test
+    public void testCoalesceIncludesNeighborsOfKeyThatIsAbsent() {
+        CoalescableTreeMap<Integer, String> map = new CoalescableTreeMap<>();
+        for (int i : new int[] { 1, 2, 4, 5 }) {
+            map.put(i, Integer.toString(i));
+        }
+        Map<Integer, String> data = map.coalesce(3,
+                (key, candidate) -> Math.abs(key - candidate) <= 1);
+        Assert.assertEquals(Lists.newArrayList(2, 4),
+                Lists.newArrayList(data.keySet()));
+        Assert.assertEquals(Lists.newArrayList("2", "4"),
+                Lists.newArrayList(data.values()));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that each key in the result is the key
+     * that the map holds, even when the lookup key differs from it but sorts
+     * in its place.
+     * <p>
+     * <strong>Start state:</strong> A map that orders its keys without regard
+     * to case, from {@code foo} and {@code goo} to their text.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Coalesce the key {@code FOO}, once with a matcher that accepts
+     * every key with the same text in any case and once with a matcher that
+     * rejects every key.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each result holds only the key {@code foo},
+     * spelled as the map holds it, mapped to its text.
+     */
+    @Test
+    public void testCoalesceReturnsKeysAsTheMapHoldsThem() {
+        CoalescableTreeMap<String, String> map = new CoalescableTreeMap<>(
+                String.CASE_INSENSITIVE_ORDER);
+        map.put("foo", "foo");
+        map.put("goo", "goo");
+        for (Map<String, String> data : Lists.newArrayList(
+                map.coalesce("FOO",
+                        (key, candidate) -> key.equalsIgnoreCase(candidate)),
+                map.coalesce("FOO", (key, candidate) -> false))) {
+            Assert.assertEquals(Lists.newArrayList("foo"),
+                    Lists.newArrayList(data.keySet()));
+            Assert.assertEquals(Lists.newArrayList("foo"),
+                    Lists.newArrayList(data.values()));
+        }
+    }
+
+    /**
      * A key whose equality looks only at its {@link #text}, so two
      * {@link Label Labels} with the same text and different {@link #kind
      * kinds} are equal but sort apart in {@link #ORDER}.

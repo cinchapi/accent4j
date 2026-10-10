@@ -1,5 +1,12 @@
 # Changelog
 
+#### Version 1.17.4 (TBD)
+* `CoalescableTreeMap#coalesce` reaches each neighbor of the lookup key by
+  stepping from the last one instead of searching the whole map again, so a
+  lookup searches the map once in each direction however many keys coalesce.
+  Each key of the returned map is the key that the map holds, including the
+  one that sorts in the place of the lookup key.
+
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
   map's `Comparator` kept apart two keys that are `equal` to each other. The
