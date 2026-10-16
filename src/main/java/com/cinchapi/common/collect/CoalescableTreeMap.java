@@ -84,12 +84,8 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      */
     public Map<K, V> coalesce(K key, BiPredicate<K, K> matcher) {
         Map<K, V> coalesced = new TreeMap<>(comparator());
-        // Iterating away from the key in each direction reaches each neighbor
-        // from the last one, instead of searching the whole map again for it.
-        // The walk down starts at the key's own place, which is compared to
-        // the key only if the matcher rejects it.
         boolean first = true;
-        for (Entry<K, V> entry : headMap(key, true).descendingMap()
+        for (Entry<K, V> entry : descendingMap().tailMap(key, true)
                 .entrySet()) {
             if(matcher.test(key, entry.getKey())
                     || (first && compare(entry.getKey(), key) == 0)) {
