@@ -447,6 +447,7 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
     @Test
     public void testJoinIndicesUsesIdleWorkers() throws InterruptedException {
         JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        Thread.sleep(100); // Let the workers start waiting for tasks
         CyclicBarrier together = new CyclicBarrier(2);
         AtomicInteger timeouts = new AtomicInteger();
         joinable.join(2, index -> {

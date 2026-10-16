@@ -89,7 +89,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     private final Thread[] workers;
 
     /**
-     * The number of {@link #workers} that are waiting for a task.
+     * The number of {@link #workers} that are waiting for a task or helping a
+     * join.
      */
     private final AtomicInteger idle = new AtomicInteger();
 
@@ -295,10 +296,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
 
     /**
      * Run tasks on a worker thread until the executor terminates. While the
-     * executor runs, the worker helps each join in progress, then waits for a
-     * task and runs it. After {@link #shutdown()}, the worker runs the tasks
-     * that remain in the queue and exits. The last worker to exit marks the
-     * executor terminated.
+     * executor runs, the worker runs a queued task if there is one; otherwise
+     * it helps each join in progress, then waits for a task. After
+     * {@link #shutdown()}, the worker runs the tasks that remain in the queue
+     * and exits. The last worker to exit marks the executor terminated.
      */
     private void executeTaskLoop() {
         try {
@@ -310,14 +311,15 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                         // Count idle before reading #joins, as a join registers
                         // before it reads #idle, so a join that begins as this
                         // worker goes idle is seen here or by the Helper it
-                        // queues. Queued tasks come first, so a join never
-                        // holds up work that has no other thread
-                        if(tasks.isEmpty()) {
+                        // queues. A queued task comes before any join, and the
+                        // worker blocks only right after it has read #joins
+                        task = tasks.poll();
+                        if(task == null) {
                             for (Runnable join : joins) {
                                 join.run();
                             }
+                            task = tasks.take();
                         }
-                        task = tasks.take();
                     }
                     catch (InterruptedException e) {
                         // Interrupt signals a request to shutdown or
