@@ -592,6 +592,48 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that an interrupted join of indices returns
+     * at once with the interrupt status set, while a worker still runs one of
+     * its indices.
+     * <p>
+     * <strong>Start state:</strong> An executor with four idle workers.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join two indices. On a worker, an index blocks until the end of the
+     * test. On the calling thread, an index waits until both indices run and
+     * then interrupts the calling thread.</li>
+     * <li>Check and clear the interrupt status.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The join returns before the timeout, and the
+     * interrupt status is set.
+     */
+    @Test(timeout = 5000)
+    public void testJoinIndicesReturnsAtOnceWhenInterrupted() {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        Thread caller = Thread.currentThread();
+        CountDownLatch started = new CountDownLatch(2);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            joinable.join(2, index -> {
+                started.countDown();
+                if(Thread.currentThread() == caller) {
+                    Uninterruptibles.awaitUninterruptibly(started);
+                    caller.interrupt();
+                }
+                else {
+                    Uninterruptibles.awaitUninterruptibly(release);
+                }
+            });
+            Assert.assertTrue(Thread.interrupted());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a join of {@link Integer#MAX_VALUE}
      * indices never passes the action a negative index when a worker helps.
      * <p>
