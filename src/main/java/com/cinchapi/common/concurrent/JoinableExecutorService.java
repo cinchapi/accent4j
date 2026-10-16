@@ -47,10 +47,10 @@ import com.cinchapi.common.base.CheckedExceptions;
  * complete the entire batch of tasks.
  * </p>
  *
- * <h2>How It Works: The Caller Works, Idle Workers Help</h2>
+ * <h2>How It Works: The Caller Works, Free Workers Help</h2>
  * <p>
  * A join hands out its work one item at a time, and the calling thread takes
- * items until none are left. A worker that is idle when the join begins takes
+ * items until none are left. A worker that is free while the join runs takes
  * items too, so the work spreads across every thread that is free. A worker
  * that is busy does not wait for, or hold up, the join. So when every worker is
  * busy, the calling thread does all of the work itself, in about the time it
@@ -89,11 +89,10 @@ import com.cinchapi.common.base.CheckedExceptions;
  * <strong>divisible, "divide-and-conquer"</strong> style
  * {@code ForkJoinTask}s that can be recursively broken down.</li>
  * <li><strong>Work-Sharing Model:</strong> In this service, the threads of a
- * join take its items one at a time from a shared position, and only idle
- * workers join in. A {@code ForkJoinPool} uses a
- * <strong>work-stealing</strong> algorithm, where any idle thread can steal
- * tasks from any other busy thread, which balances recursive problems
- * well.</li>
+ * join take its items one at a time from a shared position, and only free
+ * workers join in. A {@code ForkJoinPool} uses a <strong>work-stealing</strong>
+ * algorithm, where any idle thread can steal tasks from any other busy thread,
+ * which balances recursive problems well.</li>
  * </ul>
  * </p>
  *
@@ -280,7 +279,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * </p>
      * <p>
      * The calling thread runs tasks until none are left, and any worker that is
-     * idle when the join begins runs tasks too. So the join finishes even when
+     * free while the join runs takes tasks too. So the join finishes even when
      * every worker is busy, and a busy pool leaves every task to the calling
      * thread. The tasks run in no set order, and no task runs twice.
      * </p>
@@ -315,7 +314,7 @@ public interface JoinableExecutorService extends ExecutorService {
      * </p>
      * <p>
      * The calling thread runs tasks until none are left, and any worker that is
-     * idle when the join begins runs tasks too. So the join finishes even when
+     * free while the join runs takes tasks too. So the join finishes even when
      * every worker is busy, and a busy pool leaves every task to the calling
      * thread. The tasks run in no set order, and no task runs twice.
      * </p>
