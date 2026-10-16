@@ -267,47 +267,67 @@ public interface JoinableExecutorService extends ExecutorService {
     }
 
     /**
-     * Run the provided {@code action} once for each index from {@code 0} to
-     * {@code count - 1}, and return once every run is done.
+     * Assuming an ordered collection of {@code count} tasks, such as an array
+     * or a {@link List}, run the provided {@code action} once for each task,
+     * and return once every run is done.
      * <p>
-     * The calling thread runs indices until none are left, and any worker that
-     * is idle when the join begins runs indices too. So the join finishes even
-     * when every worker is busy, and a busy pool leaves every index to the
-     * calling thread. The runs have no set order, and no index runs twice.
+     * The {@code action} receives the index of a task, from {@code 0} to
+     * {@code count - 1}, and must get that task from the collection by its
+     * index and run it. Unlike {@link #join(Runnable...)} and
+     * {@link #join(Callable...)}, this form does not take the tasks themselves.
+     * It takes only their number, so the caller creates no object for each
+     * task.
      * </p>
      * <p>
-     * Each run that throws is reported to the {@code errorHandler}, on the
-     * calling thread, with its index. If the calling thread is interrupted
+     * The calling thread runs tasks until none are left, and any worker that is
+     * idle when the join begins runs tasks too. So the join finishes even when
+     * every worker is busy, and a busy pool leaves every task to the calling
+     * thread. The tasks run in no set order, and no task runs twice.
+     * </p>
+     * <p>
+     * Each run that throws is reported to the provided {@code errorHandler}, on
+     * the calling thread, with its index. If the calling thread is interrupted
      * while it waits for a worker to finish a run, the join returns at once,
      * with the interrupt status set.
      * </p>
      *
      * @param errorHandler receives the index and the error of each run that
      *            throws
-     * @param count the number of indices to run, which must not be negative;
-     *            {@code 0} runs nothing
-     * @param action the work to do for one index
+     * @param count the number of tasks in the collection, which must not be
+     *            negative; {@code 0} runs nothing
+     * @param action receives the index of one task, and gets and runs that
+     *            task
      */
     public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
             IntConsumer action);
 
     /**
-     * Run the provided {@code action} once for each index from {@code 0} to
-     * {@code count - 1}, and return once every run is done.
+     * Assuming an ordered collection of {@code count} tasks, such as an array
+     * or a {@link List}, run the provided {@code action} once for each task,
+     * and return once every run is done.
      * <p>
-     * The calling thread runs indices until none are left, and any worker that
-     * is idle when the join begins runs indices too. So the join finishes even
-     * when every worker is busy, and a busy pool leaves every index to the
-     * calling thread. The runs have no set order, and no index runs twice.
+     * The {@code action} receives the index of a task, from {@code 0} to
+     * {@code count - 1}, and must get that task from the collection by its
+     * index and run it. Unlike {@link #join(Runnable...)} and
+     * {@link #join(Callable...)}, this form does not take the tasks themselves.
+     * It takes only their number, so the caller creates no object for each
+     * task.
+     * </p>
+     * <p>
+     * The calling thread runs tasks until none are left, and any worker that is
+     * idle when the join begins runs tasks too. So the join finishes even when
+     * every worker is busy, and a busy pool leaves every task to the calling
+     * thread. The tasks run in no set order, and no task runs twice.
      * </p>
      * <p>
      * If a run throws, the join throws that error, wrapped if it is checked,
      * once every run is done.
      * </p>
      *
-     * @param count the number of indices to run, which must not be negative;
-     *            {@code 0} runs nothing
-     * @param action the work to do for one index
+     * @param count the number of tasks in the collection, which must not be
+     *            negative; {@code 0} runs nothing
+     * @param action receives the index of one task, and gets and runs that
+     *            task
      */
     public default void join(int count, IntConsumer action) {
         join((index, error) -> {

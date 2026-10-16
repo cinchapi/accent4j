@@ -28,21 +28,23 @@ every worker is busy, a join takes about as long as running its tasks alone, and
 idle workers make it finish sooner. The join of 200,000 tasks with every worker
 busy now takes about 20 milliseconds. Every form of `join` works this way.
 
-* `JoinableExecutorService` has a new `join` form that runs an action once for
-  each index from `0` up to a count. It creates no `Future` or other object for
-  each index, which suits a large batch of quick tasks. For example, this
-  fetches each page on whichever threads are free and returns once every fetch
-  is done:
+* `JoinableExecutorService` has a new `join` form for a batch of tasks that you
+  keep in an ordered collection, such as an array or a `List`. Instead of the
+  tasks themselves, it takes their number and an action, which receives the
+  index of a task and gets and runs that task. So it creates no `Future` or
+  other object for each task, which suits a large batch of quick tasks. For
+  example, this fetches each page on whichever threads are free and returns once
+  every fetch is done:
 
   ```java
   String[] pages = new String[urls.length];
   executor.join(urls.length, i -> pages[i] = fetch(urls[i]));
   ```
 
-  The indices run in no set order. If a run throws, the join throws that error
-  once every index has run. Another form passes each error and its index to a
-  handler instead. A class that implements `JoinableExecutorService` must now
-  implement this form.
+  The tasks run in no set order. If a task throws, the join throws that error
+  once every task has run. Another form passes each error and the index of its
+  task to a handler instead. A class that implements `JoinableExecutorService`
+  must now implement this form.
 
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
