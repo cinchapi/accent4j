@@ -254,7 +254,7 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
      * of the {@code tasks}.
      *
      * @param tasks the tasks to run, which must not be empty
-     * @param futureOf the {@link FutureTask} that runs a task
+     * @param futureOf makes the {@link FutureTask} that runs a task
      * @param errorHandler receives each task that fails, with its error
      * @return the {@link Future} of each task, in the order of {@code tasks}
      */
@@ -286,38 +286,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     }
 
     /**
-     * The main loop for worker threads in the executor service. This method
-     * runs continuously until the executor service is terminated. It is
-     * responsible for executing tasks from the task groups that have been
-     * submitted to the service.
-     *
-     * <p>
-     * The worker loop operates as follows:
-     * <ol>
-     * <li>If the executor service is in the {@link State#TERMINATED} state, the
-     * loop
-     * terminates and the worker thread exits.</li>
-     * <li>If the executor service is in the {@link State#SHUTDOWN} state, the
-     * worker attempts to retrieve and process a task group from the queue.</li>
-     * <li>If there are no task groups available in the shutdown state, the
-     * worker thread exits the loop and terminates.</li>
-     * <li>If the executor service is in the {@link State#RUNNING} state, the
-     * worker retrieves a task group from the queue and processes it.</li>
-     * <li>For each task in the group, the worker calls the
-     * {@link #run(Runnable)} method to execute the task.</li>
-     * <li>If the executor service transitions to the {@link State#SHUTDOWN}
-     * state during task execution, the worker continues executing all remaining
-     * tasks in the current group before exiting the loop.</li>
-     * <li>If the executor service remains in the {@link State#RUNNING} state,
-     * the worker returns the partially processed group back to the queue for
-     * another worker to continue execution.</li>
-     * </ol>
-     * </p>
-     * <p>
-     * The worker loop is designed to handle interruptions and state transitions
-     * gracefully, ensuring that all submitted tasks are eventually executed
-     * unless the executor service is terminated forcefully.
-     * </p>
+     * Run tasks on a worker thread until the executor terminates. While the
+     * executor runs, the worker waits for a task and runs it. After
+     * {@link #shutdown()}, the worker runs the tasks that remain in the queue
+     * and exits. The last worker to exit marks the executor terminated.
      */
     private void executeTaskLoop() {
         try {
