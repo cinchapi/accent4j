@@ -22,12 +22,14 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.stream.Collectors;
 
 import org.junit.Assert;
@@ -225,6 +227,175 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
         Thread.sleep(100);
         Assert.assertTrue(aCount.get() > 0);
         Assert.assertFalse(bCount.get() > 0);
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that the work to join {@link Runnable
+     * Runnables} grows with the number of tasks, not with its square, when
+     * the calling thread runs them because every worker is busy.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 200,000 tasks that each count once.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The join returns within five seconds, after
+     * every task has run.
+     */
+    @Test(timeout = 5000)
+    public void testJoinRunnablesWhileWorkersAreBusyIsLinear()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            AtomicInteger count = new AtomicInteger();
+            Runnable[] tasks = new Runnable[200000];
+            for (int i = 0; i < tasks.length; ++i) {
+                tasks[i] = count::incrementAndGet;
+            }
+            joinable.join(tasks);
+            Assert.assertEquals(tasks.length, count.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that the work to join {@link Callable
+     * Callables} grows with the number of tasks, not with its square, when
+     * the calling thread runs them because every worker is busy.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 200,000 tasks that each return their index.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The join returns within five seconds, and
+     * each {@link Future} holds the index of its task.
+     */
+    @SuppressWarnings("unchecked")
+    @Test(timeout = 5000)
+    public void testJoinCallablesWhileWorkersAreBusyIsLinear()
+            throws Exception {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            Callable<Integer>[] tasks = new Callable[200000];
+            for (int i = 0; i < tasks.length; ++i) {
+                int index = i;
+                tasks[i] = () -> index;
+            }
+            List<Future<Integer>> futures = joinable.join(tasks);
+            for (int i = 0; i < tasks.length; ++i) {
+                Assert.assertEquals(Integer.valueOf(i), futures.get(i).get());
+            }
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a join runs each task exactly once
+     * while the workers and the calling thread both run tasks.
+     * <p>
+     * <strong>Start state:</strong> An executor with four idle workers.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 10,000 tasks that each count how many times they run.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each task ran exactly once.
+     */
+    @Test
+    public void testJoinRunsEachTaskOnce() {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        AtomicIntegerArray runs = new AtomicIntegerArray(10000);
+        Runnable[] tasks = new Runnable[runs.length()];
+        for (int i = 0; i < tasks.length; ++i) {
+            int index = i;
+            tasks[i] = () -> runs.incrementAndGet(index);
+        }
+        joinable.join(tasks);
+        for (int i = 0; i < runs.length(); ++i) {
+            Assert.assertEquals(1, runs.get(i));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code shutdownNow} returns only the
+     * tasks that never ran, even after a join whose tasks the calling thread
+     * ran while every worker was busy.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 100 tasks.</li>
+     * <li>Submit three more tasks, which no thread runs.</li>
+     * <li>Call {@code shutdownNow}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks.
+     */
+    @Test
+    public void testShutdownNowAfterJoinReturnsOnlyTasksThatNeverRan()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            Runnable[] tasks = new Runnable[100];
+            for (int i = 0; i < tasks.length; ++i) {
+                tasks[i] = () -> {};
+            }
+            joinable.join(tasks);
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(() -> {});
+            }
+            Assert.assertEquals(3, joinable.shutdownNow().size());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * Occupy {@code workers} worker threads of {@code executor} with tasks
+     * that block until the returned latch counts down, and return once each
+     * of them has started.
+     *
+     * @param executor the executor whose workers to block
+     * @param workers the number of workers that {@code executor} has
+     * @return the latch that releases the blocked workers
+     * @throws InterruptedException if interrupted while waiting for the
+     *             workers to start
+     */
+    private static CountDownLatch blockWorkers(ExecutorService executor,
+            int workers) throws InterruptedException {
+        CountDownLatch started = new CountDownLatch(workers);
+        CountDownLatch release = new CountDownLatch(1);
+        for (int i = 0; i < workers; ++i) {
+            executor.execute(() -> {
+                started.countDown();
+                try {
+                    release.await();
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+        started.await();
+        return release;
     }
 
     @Override
