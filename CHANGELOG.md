@@ -1,20 +1,48 @@
 # Changelog
 
 #### Version 1.18.0 (TBD)
+
+##### Joins in JoinableExecutorService
+
+A join in a `JoinableExecutorService` is now fast for a batch of any size, even
+when every worker is busy. A join lets a thread finish a batch of work, such as
+a read from many files, with help from any worker that's free. The calling
+thread works on the batch too, so a join should never take longer than running
+its tasks alone.
+
+Previously, a join put every task in the batch on the queue that all of the
+workers share. Then the calling thread searched that queue for each of its tasks
+that wasn't finished, to take it back and run it itself. Each search looked
+through the queue while the workers and every other join waited for it. So a
+batch twice as large took about four times as long, and with every worker busy,
+a join of 200,000 tasks took more than five seconds.
+
+Now, a join keeps its tasks off the queue and numbers them. The calling thread
+takes the next number, runs that task, and repeats until no numbers are left.
+When the join begins, it asks only the workers that are idle at that moment to
+help. Each helper takes the next number from the same join, so no task runs
+twice.
+
+Taking the next number is one quick step, however large the batch is. So when
+every worker is busy, a join takes about as long as running its tasks alone, and
+idle workers make it finish sooner. The join of 200,000 tasks with every worker
+busy now takes about 20 milliseconds. Every form of `join` works this way.
+
 * `JoinableExecutorService` has a new `join` form that runs an action once for
-  each index from `0` up to a count, instead of taking an array of tasks. It
-  makes no task object or `Future` for each index, so it suits a join of many
-  small pieces of work. A class that implements `JoinableExecutorService` must
-  now implement this form.
-* Fixed a bug where `JoinableExecutorService#join` slowed down with the square
-  of the number of tasks it was given. After it queued the tasks, the calling
-  thread took back each one that no worker had started by removing it from the
-  shared queue, which searches the queue while it holds the queue's lock, so the
-  workers and every other caller waited too. With every worker busy, a join of
-  200,000 tasks took more than five seconds. Now, the threads of a join take its
-  tasks one at a time, and only the workers that are idle when the join begins
-  help. So a busy pool leaves every task to the calling thread instead of
-  queuing them.
+  each index from `0` up to a count. It creates no `Future` or other object for
+  each index, which suits a large batch of quick tasks. For example, this
+  fetches each page on whichever threads are free and returns once every fetch
+  is done:
+
+  ```java
+  String[] pages = new String[urls.length];
+  executor.join(urls.length, i -> pages[i] = fetch(urls[i]));
+  ```
+
+  The indices run in no set order. If a run throws, the join throws that error
+  once every index has run. Another form passes each error and its index to a
+  handler instead. A class that implements `JoinableExecutorService` must now
+  implement this form.
 
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
