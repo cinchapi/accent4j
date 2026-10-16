@@ -258,7 +258,6 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
      * @param errorHandler receives each task that fails, with its error
      * @return the {@link Future} of each task, in the order of {@code tasks}
      */
-    @SuppressWarnings("unchecked")
     private <T, V> List<Future<V>> joinAll(T[] tasks,
             Function<T, FutureTask<V>> futureOf,
             BiConsumer<T, Throwable> errorHandler) {
