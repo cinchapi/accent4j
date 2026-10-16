@@ -2,12 +2,21 @@
 
 #### Version 1.18.0 (TBD)
 
-##### Performance Improvements
-* `CoalescableTreeMap#coalesce` reaches each neighbor of the lookup key by
-  stepping from the last one instead of searching the whole map again, so a
-  lookup searches the map once in each direction however many keys coalesce.
-  Each key of the returned map is the key that the map holds, including the
-  one that sorts in the place of the lookup key.
+##### Miscellaneous
+* `CoalescableTreeMap#coalesce` now returns a Map whose keys are the same as the
+  keys actually stored in the original Map. Previously, each neighbor came back
+  as the original Map stored it, but the key at the lookup position came back as
+  the caller spelled it. For example, in a Map that ignores case and stores
+  `foo`, a lookup of `FOO` previously returned the key `FOO` and now returns
+  `foo`. The returned Map compares keys the same way as the original Map, so
+  `get` with the lookup key finds the entry in both cases.
+* `CoalescableTreeMap#coalesce` is now faster on every lookup, most of all on a
+  large map or when many keys coalesce. A lookup searches the map twice, once on
+  each side of the lookup key, and steps from each neighbor to the next. Each
+  coalesced key costs one call to the matcher. Previously, a lookup searched the
+  map again for every neighbor, so it cost three searches plus one per coalesced
+  key. On a map of two million keys where two keys coalesce, a lookup makes
+  about half as many key comparisons and takes about a third less time.
 
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
