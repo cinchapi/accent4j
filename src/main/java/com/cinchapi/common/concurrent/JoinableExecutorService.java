@@ -306,7 +306,12 @@ public interface JoinableExecutorService extends ExecutorService {
      */
     public default void join(int count, IntConsumer action) {
         join((index, error) -> {
-            throw CheckedExceptions.wrapAsRuntimeException(error);
+            if(error instanceof Error) {
+                throw (Error) error;
+            }
+            else {
+                throw CheckedExceptions.wrapAsRuntimeException(error);
+            }
         }, count, action);
     }
 

@@ -92,6 +92,40 @@ public abstract class AbstractJoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a join of indices without an error
+     * handler throws an {@link Error} from a failed run as it is, without a
+     * wrapper.
+     * <p>
+     * <strong>Start state:</strong> A new executor.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 10 indices, of which index 5 throws an {@link Error}.</li>
+     * <li>Catch whatever the join throws.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The join throws the same {@link Error} that
+     * index 5 threw.
+     */
+    @Test
+    public void testJoinIndicesThrowsAnErrorUnwrapped() {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        Error failure = new Error();
+        Throwable thrown = null;
+        try {
+            joinable.join(10, index -> {
+                if(index == 5) {
+                    throw failure;
+                }
+            });
+        }
+        catch (Throwable e) {
+            thrown = e;
+        }
+        Assert.assertSame(failure, thrown);
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a join of zero indices runs nothing.
      * <p>
      * <strong>Start state:</strong> A new executor.
