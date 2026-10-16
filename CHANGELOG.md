@@ -1,5 +1,16 @@
 # Changelog
 
+#### Version 1.17.4 (TBD)
+* Fixed a bug where `JoinableExecutorService#join` slowed down with the square
+  of the number of tasks it was given. After it queued the tasks, the calling
+  thread took back each one that no worker had started by removing it from the
+  shared queue, which searches the queue while it holds the queue's lock, so the
+  workers and every other caller waited too. With every worker busy, a join of
+  200,000 tasks took more than five seconds. Now, the calling thread runs each
+  task in place, and a task that another thread already started or finished does
+  nothing when it runs again. `shutdownNow` still returns only the tasks that
+  have not run.
+
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
   map's `Comparator` kept apart two keys that are `equal` to each other. The

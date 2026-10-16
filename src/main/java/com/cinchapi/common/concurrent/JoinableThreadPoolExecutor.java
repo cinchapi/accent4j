@@ -187,12 +187,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                 futures.add(future);
             }
             for (int i = futures.size() - 1; i >= 0; --i) {
-                FutureTask<V> task = (FutureTask<V>) futures.get(i);
-                if(!task.isDone() && this.tasks.remove(task)) {
-                    // Use the calling thread to steal work before awaiting all
-                    // tasks to complete
-                    task.run();
-                }
+                // Run each task here instead of waiting for a worker. A task
+                // that another thread started or finished does nothing when
+                // it runs again, so it can stay in the queue.
+                ((FutureTask<V>) futures.get(i)).run();
             }
             for (int i = 0; i < futures.size(); ++i) {
                 Future<V> future = futures.get(i);
@@ -247,12 +245,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                 futures.add(future);
             }
             for (int i = futures.size() - 1; i >= 0; --i) {
-                FutureTask<Void> task = futures.get(i);
-                if(!task.isDone() && this.tasks.remove(task)) {
-                    // Use the calling thread to steal work before awaiting all
-                    // tasks to complete
-                    task.run();
-                }
+                // Run each task here instead of waiting for a worker. A task
+                // that another thread started or finished does nothing when
+                // it runs again, so it can stay in the queue.
+                futures.get(i).run();
             }
             for (int i = 0; i < futures.size(); ++i) {
                 Future<Void> future = futures.get(i);
@@ -345,6 +341,9 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                 worker.interrupt();
             }
             tasks.drainTo(unfinished);
+            // A join runs its tasks in place and leaves them in the queue, so
+            // some drained tasks may have already run
+            unfinished.removeIf(task -> ((FutureTask<?>) task).isDone());
         }
         return unfinished;
     }
