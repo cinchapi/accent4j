@@ -62,7 +62,10 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      * The returned {@link Map} is a copy in the order of this map. It compares
      * keys with the {@link #comparator() comparator} of this map, so it keeps
      * every key that this map keeps apart, even keys that are
-     * {@link Object#equals(Object) equal} to each other.
+     * {@link Object#equals(Object) equal} to each other. Each of its keys is
+     * the key that this map holds, including the key that sorts in the place
+     * of {@code key}, which coalesces even when the {@code matcher} rejects
+     * it.
      * </p>
      * <p>
      * The returned {@link Map} omits each key that maps to {@code null},
@@ -81,25 +84,50 @@ public class CoalescableTreeMap<K, V> extends TreeMap<K, V> {
      */
     public Map<K, V> coalesce(K key, BiPredicate<K, K> matcher) {
         Map<K, V> coalesced = new TreeMap<>(comparator());
-        V matched = get(key);
-        if(matched != null) {
-            coalesced.put(key, matched);
-        }
-        Entry<K, V> entry = lowerEntry(key);
-        while (entry != null && matcher.test(key, entry.getKey())) {
-            if(entry.getValue() != null) {
-                coalesced.put(entry.getKey(), entry.getValue());
+        boolean first = true;
+        for (Entry<K, V> entry : descendingMap().tailMap(key, true)
+                .entrySet()) {
+            if(matcher.test(key, entry.getKey())
+                    || (first && compare(entry.getKey(), key) == 0)) {
+                if(entry.getValue() != null) {
+                    coalesced.put(entry.getKey(), entry.getValue());
+                }
+                first = false;
             }
-            entry = lowerEntry(entry.getKey());
-        }
-        entry = higherEntry(key);
-        while (entry != null && matcher.test(key, entry.getKey())) {
-            if(entry.getValue() != null) {
-                coalesced.put(entry.getKey(), entry.getValue());
+            else {
+                break;
             }
-            entry = higherEntry(entry.getKey());
+        }
+        for (Entry<K, V> entry : tailMap(key, false).entrySet()) {
+            if(matcher.test(key, entry.getKey())) {
+                if(entry.getValue() != null) {
+                    coalesced.put(entry.getKey(), entry.getValue());
+                }
+            }
+            else {
+                break;
+            }
         }
         return coalesced;
+    }
+
+    /**
+     * Compare {@code k1} to {@code k2} in the order of this map.
+     *
+     * @param k1
+     * @param k2
+     * @return a negative number, zero or a positive number as {@code k1} sorts
+     *         before, in the place of or after {@code k2}
+     */
+    @SuppressWarnings("unchecked")
+    private int compare(K k1, K k2) {
+        Comparator<? super K> comparator = comparator();
+        if(comparator != null) {
+            return comparator.compare(k1, k2);
+        }
+        else {
+            return ((Comparable<? super K>) k1).compareTo(k2);
+        }
     }
 
 }
