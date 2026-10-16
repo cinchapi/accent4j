@@ -1,15 +1,20 @@
 # Changelog
 
-#### Version 1.17.4 (TBD)
+#### Version 1.18.0 (TBD)
+* `JoinableExecutorService` has a new `join` form that runs an action once for
+  each index from `0` up to a count, instead of taking an array of tasks. It
+  makes no task object or `Future` for each index, so it suits a join of many
+  small pieces of work. A class that implements `JoinableExecutorService` must
+  now implement this form.
 * Fixed a bug where `JoinableExecutorService#join` slowed down with the square
   of the number of tasks it was given. After it queued the tasks, the calling
   thread took back each one that no worker had started by removing it from the
   shared queue, which searches the queue while it holds the queue's lock, so the
   workers and every other caller waited too. With every worker busy, a join of
-  200,000 tasks took more than five seconds. Now, the calling thread runs each
-  task in place, and a task that another thread already started or finished does
-  nothing when it runs again. `shutdownNow` still returns only the tasks that
-  have not run.
+  200,000 tasks took more than five seconds. Now, the threads of a join take its
+  tasks one at a time, and only the workers that are idle when the join begins
+  help. So a busy pool leaves every task to the calling thread instead of
+  queuing them.
 
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the

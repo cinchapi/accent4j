@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.BiConsumer;
+import java.util.function.IntConsumer;
 
 import com.cinchapi.common.base.CheckedExceptions;
 
@@ -46,23 +47,15 @@ import com.cinchapi.common.base.CheckedExceptions;
  * complete the entire batch of tasks.
  * </p>
  *
- * <h2>How It Works: A "Take-Back" Strategy</h2>
+ * <h2>How It Works: The Caller Works, Idle Workers Help</h2>
  * <p>
- * Implementations of this interface typically use a simple but effective
- * architecture to achieve this behavior:
+ * A join hands out its work one item at a time, and the calling thread takes
+ * items until none are left. A worker that is idle when the join begins takes
+ * items too, so the work spreads across every thread that is free. A worker
+ * that is busy does not wait for, or hold up, the join. So when every worker is
+ * busy, the calling thread does all of the work itself, in about the time it
+ * would take to do it without this executor.
  * </p>
- * <ol>
- * <li><strong>Single Shared Queue:</strong> All worker threads in the pool
- * pull tasks from one central {@link java.util.concurrent.BlockingQueue}.</li>
- * <li><strong>Submission and "Take-Back":</strong> When {@code join} is
- * called, all tasks are added to this shared queue. The calling thread
- * then immediately attempts to <strong>take back</strong> those same
- * tasks from the queue before a dedicated worker can.</li>
- * <li><strong>Completion:</strong> If the calling thread successfully
- * retrieves a task, it executes it directly. The {@code join} method
- * only returns after all tasks in the batch have been completed, whether
- * they were run by the calling thread or the pool's workers.</li>
- * </ol>
  *
  * <h2>Ideal Use Case: Parallel Independent Tasks</h2>
  * <p>
@@ -95,16 +88,12 @@ import com.cinchapi.common.base.CheckedExceptions;
  * {@code Runnable}/{@code Callable} tasks. A {@code ForkJoinPool} is for
  * <strong>divisible, "divide-and-conquer"</strong> style
  * {@code ForkJoinTask}s that can be recursively broken down.</li>
- * <li><strong>Architecture:</strong> This service relies on a
- * <strong>single shared queue</strong>, which can be a source of
- * contention. A {@code ForkJoinPool} uses <strong>per-thread
- * deques</strong> (double-ended queues) to dramatically reduce
- * contention.</li>
- * <li><strong>Work-Sharing Model:</strong> This service uses a simple
- * "take-back" strategy. A {@code ForkJoinPool} uses a more sophisticated
- * <strong>work-stealing</strong> algorithm, where any idle thread can
- * steal tasks from any other busy thread, providing superior load
- * balancing for recursive problems.</li>
+ * <li><strong>Work-Sharing Model:</strong> In this service, the threads of a
+ * join take its items one at a time from a shared position, and only idle
+ * workers join in. A {@code ForkJoinPool} uses a
+ * <strong>work-stealing</strong> algorithm, where any idle thread can steal
+ * tasks from any other busy thread, which balances recursive problems
+ * well.</li>
  * </ul>
  * </p>
  *
@@ -180,10 +169,10 @@ public interface JoinableExecutorService extends ExecutorService {
      * them have completed.
      * </p>
      * <p>
-     * Each task may execute in a in a pooled thread, or in the calling thread.
+     * Each task may execute in a pooled thread, or in the calling thread.
      * Because the calling thread participates in execution while waiting, the
-     * affect is that the group of {@code tasks} in completed in at least as
-     * much time as they would be if the calling thread executed them serially
+     * effect is that the group of {@code tasks} completes in no more time
+     * than it would if the calling thread executed them serially.
      * </p>
      *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
@@ -210,10 +199,10 @@ public interface JoinableExecutorService extends ExecutorService {
      * them have completed.
      * </p>
      * <p>
-     * Each task may execute in a in a pooled thread, or in the calling thread.
+     * Each task may execute in a pooled thread, or in the calling thread.
      * Because the calling thread participates in execution while waiting, the
-     * affect is that the group of {@code tasks} in completed in at least as
-     * much time as they would be if the calling thread executed them serially
+     * effect is that the group of {@code tasks} completes in no more time
+     * than it would if the calling thread executed them serially.
      * </p>
      *
      * @param errorHandler a {@link BiConsumer} that runs whenever an error
@@ -233,17 +222,17 @@ public interface JoinableExecutorService extends ExecutorService {
      * them have completed.
      * </p>
      * <p>
-     * Each task may execute in a in a pooled thread, or in the calling thread.
+     * Each task may execute in a pooled thread, or in the calling thread.
      * Because the calling thread participates in execution while waiting, the
-     * affect is that the group of {@code tasks} in completed in at least as
-     * much time as they would be if the calling thread executed them serially
+     * effect is that the group of {@code tasks} completes in no more time
+     * than it would if the calling thread executed them serially.
      * </p>
      *
      * @param tasks
      * @return a list of {@link Future} objects that correspond to each of the
      *         submitted {@code tasks}; since this method awaits completion of
      *         all tasks, each {@link Future} will be {@link Future#isDone()
-     *         done} and the result can be {@link Future#get() retrived}
+     *         done} and the result can be {@link Future#get() retrieved}
      *         immediately
      */
     @SuppressWarnings("unchecked")
@@ -263,10 +252,10 @@ public interface JoinableExecutorService extends ExecutorService {
      * them have completed.
      * </p>
      * <p>
-     * Each task may execute in a in a pooled thread, or in the calling thread.
+     * Each task may execute in a pooled thread, or in the calling thread.
      * Because the calling thread participates in execution while waiting, the
-     * affect is that the group of {@code tasks} in completed in at least as
-     * much time as they would be if the calling thread executed them serially
+     * effect is that the group of {@code tasks} completes in no more time
+     * than it would if the calling thread executed them serially.
      * </p>
      *
      * @param tasks
@@ -275,6 +264,55 @@ public interface JoinableExecutorService extends ExecutorService {
         join((task, error) -> {
             throw CheckedExceptions.wrapAsRuntimeException(error);
         }, tasks);
+    }
+
+    /**
+     * Run the provided {@code action} once for each index from {@code 0} to
+     * {@code count - 1}, and return once every run is done.
+     * <p>
+     * The calling thread runs indices until none are left, and any worker that
+     * is idle when the join begins runs indices too. So the join finishes even
+     * when every worker is busy, and a busy pool leaves every index to the
+     * calling thread. The runs have no set order, and no index runs twice.
+     * </p>
+     * <p>
+     * Each run that throws is reported to the {@code errorHandler}, on the
+     * calling thread, with its index. If the calling thread is interrupted
+     * while it waits for a worker to finish a run, the join returns at once,
+     * with the interrupt status set.
+     * </p>
+     *
+     * @param errorHandler receives the index and the error of each run that
+     *            throws
+     * @param count the number of indices to run, which must not be negative;
+     *            {@code 0} runs nothing
+     * @param action the work to do for one index
+     */
+    public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
+            IntConsumer action);
+
+    /**
+     * Run the provided {@code action} once for each index from {@code 0} to
+     * {@code count - 1}, and return once every run is done.
+     * <p>
+     * The calling thread runs indices until none are left, and any worker that
+     * is idle when the join begins runs indices too. So the join finishes even
+     * when every worker is busy, and a busy pool leaves every index to the
+     * calling thread. The runs have no set order, and no index runs twice.
+     * </p>
+     * <p>
+     * If a run throws, the join throws that error, wrapped if it is checked,
+     * once every run is done.
+     * </p>
+     *
+     * @param count the number of indices to run, which must not be negative;
+     *            {@code 0} runs nothing
+     * @param action the work to do for one index
+     */
+    public default void join(int count, IntConsumer action) {
+        join((index, error) -> {
+            throw CheckedExceptions.wrapAsRuntimeException(error);
+        }, count, action);
     }
 
 }

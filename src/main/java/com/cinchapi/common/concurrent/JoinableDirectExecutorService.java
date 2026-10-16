@@ -15,8 +15,10 @@
  */
 package com.cinchapi.common.concurrent;
 
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -25,7 +27,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.IntConsumer;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -90,6 +94,31 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
                 }
             }
             return futures;
+        }
+        else {
+            throw new RejectedExecutionException();
+        }
+    }
+
+    @Override
+    public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
+            IntConsumer action) {
+        Preconditions.checkNotNull(errorHandler);
+        Preconditions.checkNotNull(action);
+        Preconditions.checkArgument(count >= 0);
+        if(shutdown.getCount() > 0) {
+            List<Entry<Integer, Throwable>> errors = new ArrayList<>();
+            for (int index = 0; index < count; ++index) {
+                try {
+                    action.accept(index);
+                }
+                catch (Throwable error) {
+                    errors.add(new SimpleImmutableEntry<>(index, error));
+                }
+            }
+            for (Entry<Integer, Throwable> error : errors) {
+                errorHandler.accept(error.getKey(), error.getValue());
+            }
         }
         else {
             throw new RejectedExecutionException();
