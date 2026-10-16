@@ -286,9 +286,9 @@ public interface JoinableExecutorService extends ExecutorService {
      * </p>
      * <p>
      * Each run that throws is reported to the provided {@code errorHandler}, on
-     * the calling thread, with its index. If the calling thread is interrupted
-     * while it waits for a worker to finish a run, the join returns at once,
-     * with the interrupt status set.
+     * the calling thread, with its index, in index order. If the calling thread
+     * is interrupted while it waits for a worker to finish a run, the join
+     * returns at once, with the interrupt status set.
      * </p>
      *
      * @param errorHandler receives the index and the error of each run that
@@ -320,8 +320,8 @@ public interface JoinableExecutorService extends ExecutorService {
      * thread. The tasks run in no set order, and no task runs twice.
      * </p>
      * <p>
-     * If a run throws, the join throws that error, wrapped if it is checked,
-     * once every run is done.
+     * If any run throws, the join throws the error of the failed run with the
+     * lowest index, wrapped if it is checked, once every run is done.
      * </p>
      *
      * @param count the number of tasks in the collection, which must not be
