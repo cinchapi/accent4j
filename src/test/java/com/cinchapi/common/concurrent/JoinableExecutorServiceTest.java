@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -408,13 +409,15 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
-     * <strong>Goal:</strong> Verify that an idle worker helps run the indices
-     * of a join.
+     * <strong>Goal:</strong> Verify that a worker that was idle when a join
+     * began helps run its indices.
      * <p>
-     * <strong>Start state:</strong> An executor with four idle workers.
+     * <strong>Start state:</strong> A new executor with four workers, whose
+     * threads the test records as the executor creates them.
      * <p>
      * <strong>Workflow:</strong>
      * <ul>
+     * <li>Wait until each worker is in the {@code WAITING} state.</li>
      * <li>Join two indices, each of which waits until both of them are
      * running.</li>
      * </ul>
@@ -423,9 +426,22 @@ public class JoinableExecutorServiceTest extends
      * returns without either wait timing out.
      */
     @Test
-    public void testJoinIndicesUsesIdleWorkers() throws InterruptedException {
-        JoinableExecutorService joinable = (JoinableExecutorService) executor;
-        Thread.sleep(100); // Let the workers start waiting for tasks
+    public void testJoinIndicesUsesIdleWorkers() {
+        List<Thread> workers = new CopyOnWriteArrayList<>();
+        JoinableExecutorService joinable = JoinableExecutorService.create(4,
+                task -> {
+                    Thread worker = new Thread(task);
+                    worker.setDaemon(true);
+                    workers.add(worker);
+                    return worker;
+                });
+        // A worker enters the WAITING state only inside take, after it has
+        // looked for joins, so only a queued helper can bring it to this join
+        for (Thread worker : workers) {
+            while (worker.getState() != Thread.State.WAITING) {
+                Thread.yield();
+            }
+        }
         CyclicBarrier together = new CyclicBarrier(2);
         AtomicInteger timeouts = new AtomicInteger();
         joinable.join(2, index -> {
@@ -437,6 +453,7 @@ public class JoinableExecutorServiceTest extends
             }
         });
         Assert.assertEquals(0, timeouts.get());
+        joinable.shutdownNow();
     }
 
     /**
