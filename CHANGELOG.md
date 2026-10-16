@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.17.4 (TBD)
+#### Version 1.18.0 (TBD)
 * `CoalescableTreeMap#coalesce` reaches each neighbor of the lookup key by
   stepping from the last one instead of searching the whole map again, so a
   lookup searches the map once in each direction however many keys coalesce.
