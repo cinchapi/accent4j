@@ -137,6 +137,38 @@ public class CoalescableTreeMapTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that coalescing stops on each side at the
+     * first key that the matcher rejects, so a key beyond it does not coalesce
+     * even when the matcher accepts it.
+     * <p>
+     * <strong>Start state:</strong> A map, created without a
+     * {@link Comparator}, from the integers 1 through 7 to their text.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Coalesce the key 4 with a matcher that accepts a key within 1 of it
+     * and also accepts 1 and 7.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The result maps 3, 4 and 5, in that order, to
+     * their text.
+     */
+    @Test
+    public void testCoalesceStopsAtFirstKeyThatMatcherRejects() {
+        CoalescableTreeMap<Integer, String> map = new CoalescableTreeMap<>();
+        for (int i = 1; i <= 7; ++i) {
+            map.put(i, Integer.toString(i));
+        }
+        Map<Integer, String> data = map.coalesce(4,
+                (key, candidate) -> Math.abs(key - candidate) <= 1
+                        || candidate == 1 || candidate == 7);
+        Assert.assertEquals(Lists.newArrayList(3, 4, 5),
+                Lists.newArrayList(data.keySet()));
+        Assert.assertEquals(Lists.newArrayList("3", "4", "5"),
+                Lists.newArrayList(data.values()));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that coalescing omits each key that maps to
      * {@code null} and still coalesces the keys beyond it.
      * <p>
