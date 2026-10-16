@@ -35,6 +35,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -181,13 +182,16 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
         Preconditions.checkNotNull(action);
         Preconditions.checkArgument(count >= 0);
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            AtomicInteger next = new AtomicInteger();
+            // Each thread that drains reads one position past the last index,
+            // which would wrap an int when count is near Integer.MAX_VALUE
+            AtomicLong next = new AtomicLong();
             CountDownLatch done = new CountDownLatch(count);
             Queue<Entry<Integer, Throwable>> errors;
             errors = new ConcurrentLinkedQueue<>();
             Runnable drain = () -> {
-                int index;
-                while ((index = next.getAndIncrement()) < count) {
+                long position;
+                while ((position = next.getAndIncrement()) < count) {
+                    int index = (int) position;
                     try {
                         action.accept(index);
                     }

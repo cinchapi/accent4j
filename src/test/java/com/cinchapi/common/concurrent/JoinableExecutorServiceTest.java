@@ -29,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.stream.Collectors;
@@ -518,6 +519,47 @@ public class JoinableExecutorServiceTest extends
         Assert.assertEquals(0, elsewhere.get());
         for (int i = 0; i < runs.length(); ++i) {
             Assert.assertEquals(i == 3 || i == 700 ? 0 : 1, runs.get(i));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a join of {@link Integer#MAX_VALUE}
+     * indices never passes the action a negative index when a worker helps.
+     * <p>
+     * <strong>Start state:</strong> A new executor whose one worker is blocked
+     * on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join {@link Integer#MAX_VALUE} indices. When the calling thread
+     * reaches the last 100 million, it releases the worker, which then helps
+     * with the indices that remain.</li>
+     * <li>Submit a task and wait for it, so the worker has left the join.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The action never receives a negative index.
+     */
+    @Test(timeout = 300000)
+    public void testJoinIndicesNeverPassesANegativeIndexWhenCountIsMaxValue()
+            throws Exception {
+        JoinableExecutorService joinable = JoinableExecutorService.create(1);
+        try {
+            CountDownLatch release = blockWorkers(joinable, 1);
+            int handoff = Integer.MAX_VALUE - 100_000_000;
+            AtomicBoolean negative = new AtomicBoolean();
+            joinable.join(Integer.MAX_VALUE, index -> {
+                if(index == handoff) {
+                    release.countDown();
+                }
+                else if(index < 0) {
+                    negative.set(true);
+                }
+            });
+            joinable.submit(() -> {}).get();
+            Assert.assertFalse(negative.get());
+        }
+        finally {
+            joinable.shutdownNow();
         }
     }
 
