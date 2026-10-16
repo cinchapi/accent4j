@@ -17,6 +17,7 @@ package com.cinchapi.common.concurrent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,7 +30,8 @@ import com.google.common.collect.ImmutableList;
  *
  * @author Jeff Nelson
  */
-public class JoinableDirectExecutorServiceTest {
+public class JoinableDirectExecutorServiceTest extends
+        AbstractExecutorServiceTest {
 
     /**
      * <strong>Goal:</strong> Verify that a join of indices on a direct
@@ -82,6 +84,11 @@ public class JoinableDirectExecutorServiceTest {
                 });
         Assert.assertEquals(ImmutableList.of("ran 0", "ran 2", "ran 3",
                 "ran 4", "failed 1"), events);
+    }
+
+    @Override
+    protected ExecutorService $getExecutorService() {
+        return JoinableExecutorService.direct();
     }
 
 }
