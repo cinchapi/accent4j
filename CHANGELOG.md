@@ -19,9 +19,9 @@ a join of 200,000 tasks took more than five seconds.
 
 Now, a join keeps its tasks off the queue and numbers them. The calling thread
 takes the next number, runs that task, and repeats until no numbers are left.
-When the join begins, it asks only the workers that are idle at that moment to
-help. Each helper takes the next number from the same join, so no task runs
-twice.
+Any worker that is free while the join runs helps, whether it was idle when the
+join began or finished other work after that. Each helper takes the next number
+from the same join, so no task runs twice.
 
 Taking the next number is one quick step, however large the batch is. So when
 every worker is busy, a join takes about as long as running its tasks alone, and

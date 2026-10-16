@@ -462,6 +462,47 @@ public class JoinableExecutorServiceTest extends AbstractExecutorServiceTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a worker that frees up after a join of
+     * indices begins helps run its indices.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join two indices. Each index releases the blocked workers and then
+     * waits until both indices are running.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> A freed worker runs the second index while the
+     * calling thread waits in the first, so the join returns without either
+     * wait timing out.
+     */
+    @Test
+    public void testJoinIndicesUsesWorkersThatFreeUpDuringTheJoin()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            CyclicBarrier together = new CyclicBarrier(2);
+            AtomicInteger timeouts = new AtomicInteger();
+            joinable.join(2, index -> {
+                release.countDown();
+                try {
+                    together.await(5, TimeUnit.SECONDS);
+                }
+                catch (Exception e) {
+                    timeouts.incrementAndGet();
+                }
+            });
+            Assert.assertEquals(0, timeouts.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a join of indices reports each run
      * that throws to the error handler, with its index, on the calling thread
      * and after every other index runs.

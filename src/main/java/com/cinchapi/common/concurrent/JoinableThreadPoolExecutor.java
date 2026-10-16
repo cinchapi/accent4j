@@ -89,9 +89,17 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     private final Thread[] workers;
 
     /**
-     * The number of {@link #workers} that are waiting for a task.
+     * The number of {@link #workers} that are waiting for a task or helping a
+     * join.
      */
     private final AtomicInteger idle = new AtomicInteger();
+
+    /**
+     * The work of each join that is in progress. A worker runs each of them
+     * before it waits for a task, so a worker that frees up during a join takes
+     * part in it.
+     */
+    private final Queue<Runnable> joins = new ConcurrentLinkedQueue<>();
 
     /**
      * Construct a new instance.
@@ -183,9 +191,9 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                     }
                 }
             };
-            // Ask for help only from workers that are idle now, so a busy pool
-            // leaves every index to the calling thread instead of queuing help
-            // that no worker will start soon
+            joins.add(drain);
+            // A worker that is busy now finds the join in #joins when it frees
+            // up, so only the workers that are idle now need a wake-up
             int helpers = Math.min(idle.get(), count - 1);
             for (int i = 0; i < helpers; ++i) {
                 tasks.offer(new Helper(drain));
@@ -197,6 +205,7 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
+            joins.remove(drain);
             errors.stream()
                     .sorted(Comparator.comparingInt(error -> error.getKey()))
                     .forEach(error -> errorHandler.accept(error.getKey(),
@@ -287,7 +296,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
 
     /**
      * Run tasks on a worker thread until the executor terminates. While the
-     * executor runs, the worker waits for a task and runs it. After
+     * executor runs, the worker runs a queued task if there is one; otherwise
+     * it helps each join in progress, then waits for a task. After
      * {@link #shutdown()}, the worker runs the tasks that remain in the queue
      * and exits. The last worker to exit marks the executor terminated.
      */
@@ -298,7 +308,18 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                     FutureTask<?> task;
                     idle.incrementAndGet();
                     try {
-                        task = tasks.take();
+                        // Count idle before reading #joins, as a join registers
+                        // before it reads #idle, so a join that begins as this
+                        // worker goes idle is seen here or by the Helper it
+                        // queues. A queued task comes before any join, and the
+                        // worker blocks only right after it has read #joins
+                        task = tasks.poll();
+                        if(task == null) {
+                            for (Runnable join : joins) {
+                                join.run();
+                            }
+                            task = tasks.take();
+                        }
                     }
                     catch (InterruptedException e) {
                         // Interrupt signals a request to shutdown or
