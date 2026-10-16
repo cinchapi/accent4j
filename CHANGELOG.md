@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.18.0 (TBD)
+#### Version 1.18.0 (October 16, 2026)
 
 ##### Joins in JoinableExecutorService
 
