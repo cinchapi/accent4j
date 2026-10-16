@@ -40,6 +40,7 @@ import org.junit.Test;
 
 import com.cinchapi.common.base.ArrayBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Uninterruptibles;
 
 /**
  * Unit tests for {@link JoinableExecutorService}.
@@ -370,6 +371,57 @@ public class JoinableExecutorServiceTest extends
         }
         finally {
             release.countDown();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code shutdownNow} omits the helper
+     * that a join queues for a worker that counts as idle but is busy in
+     * another join.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>On another thread, join five indices that each block until the end
+     * of the test, and wait until that thread runs index 0.</li>
+     * <li>Release the workers, and wait until they run indices 1 to 4 of that
+     * join, which leaves each of them counted as idle.</li>
+     * <li>Join two indices, which queues one helper that no worker can
+     * take.</li>
+     * <li>Call {@code shutdownNow}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code shutdownNow} returns no tasks.
+     */
+    @Test
+    public void testShutdownNowOmitsTheWorkOfAJoin()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        CountDownLatch first = new CountDownLatch(1);
+        CountDownLatch held = new CountDownLatch(5);
+        CountDownLatch hold = new CountDownLatch(1);
+        Thread other = new Thread(() -> joinable.join(5, index -> {
+            first.countDown();
+            held.countDown();
+            // shutdownNow interrupts the workers before it drains the queue, so
+            // a worker that woke up could take the helper first
+            Uninterruptibles.awaitUninterruptibly(hold);
+        }));
+        other.start();
+        try {
+            first.await();
+            release.countDown();
+            held.await();
+            joinable.join(2, index -> {});
+            Assert.assertEquals(0, joinable.shutdownNow().size());
+        }
+        finally {
+            release.countDown();
+            hold.countDown();
+            other.join();
         }
     }
 
