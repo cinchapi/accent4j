@@ -15,8 +15,10 @@
  */
 package com.cinchapi.common.concurrent;
 
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -25,7 +27,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.IntConsumer;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -43,14 +47,14 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
     private final CountDownLatch shutdown = new CountDownLatch(1);
 
     @Override
-    public void shutdown() {
-        shutdown.countDown();
+    public boolean awaitTermination(long timeout, TimeUnit unit)
+            throws InterruptedException {
+        return shutdown.await(timeout, unit);
     }
 
     @Override
-    public List<Runnable> shutdownNow() {
-        shutdown();
-        return ImmutableList.of();
+    public void execute(Runnable command) {
+        join(command);
     }
 
     @Override
@@ -61,17 +65,6 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
     @Override
     public boolean isTerminated() {
         return shutdown.getCount() == 0;
-    }
-
-    @Override
-    public boolean awaitTermination(long timeout, TimeUnit unit)
-            throws InterruptedException {
-        return shutdown.await(timeout, unit);
-    }
-
-    @Override
-    public void execute(Runnable command) {
-        join(command);
     }
 
     @Override
@@ -97,6 +90,31 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
     }
 
     @Override
+    public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
+            IntConsumer action) {
+        Preconditions.checkNotNull(errorHandler);
+        Preconditions.checkNotNull(action);
+        Preconditions.checkArgument(count >= 0);
+        if(shutdown.getCount() > 0) {
+            List<Entry<Integer, Throwable>> errors = new ArrayList<>();
+            for (int index = 0; index < count; ++index) {
+                try {
+                    action.accept(index);
+                }
+                catch (Throwable error) {
+                    errors.add(new SimpleImmutableEntry<>(index, error));
+                }
+            }
+            for (Entry<Integer, Throwable> error : errors) {
+                errorHandler.accept(error.getKey(), error.getValue());
+            }
+        }
+        else {
+            throw new RejectedExecutionException();
+        }
+    }
+
+    @Override
     public void join(BiConsumer<Runnable, Throwable> errorHandler,
             Runnable... tasks) {
         if(shutdown.getCount() > 0) {
@@ -112,6 +130,17 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
         else {
             throw new RejectedExecutionException();
         }
+    }
+
+    @Override
+    public void shutdown() {
+        shutdown.countDown();
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+        shutdown();
+        return ImmutableList.of();
     }
 
 }

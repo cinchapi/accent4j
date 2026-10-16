@@ -1,5 +1,67 @@
 # Changelog
 
+#### Version 1.18.0 (October 16, 2026)
+
+##### Joins in JoinableExecutorService
+
+A join in a `JoinableExecutorService` is now fast for a batch of any size, even
+when every worker is busy. A join lets a thread finish a batch of work, such as
+a read from many files, with help from any worker that's free. The calling
+thread works on the batch too, so a join should never take longer than running
+its tasks alone.
+
+Previously, a join put every task in the batch on the queue that all of the
+workers share. Then the calling thread searched that queue for each of its tasks
+that wasn't finished, to take it back and run it itself. Each search looked
+through the queue while the workers and every other join waited for it. So a
+batch twice as large took about four times as long, and with every worker busy,
+a join of 200,000 tasks took more than five seconds.
+
+Now, a join keeps its tasks off the queue and numbers them. The calling thread
+takes the next number, runs that task, and repeats until no numbers are left.
+Any worker that is free while the join runs helps, whether it was idle when the
+join began or finished other work after that. Each helper takes the next number
+from the same join, so no task runs twice.
+
+Taking the next number is one quick step, however large the batch is. So when
+every worker is busy, a join takes about as long as running its tasks alone, and
+idle workers make it finish sooner. The join of 200,000 tasks with every worker
+busy now takes about 20 milliseconds. Every form of `join` works this way.
+
+* `JoinableExecutorService` has a new `join` form for a batch of tasks that you
+  keep in an ordered collection, such as an array or a `List`. Instead of the
+  tasks themselves, it takes their number and an action, which receives the
+  index of a task and gets and runs that task. So it creates no `Future` or
+  other object for each task, which suits a large batch of quick tasks. For
+  example, this fetches each page on whichever threads are free and returns once
+  every fetch is done:
+
+  ```java
+  String[] pages = new String[urls.length];
+  executor.join(urls.length, i -> pages[i] = fetch(urls[i]));
+  ```
+
+  The tasks run in no set order. If a task throws, the join throws that error
+  once every task has run. Another form passes each error and the index of its
+  task to a handler instead. A class that implements `JoinableExecutorService`
+  must now implement this form.
+
+##### Miscellaneous
+* `CoalescableTreeMap#coalesce` now returns a Map whose keys are the same as the
+  keys actually stored in the original Map. Previously, each neighbor came back
+  as the original Map stored it, but the key at the lookup position came back as
+  the caller spelled it. For example, in a Map that ignores case and stores
+  `foo`, a lookup of `FOO` previously returned the key `FOO` and now returns
+  `foo`. The returned Map compares keys the same way as the original Map, so
+  `get` with the lookup key finds the entry in both cases.
+* `CoalescableTreeMap#coalesce` is now faster on every lookup, most of all on a
+  large map or when many keys coalesce. A lookup searches the map twice, once on
+  each side of the lookup key, and steps from each neighbor to the next. Each
+  coalesced key costs one call to the matcher. Previously, a lookup searched the
+  map again for every neighbor, so it cost three searches plus one per coalesced
+  key. On a map of two million keys where two keys coalesce, a lookup makes
+  about half as many key comparisons and takes about a third less time.
+
 #### Version 1.17.3 (October 10, 2026)
 * Fixed a bug in `CoalescableTreeMap#coalesce` that dropped entries when the
   map's `Comparator` kept apart two keys that are `equal` to each other. The
