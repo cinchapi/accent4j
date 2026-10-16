@@ -31,7 +31,7 @@ import com.google.common.collect.ImmutableList;
  * @author Jeff Nelson
  */
 public class JoinableDirectExecutorServiceTest extends
-        AbstractExecutorServiceTest {
+        AbstractJoinableExecutorServiceTest {
 
     /**
      * <strong>Goal:</strong> Verify that a join of indices on a direct
