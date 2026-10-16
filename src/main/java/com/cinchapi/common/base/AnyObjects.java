@@ -180,7 +180,6 @@ public final class AnyObjects {
      * @deprecated use the {@link com.cinchapi.common.describe.Empty} framework
      *             instead
      */
-    @SuppressWarnings("deprecation")
     @Deprecated
     public static <T> void registerEmptyDefinition(Class<T> clazz,
             EmptyDefinition<T> def) {
