@@ -189,6 +189,41 @@ public interface JoinableExecutorService extends ExecutorService {
             Callable<V>... tasks);
 
     /**
+     * Assuming an ordered collection of {@code count} tasks, such as an array
+     * or a {@link List}, run the provided {@code action} once for each task,
+     * and return once every run is done.
+     * <p>
+     * The {@code action} receives the index of a task, from {@code 0} to
+     * {@code count - 1}, and must get that task from the collection by its
+     * index and run it. Unlike {@link #join(Runnable...)} and
+     * {@link #join(Callable...)}, this form does not take the tasks themselves.
+     * It takes only their number, so the caller creates no object for each
+     * task.
+     * </p>
+     * <p>
+     * The calling thread runs tasks until none are left, and any worker that is
+     * free while the join runs takes tasks too. So the join finishes even when
+     * every worker is busy, and a busy pool leaves every task to the calling
+     * thread. The tasks run in no set order, and no task runs twice.
+     * </p>
+     * <p>
+     * Each run that throws is reported to the provided {@code errorHandler}, on
+     * the calling thread, with its index, in index order. If the calling thread
+     * is interrupted while it waits for a worker to finish a run, the join
+     * returns at once, with the interrupt status set.
+     * </p>
+     *
+     * @param errorHandler receives the index and the error of each run that
+     *            throws
+     * @param count the number of tasks in the collection, which must not be
+     *            negative; {@code 0} runs nothing
+     * @param action receives the index of one task, and gets and runs that
+     *            task
+     */
+    public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
+            IntConsumer action);
+
+    /**
      * Cause the calling thread to temporarily join this {@link ExecutorService
      * executor} and assist in executing the provided {@code tasks}.
      * <p>
@@ -242,65 +277,6 @@ public interface JoinableExecutorService extends ExecutorService {
     }
 
     /**
-     * Cause the calling thread to temporarily join this {@link ExecutorService
-     * executor} and assist in executing the provided {@code tasks}.
-     * <p>
-     * Similar to all {@link ExecutorService} operations, this will
-     * asynchronously perform each of the {@code tasks}, at some point in the
-     * future. But, in addition, the calling thread will be blocked until all of
-     * them have completed.
-     * </p>
-     * <p>
-     * Each task may execute in a pooled thread, or in the calling thread.
-     * Because the calling thread participates in execution while waiting, the
-     * effect is that the group of {@code tasks} completes in no more time
-     * than it would if the calling thread executed them serially.
-     * </p>
-     *
-     * @param tasks
-     */
-    public default void join(Runnable... tasks) {
-        join((task, error) -> {
-            throw CheckedExceptions.wrapAsRuntimeException(error);
-        }, tasks);
-    }
-
-    /**
-     * Assuming an ordered collection of {@code count} tasks, such as an array
-     * or a {@link List}, run the provided {@code action} once for each task,
-     * and return once every run is done.
-     * <p>
-     * The {@code action} receives the index of a task, from {@code 0} to
-     * {@code count - 1}, and must get that task from the collection by its
-     * index and run it. Unlike {@link #join(Runnable...)} and
-     * {@link #join(Callable...)}, this form does not take the tasks themselves.
-     * It takes only their number, so the caller creates no object for each
-     * task.
-     * </p>
-     * <p>
-     * The calling thread runs tasks until none are left, and any worker that is
-     * free while the join runs takes tasks too. So the join finishes even when
-     * every worker is busy, and a busy pool leaves every task to the calling
-     * thread. The tasks run in no set order, and no task runs twice.
-     * </p>
-     * <p>
-     * Each run that throws is reported to the provided {@code errorHandler}, on
-     * the calling thread, with its index, in index order. If the calling thread
-     * is interrupted while it waits for a worker to finish a run, the join
-     * returns at once, with the interrupt status set.
-     * </p>
-     *
-     * @param errorHandler receives the index and the error of each run that
-     *            throws
-     * @param count the number of tasks in the collection, which must not be
-     *            negative; {@code 0} runs nothing
-     * @param action receives the index of one task, and gets and runs that
-     *            task
-     */
-    public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
-            IntConsumer action);
-
-    /**
      * Assuming an ordered collection of {@code count} tasks, such as an array
      * or a {@link List}, run the provided {@code action} once for each task,
      * and return once every run is done.
@@ -332,6 +308,30 @@ public interface JoinableExecutorService extends ExecutorService {
         join((index, error) -> {
             throw CheckedExceptions.wrapAsRuntimeException(error);
         }, count, action);
+    }
+
+    /**
+     * Cause the calling thread to temporarily join this {@link ExecutorService
+     * executor} and assist in executing the provided {@code tasks}.
+     * <p>
+     * Similar to all {@link ExecutorService} operations, this will
+     * asynchronously perform each of the {@code tasks}, at some point in the
+     * future. But, in addition, the calling thread will be blocked until all of
+     * them have completed.
+     * </p>
+     * <p>
+     * Each task may execute in a pooled thread, or in the calling thread.
+     * Because the calling thread participates in execution while waiting, the
+     * effect is that the group of {@code tasks} completes in no more time
+     * than it would if the calling thread executed them serially.
+     * </p>
+     *
+     * @param tasks
+     */
+    public default void join(Runnable... tasks) {
+        join((task, error) -> {
+            throw CheckedExceptions.wrapAsRuntimeException(error);
+        }, tasks);
     }
 
 }

@@ -167,6 +167,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public <V> List<Future<V>> join(
+            BiConsumer<Callable<V>, Throwable> errorHandler,
+            Callable<V>... tasks) {
+        return joinAll(tasks, FutureTask::new, errorHandler);
+    }
+
+    @Override
     public void join(BiConsumer<Integer, Throwable> errorHandler, int count,
             IntConsumer action) {
         Preconditions.checkNotNull(errorHandler);
@@ -217,14 +225,6 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <V> List<Future<V>> join(
-            BiConsumer<Callable<V>, Throwable> errorHandler,
-            Callable<V>... tasks) {
-        return joinAll(tasks, FutureTask::new, errorHandler);
-    }
-
-    @Override
     public void join(BiConsumer<Runnable, Throwable> errorHandler,
             Runnable... tasks) {
         joinAll(tasks, task -> new FutureTask<Void>(task, null), errorHandler);
@@ -253,45 +253,6 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
             unfinished.removeIf(task -> task instanceof Helper);
         }
         return unfinished;
-    }
-
-    /**
-     * Run each of the provided {@code tasks} in a
-     * {@link #join(BiConsumer, int, IntConsumer) join} of its
-     * {@link FutureTask}, report each task that fails to the
-     * {@code errorHandler}, and return the {@link Future Futures} in the order
-     * of the {@code tasks}.
-     *
-     * @param tasks the tasks to run, which must not be empty
-     * @param futureOf makes the {@link FutureTask} that runs a task
-     * @param errorHandler receives each task that fails, with its error
-     * @return the {@link Future} of each task, in the order of {@code tasks}
-     */
-    private <T, V> List<Future<V>> joinAll(T[] tasks,
-            Function<T, FutureTask<V>> futureOf,
-            BiConsumer<T, Throwable> errorHandler) {
-        Preconditions.checkNotNull(tasks);
-        Preconditions.checkArgument(tasks.length > 0);
-        List<Future<V>> futures = new ArrayList<>(tasks.length);
-        for (T task : tasks) {
-            futures.add(futureOf.apply(task));
-        }
-        // Each FutureTask keeps the error of its task, so no run of the join
-        // throws
-        join(futures.size(),
-                index -> ((FutureTask<V>) futures.get(index)).run());
-        for (int i = 0; i < futures.size(); ++i) {
-            try {
-                futures.get(i).get();
-            }
-            catch (ExecutionException e) {
-                errorHandler.accept(tasks[i], e);
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        return futures;
     }
 
     /**
@@ -361,6 +322,45 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                 state.compareAndSet(SHUTDOWN, TERMINATED);
             }
         }
+    }
+
+    /**
+     * Run each of the provided {@code tasks} in a
+     * {@link #join(BiConsumer, int, IntConsumer) join} of its
+     * {@link FutureTask}, report each task that fails to the
+     * {@code errorHandler}, and return the {@link Future Futures} in the order
+     * of the {@code tasks}.
+     *
+     * @param tasks the tasks to run, which must not be empty
+     * @param futureOf makes the {@link FutureTask} that runs a task
+     * @param errorHandler receives each task that fails, with its error
+     * @return the {@link Future} of each task, in the order of {@code tasks}
+     */
+    private <T, V> List<Future<V>> joinAll(T[] tasks,
+            Function<T, FutureTask<V>> futureOf,
+            BiConsumer<T, Throwable> errorHandler) {
+        Preconditions.checkNotNull(tasks);
+        Preconditions.checkArgument(tasks.length > 0);
+        List<Future<V>> futures = new ArrayList<>(tasks.length);
+        for (T task : tasks) {
+            futures.add(futureOf.apply(task));
+        }
+        // Each FutureTask keeps the error of its task, so no run of the join
+        // throws
+        join(futures.size(),
+                index -> ((FutureTask<V>) futures.get(index)).run());
+        for (int i = 0; i < futures.size(); ++i) {
+            try {
+                futures.get(i).get();
+            }
+            catch (ExecutionException e) {
+                errorHandler.accept(tasks[i], e);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return futures;
     }
 
     /**

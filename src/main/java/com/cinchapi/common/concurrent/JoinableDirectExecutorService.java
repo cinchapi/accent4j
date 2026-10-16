@@ -47,14 +47,14 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
     private final CountDownLatch shutdown = new CountDownLatch(1);
 
     @Override
-    public void shutdown() {
-        shutdown.countDown();
+    public boolean awaitTermination(long timeout, TimeUnit unit)
+            throws InterruptedException {
+        return shutdown.await(timeout, unit);
     }
 
     @Override
-    public List<Runnable> shutdownNow() {
-        shutdown();
-        return ImmutableList.of();
+    public void execute(Runnable command) {
+        join(command);
     }
 
     @Override
@@ -65,17 +65,6 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
     @Override
     public boolean isTerminated() {
         return shutdown.getCount() == 0;
-    }
-
-    @Override
-    public boolean awaitTermination(long timeout, TimeUnit unit)
-            throws InterruptedException {
-        return shutdown.await(timeout, unit);
-    }
-
-    @Override
-    public void execute(Runnable command) {
-        join(command);
     }
 
     @Override
@@ -141,6 +130,17 @@ public class JoinableDirectExecutorService extends AbstractExecutorService
         else {
             throw new RejectedExecutionException();
         }
+    }
+
+    @Override
+    public void shutdown() {
+        shutdown.countDown();
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+        shutdown();
+        return ImmutableList.of();
     }
 
 }
