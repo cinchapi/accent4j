@@ -99,7 +99,9 @@ nexusPublishing {
   }
 }
 
-tasks.matching { it.name.contains('publishToSonatype') }.configureEach {
+// Skip every Sonatype task, including the staging repository setup and each
+// publication's upload, for builds that do not publish to Maven Central
+tasks.matching { it.name.contains('Sonatype') }.configureEach {
   onlyIf { publishToMavenCentral }
 }
 tasks.matching { it.name.contains('closeSonatype') || it.name.contains('releaseSonatype') || it.name.contains('closeAndReleaseSonatype') }.configureEach {
@@ -154,5 +156,10 @@ publishing {
 
 signing {
   required { publishToMavenCentral && !mavenVersion.endsWith('SNAPSHOT') }
+  // CI supplies the release key as properties instead of a keyring file
+  def signingKey = findProperty('signingKey')
+  if(signingKey) {
+    useInMemoryPgpKeys(signingKey, findProperty('signingPassword'))
+  }
   sign publishing.publications.maven
 }
