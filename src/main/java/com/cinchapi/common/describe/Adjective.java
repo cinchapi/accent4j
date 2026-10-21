@@ -15,6 +15,7 @@
  */
 package com.cinchapi.common.describe;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Predicate;
@@ -36,18 +37,62 @@ import com.google.common.collect.Maps;
 public abstract class Adjective {
 
     /**
-     * The provided definitions.
+     * The provided definitions. While {@link #isShared} is {@code true}, other
+     * instances may read this map too, so it must not change.
      */
-    private Map<Class<?>, Predicate<?>> definitions = Maps.newHashMap();
+    private Map<Class<?>, Predicate<?>> definitions;
+
+    /**
+     * Whether other instances may share the {@link #definitions}, so that a
+     * {@link #define(Class, Predicate) definition} must go into a copy of them.
+     */
+    private boolean isShared;
+
+    /**
+     * Construct a new instance with no definitions.
+     */
+    public Adjective() {
+        this(Collections.emptyMap());
+    }
+
+    /**
+     * Construct a new instance whose definitions start as the provided
+     * {@code defaults}.
+     * <p>
+     * The new instance never changes the {@code defaults}, so any number of
+     * instances, on any threads, can share one map of them. A
+     * {@link #define(Class, Predicate) definition} added to one of those
+     * instances affects neither the {@code defaults} nor any other instance.
+     * </p>
+     * 
+     * @param defaults the definitions that the new instance starts with; the
+     *            caller must not change them after this call
+     */
+    protected Adjective(Map<Class<?>, Predicate<?>> defaults) {
+        this.definitions = defaults;
+        this.isShared = true;
+    }
 
     /**
      * Provide a definition of this {@link Adjective} with respect to objects of
      * the provided {@code clazz} and its descendants.
      * 
-     * @param clazz
-     * @param definition
+     * @param clazz the class of the objects that the {@code definition} applies
+     *            to
+     * @param definition the {@link Predicate} that decides whether this
+     *            {@link Adjective} describes an object of the {@code clazz}
      */
     public <T> void define(Class<T> clazz, Predicate<T> definition) {
+        if(isShared) {
+            // Adding each entry in turn gives the copy the capacity, and so the
+            // iteration order, of a map that received each definition directly
+            Map<Class<?>, Predicate<?>> copy = Maps.newHashMap();
+            for (Entry<Class<?>, Predicate<?>> entry : definitions.entrySet()) {
+                copy.put(entry.getKey(), entry.getValue());
+            }
+            definitions = copy;
+            isShared = false;
+        }
         definitions.put(clazz, definition);
     }
 
