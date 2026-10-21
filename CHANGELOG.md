@@ -7,9 +7,7 @@
   instead of 240, which helps a caller that checks many values, such as a
   `Comparator` that calls `Empty.ness().describes(...)` for each comparison.
   Each call still returns a new instance, and a definition that you add to one
-  instance doesn't affect any other instance or the defaults. A subclass of
-  `Adjective` can share its own defaults the same way through a new protected
-  constructor that takes them.
+  instance doesn't affect any other instance or the defaults.
 
 #### Version 1.18.0 (October 16, 2026)
 

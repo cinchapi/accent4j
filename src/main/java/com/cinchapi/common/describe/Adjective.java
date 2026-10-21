@@ -65,10 +65,10 @@ public abstract class Adjective {
      * instances affects neither the {@code defaults} nor any other instance.
      * </p>
      * 
-     * @param defaults the definitions that the new instance starts with; the
-     *            caller must not change them after this call
+     * @param defaults the definitions that the new instance starts with, which
+     *            never change
      */
-    protected Adjective(Map<Class<?>, Predicate<?>> defaults) {
+    Adjective(Map<Class<?>, Predicate<?>> defaults) {
         this.definitions = defaults;
         this.isShared = true;
     }
