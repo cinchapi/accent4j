@@ -32,7 +32,6 @@ executors:
       GRADLE_OPTS: "-Djenkins=true -Xmx1024m"
       TERM: dumb
       CONTAINER_BUILD: "true"
-      ORG_GRADLE_PROJECT_signing.secretKeyRingFile: /home/circleci/secring.gpg
 
   java21-executor:
     docker:
@@ -102,13 +101,6 @@ jobs:
       - checkout:
           path: ~/$CIRCLE_PROJECT_REPONAME
       - run:
-          name: Get Signing Credentials
-          command: |
-            cd ~/$CIRCLE_PROJECT_REPONAME
-            git clone git@github.com:cinchapi/sonatype-credentials.git
-            cp sonatype-credentials/gradle.properties .
-            cp sonatype-credentials/secring.gpg ~
-      - run:
           name: Generate gradle.lock
           command: |
             find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > ~/gradle.lock
@@ -118,7 +110,6 @@ jobs:
           paths:
             - gradle.lock
             - project
-            - secring.gpg
 
   compile:
     executor: java8-executor
@@ -177,6 +168,15 @@ jobs:
           name: Assemble and Publish
           command: |
             cd ~/$CIRCLE_PROJECT_REPONAME
+            # Only develop and master publish to Maven Central, and only
+            # their workflow entry gives this job the release-publishing
+            # context
+            case "$CIRCLE_BRANCH" in
+              develop|master)
+                source .circleci/load-release-secrets.sh
+                load_release_secrets
+                ;;
+            esac
             ./gradlew assemble publish closeAndReleaseSonatypeStagingRepository --no-daemon
       - run:
           name: Save artifacts
@@ -204,6 +204,22 @@ workflows:
           requires:
             - compile
       - publish:
+          name: publish-release
+          context: release-publishing
+          filters:
+            branches:
+              only:
+                - develop
+                - master
+          requires:
+            - test
+            - test-java21
+      - publish:
+          filters:
+            branches:
+              ignore:
+                - develop
+                - master
           requires:
             - test
             - test-java21
