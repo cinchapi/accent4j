@@ -1,5 +1,14 @@
 # Changelog
 
+#### Version 1.19.0 (TBD)
+* `Empty#is` and `Empty#ness` share one read-only set of default definitions
+  among the instances that they return, and an instance copies the set only when
+  you add a definition to it with `define`. So each call allocates 24 bytes
+  instead of 240, which helps a caller that checks many values, such as a
+  `Comparator` that calls `Empty.ness().describes(...)` for each comparison.
+  Each call still returns a new instance, and a definition that you add to one
+  instance doesn't affect any other instance or the defaults.
+
 #### Version 1.18.0 (October 16, 2026)
 
 ##### Joins in JoinableExecutorService
