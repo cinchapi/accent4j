@@ -78,13 +78,15 @@ public final class Logger {
 
     /**
      * Return a {@link Logger} that doesn't log messages to anywhere.
-     * 
+     * <p>
+     * Every call returns the same instance, so a caller can ask for one as
+     * often as it likes.
+     * </p>
+     *
      * @return the fake Logger
      */
     public static Logger none() {
-        return builder().name("none")
-                .directory(Files.tempDir(UUID.randomUUID().toString()))
-                .enableConsoleLogging(false).level(Level.ERROR).build();
+        return NoneHolder.INSTANCE;
     }
 
     /**
@@ -346,6 +348,25 @@ public final class Logger {
             this.name = name;
             return this;
         }
+    }
+
+    /**
+     * Holds the {@link Logger} that {@link Logger#none()} returns. The
+     * {@link Logger} is built when {@link Logger#none()} is first called, so
+     * loading {@link Logger} creates no log files.
+     *
+     * @author Jeff Nelson
+     */
+    private static final class NoneHolder {
+
+        /**
+         * The {@link Logger} that {@link Logger#none()} returns.
+         */
+        private static final Logger INSTANCE = builder().name("none")
+                .directory(Files.tempDir(UUID.randomUUID().toString()))
+                .enableConsoleLogging(false).level(Level.ERROR).build();
+
+        private NoneHolder() {/* no-init */}
     }
 
 }
