@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.18.1 (TBD)
+#### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
   and opened four log files that stayed open for the life of the JVM. A caller
   that asked for it often, such as once per request, eventually ran out of
