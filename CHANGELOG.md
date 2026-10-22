@@ -1,5 +1,12 @@
 # Changelog
 
+#### Version 1.18.1 (TBD)
+* Fixed a bug where each call to `Logger.none()` created a temporary directory
+  and opened four log files that stayed open for the life of the JVM. A caller
+  that asked for it often, such as once per request, eventually ran out of
+  memory or file handles. `Logger.none()` returns the same `Logger` on every
+  call. ([GH-49](https://github.com/cinchapi/accent4j/issues/49))
+
 #### Version 1.18.0 (October 16, 2026)
 
 ##### Joins in JoinableExecutorService
