@@ -55,7 +55,7 @@ jobs:
     concurrency:
       group: agents-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.number }}
       queue: max
-    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@0f30e43671a5fa62ced057e8d59ec01287671eb4
+    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@54c8066405c94ef3a2fa7c5740182a49962d680f
     permissions:
       contents: read
       id-token: write
