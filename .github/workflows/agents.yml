@@ -6,7 +6,7 @@ name: Agent skills
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, labeled]
+    types: [opened, reopened, ready_for_review, labeled, synchronize]
   issues:
     types: [labeled]
   issue_comment:
@@ -43,7 +43,10 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository &&
           ((github.event.action == 'labeled' &&
               startsWith(github.event.label.name, 'agent:')) ||
-            (github.event.action != 'labeled' && !github.event.pull_request.draft))) ||
+            (github.event.action == 'synchronize' &&
+              contains(github.event.pull_request.labels.*.name, 'pipeline:done')) ||
+            (github.event.action != 'labeled' && github.event.action != 'synchronize' &&
+              !github.event.pull_request.draft))) ||
         (github.event_name == 'issues' &&
           startsWith(github.event.label.name, 'agent:')) ||
         (github.event_name == 'issue_comment' &&
@@ -52,7 +55,7 @@ jobs:
     concurrency:
       group: agents-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.number }}
       queue: max
-    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@cfff101beb294014d6c724223f561a92be36c3f5
+    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@0f30e43671a5fa62ced057e8d59ec01287671eb4
     permissions:
       contents: read
       id-token: write
