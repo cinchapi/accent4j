@@ -24,9 +24,6 @@ import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.cinchapi.common.base.AnyStrings;
-import com.cinchapi.common.base.SplitOption;
-import com.cinchapi.common.base.StringSplitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -274,6 +271,13 @@ public class StringSplitterTest {
         while (it.hasNext()) {
             Assert.assertFalse(it.next().contains(" "));
         }
+    }
+    
+    @Test
+    public void testSplitEmptyString() {
+        String string = "";
+        StringSplitter it = new StringSplitter(string, ',', SplitOption.TRIM_WHITESPACE);
+        Assert.assertArrayEquals(new String[0], it.toArray());
     }
 
     /**

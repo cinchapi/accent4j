@@ -18,7 +18,11 @@ package com.cinchapi.common.collect;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
 import com.google.common.collect.Iterables;
+import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 
 /**
@@ -48,6 +52,33 @@ public final class Multimaps {
                         Map::putAll);
     }
 
+    /**
+     * Return a {@link Multimap} that wraps the data in the provided
+     * {@code map}.
+     * <p>
+     * <strong>NOTE:</strong> This does not create a view that reads through to
+     * the original {@code map} so subsequent changes will not be reflected in
+     * the returned {@link Multimap} and vice-versa.
+     * </p>
+     * 
+     * @param map
+     * @return the {@link Multimap}
+     */
+    public static <K, V> Multimap<K, V> from(Map<K, Set<V>> map) {
+        Multimap<K, V> mmap = LinkedHashMultimap.create();
+        for (Entry<K, Set<V>> entry : map.entrySet()) {
+            mmap.putAll(entry.getKey(), entry.getValue());
+        }
+        return mmap;
+    }
+
+    /**
+     * Flatten, if possible, the {@link Collection} {@code value} into a single
+     * {@link Object}.
+     * 
+     * @param value
+     * @return the "flattened" object
+     */
     private static Object flatten(Collection<Object> value) {
         if(value.isEmpty()) {
             return null;

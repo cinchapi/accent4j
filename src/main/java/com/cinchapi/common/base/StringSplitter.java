@@ -234,7 +234,7 @@ public class StringSplitter {
         while (hasNext()) {
             builder.add(next());
         }
-        return builder.build();
+        return builder.length() > 0 ? builder.build() : Array.containing();
     }
 
     /**

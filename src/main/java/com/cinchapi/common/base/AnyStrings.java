@@ -570,13 +570,7 @@ public class AnyStrings {
      * @return the resulting String
      */
     public static String join(char separator, Object... args) {
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < args.length; ++i) {
-            builder.append(args[i]);
-            builder.append(separator);
-        }
-        builder.deleteCharAt(builder.length() - 1);
-        return builder.toString();
+        return join(String.valueOf(separator), args);
     }
 
     /**
@@ -590,11 +584,13 @@ public class AnyStrings {
      */
     public static String join(String separator, Object... args) {
         StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < args.length; ++i) {
-            builder.append(args[i]);
-            builder.append(separator);
+        if(args.length > 0) {
+            for (int i = 0; i < args.length; ++i) {
+                builder.append(args[i]);
+                builder.append(separator);
+            }
+            builder.deleteCharAt(builder.length() - 1);
         }
-        builder.deleteCharAt(builder.length() - 1);
         return builder.toString();
     }
 
@@ -801,7 +797,7 @@ public class AnyStrings {
                     // Double objects by appending a single 'D' character.
                     return Double.valueOf(value.substring(0, i));
                 }
-                else if((c == 'E' || c == 'e') && i < size - 1) {
+                else if((c == 'E' || c == 'e') && i > 0 && i < size - 1) {
                     // CON-627: Account for valid representations of scientific
                     // notation
                     if(!scientific) {

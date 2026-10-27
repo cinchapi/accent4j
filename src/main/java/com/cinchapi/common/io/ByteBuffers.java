@@ -26,8 +26,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.cinchapi.common.base.CheckedExceptions;
-import com.cinchapi.common.base.Verify;
 import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
+import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 
 /**
  * Additional utility methods for ByteBuffers that are not found in the
@@ -86,11 +87,22 @@ public abstract class ByteBuffers {
      *         {@code buffer}.
      */
     public static byte[] getByteArray(ByteBuffer buffer) {
-        buffer.mark();
-        byte[] array = new byte[buffer.remaining()];
-        buffer.get(array);
-        buffer.reset();
-        return array;
+        if(buffer.hasArray() && buffer.arrayOffset() == 0
+                && buffer.remaining() == buffer.array().length) {
+            // A sliced ByteBuffer shares the parent's backing array but has a
+            // non-zero arrayOffset, so buffer.array() would return the parent's
+            // full array rather than just the slice's content. Only take the
+            // fast path when the remaining content spans the entire backing
+            // array.
+            return buffer.array();
+        }
+        else {
+            buffer.mark();
+            byte[] array = new byte[buffer.remaining()];
+            buffer.get(array);
+            buffer.reset();
+            return array;
+        }
     }
 
     /**
@@ -160,6 +172,32 @@ public abstract class ByteBuffers {
      * @param hex
      * @return the binary data
      */
+    public static ByteBuffer decodeFromHexString(String hex) {
+        return ByteBuffer.wrap(BaseEncoding.base16().decode(hex));
+    }
+
+    /**
+     * Encode the remaining bytes in as {@link ByteBuffer} as a hex string and
+     * maintain the current position.
+     * 
+     * @param buffer
+     * @return the hex string
+     */
+    public static String encodeAsHexString(ByteBuffer buffer) {
+        buffer.rewind();
+        return BaseEncoding.base16().encode(ByteBuffers.getByteArray(buffer));
+    }
+
+    /**
+     * Decode the {@code hex}adeciaml string and return the resulting binary
+     * data.
+     * 
+     * @param hex
+     * @return the binary data
+     * @deprecated in favor of {@link #decodeFromHexString(String)}; which
+     *             expects its input in a different case format
+     */
+    @Deprecated
     public static ByteBuffer decodeFromHex(String hex) {
         int len = hex.length();
         byte[] data = new byte[len / 2];
@@ -176,7 +214,10 @@ public abstract class ByteBuffers {
      * 
      * @param buffer
      * @return the hex string
+     * @deprecated in favor of {@link #encodeAsHexString(ByteBuffer)}; which
+     *             returns the value in a different case format
      */
+    @Deprecated
     public static String encodeAsHex(ByteBuffer buffer) {
         StringBuilder sb = new StringBuilder();
         buffer.mark();
@@ -213,12 +254,14 @@ public abstract class ByteBuffers {
      * @param length
      * @return a ByteBuffer that has {@code length} bytes from {@code buffer}
      */
-    public static ByteBuffer get(ByteBuffer buffer, int length) {
-        Verify.thatArgument(buffer.remaining() >= length,
-                "The number of bytes remaining in the buffer cannot be less than the desired length");
+    public static ByteBuffer get(ByteBuffer source, int length) {
+        Preconditions.checkArgument(source.remaining() >= length,
+                "The number of bytes remaining in the buffer cannot be less than length");
         byte[] backingArray = new byte[length];
-        buffer.get(backingArray);
-        return ByteBuffer.wrap(backingArray);
+        source.get(backingArray);
+        ByteBuffer destination = ByteBuffer.wrap(backingArray);
+        destination.order(source.order());
+        return destination;
     }
 
     /**
@@ -371,6 +414,65 @@ public abstract class ByteBuffers {
     }
 
     /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at it's current position, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         it's current position and the byte at {@code length} positions
+     *         away
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int length) {
+        return share(buffer, buffer.position(), length);
+    }
+
+    /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at {@code position}, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         {@code position} and {@code position + length}
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int position,
+            int length) {
+        int end = position + length;
+        Preconditions.checkArgument(end <= buffer.limit());
+        int limit = buffer.limit();
+
+        // Narrow the #buffer's window to be between the desired start and #end
+        // #positions so that the #slice is similarly narrowed
+        buffer.position(position);
+        buffer.limit(end);
+        ByteBuffer slice = buffer.slice();
+
+        // Reset the #buffer's original #limit, but advance it's position to the
+        // #end of the #slice.
+        buffer.limit(limit);
+        buffer.position(end);
+
+        return slice;
+    }
+
+    /**
      * Return a byte array with the content of {@code buffer}. This method
      * returns the byte array that backs {@code buffer} if one exists, otherwise
      * it creates a new byte array with the content between the current position
@@ -411,6 +513,7 @@ public abstract class ByteBuffers {
         buffer.reset();
         return chars;
     }
+
     /**
      * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
      * {@code buffer}.

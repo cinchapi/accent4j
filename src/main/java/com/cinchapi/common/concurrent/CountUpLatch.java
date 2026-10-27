@@ -16,7 +16,7 @@
 package com.cinchapi.common.concurrent;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
 /**
  * Similar to a {@link java.util.concurrent.CountDownLatch} but increments
@@ -43,14 +43,9 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CountUpLatch {
 
     /**
-     * The current number of times the latch has been incremented.
+     * Synchronization control 
      */
-    private final AtomicLong count = new AtomicLong(0);
-
-    /**
-     * Signaling mechanism.
-     */
-    private final Object signal = new Object();
+    private final Sync sync = new Sync();
 
     /**
      * Block, if necessary, until this latch has been incremented at least
@@ -60,11 +55,7 @@ public class CountUpLatch {
      * @throws InterruptedException
      */
     public void await(int count) throws InterruptedException {
-        synchronized (signal) {
-            while (this.count.get() < count) {
-                signal.wait();
-            }
-        }
+        sync.acquireSharedInterruptibly(count);
     }
 
     /**
@@ -77,22 +68,14 @@ public class CountUpLatch {
      */
     public boolean await(int count, long timeout, TimeUnit unit)
             throws InterruptedException {
-        synchronized (signal) {
-            while (this.count.get() < count) {
-                signal.wait(timeout, (int) unit.toNanos(timeout));
-            }
-            return this.count.get() >= count;
-        }
+        return sync.tryAcquireSharedNanos(count, unit.toNanos(timeout));
     }
 
     /**
      * Increment the latch.
      */
     public void countUp() {
-        synchronized (signal) {
-            count.incrementAndGet();
-            signal.notifyAll();
-        }
+        sync.releaseShared(1);
     }
 
     /**
@@ -101,7 +84,7 @@ public class CountUpLatch {
      * @return the current count
      */
     public long getCount() {
-        return count.get();
+        return sync.getCount();
     }
 
     /**
@@ -113,6 +96,49 @@ public class CountUpLatch {
      */
     public String toString() {
         return super.toString() + "[Count = " + getCount() + "]";
+    }
+
+    /**
+     * Synchronization control for {@link CountUpLatch}.
+     *
+     * @author Jeff Nelson
+     */
+    private static final class Sync extends AbstractQueuedSynchronizer {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Construct a new instance.
+         */
+        private Sync() {
+            setState(0);
+        }
+
+        @Override
+        protected int tryAcquireShared(int seeking) {
+            // This is called when a thread awaits for #seeking.
+            return (getState() >= seeking) ? 1 : -1;
+        }
+
+        @Override
+        protected boolean tryReleaseShared(int ignore) {
+            // This is called when a thread counts up in which case we must
+            // always see if any threads can transition
+            for (;;) {
+                int c = getState();
+                if(compareAndSetState(c, c + 1)) {
+                    return true;
+                }
+            }
+        }
+
+        /**
+         * Return the current count.
+         * @return the count
+         */
+        int getCount() {
+            return getState();
+        }
     }
 
 }
