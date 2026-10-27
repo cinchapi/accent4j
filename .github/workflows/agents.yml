@@ -1,0 +1,59 @@
+# Written by .agents/setup.sh, which rewrites it on every skills pull.
+# Change the shared workflows in cinchapi/cinchapi-agent-skills instead. Keep
+# the name, because the CodeBuild runners start only for a workflow whose name
+# begins with "Agent ".
+name: Agent skills
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, labeled]
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: Skill to run
+        type: choice
+        options:
+          - review-pipeline
+          - code-review
+          - code-comment-cleanup
+          - test-cleanup
+          - work-on
+          - implement
+      number:
+        description: Pull request or issue number
+        type: number
+        required: true
+      args:
+        description: Extra instructions for the skill
+        type: string
+        required: false
+
+permissions: {}
+
+jobs:
+  agents:
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      (github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          ((github.event.action == 'labeled' &&
+              startsWith(github.event.label.name, 'agent:')) ||
+            (github.event.action != 'labeled' && !github.event.pull_request.draft))) ||
+        (github.event_name == 'issues' &&
+          startsWith(github.event.label.name, 'agent:')) ||
+        (github.event_name == 'issue_comment' &&
+          (startsWith(github.event.comment.body, '/agent') ||
+            startsWith(github.event.comment.body, '/approve'))))
+    concurrency:
+      group: agents-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.number }}
+      queue: max
+    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@cfff101beb294014d6c724223f561a92be36c3f5
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
