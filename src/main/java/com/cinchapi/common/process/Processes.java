@@ -29,8 +29,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Platform;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -142,7 +142,7 @@ public class Processes {
             }
         }
         catch (IOException e) {
-            Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
         if(process != null) {
             ProcessResult result = waitForSuccessfulCompletion(process);
@@ -185,7 +185,7 @@ public class Processes {
                     latch.countDown();
                 }
                 catch (IOException e) {
-                    throw Throwables.propagate(e);
+                    throw CheckedExceptions.wrapAsRuntimeException(e);
                 }
             });
 
@@ -201,7 +201,7 @@ public class Processes {
                     latch.countDown();
                 }
                 catch (IOException e) {
-                    throw Throwables.propagate(e);
+                    throw CheckedExceptions.wrapAsRuntimeException(e);
                 }
             });
             int code = process.waitFor();
@@ -210,7 +210,7 @@ public class Processes {
             return new ProcessResult(code, stdout, stderr);
         }
         catch (InterruptedException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -225,7 +225,8 @@ public class Processes {
     public static ProcessResult waitForSuccessfulCompletion(Process process) {
         ProcessResult result = waitFor(process);
         if(result.exitCode() != 0) {
-            List<String> msg = result.out().isEmpty() ? result.err() : result.out();
+            List<String> msg = result.out().isEmpty() ? result.err()
+                    : result.out();
             throw new RuntimeException(msg.toString());
         }
         return result;
@@ -248,7 +249,7 @@ public class Processes {
             return output;
         }
         catch (Exception e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

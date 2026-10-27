@@ -31,7 +31,7 @@ import com.cinchapi.common.reflect.Reflection;
  * @author Jeff Nelson
  */
 public final class CheckedExceptions {
-
+    
     /**
      * Take a checked {@link Exception} and throw it as a
      * {@link RuntimeException}.
@@ -58,15 +58,7 @@ public final class CheckedExceptions {
      * @throws RuntimeException
      */
     public static RuntimeException throwAsRuntimeException(Exception e) {
-        if(e instanceof RuntimeException) {
-            throw (RuntimeException) e;
-        }
-        else {
-            RuntimeException re = new RuntimeException(AnyStrings.format(
-                    "{} {}", e.getClass().getName(), e.getMessage()));
-            re.setStackTrace(e.getStackTrace());
-            throw re;
-        }
+        return throwAsRuntimeException((Throwable) e);
     }
 
     /**
@@ -84,7 +76,77 @@ public final class CheckedExceptions {
      *     methodThatThrowsException();
      * }
      * catch (Exception e) {
-     *     throw Exceptions.throwAsRuntimeException(e, IllegalArgumentException.class);
+     *     throw Exceptions.throwAsRuntimeException(e,
+     *             IllegalArgumentException.class);
+     * }
+     * </pre>
+     * 
+     * @param e the checked {@link Exception} to replace
+     * @param desiredType the type of {@link RuntimeException} with which to
+     *            wrap {@code e}
+     * @return nothing, return type is only so that an invocation of this method
+     *         can be chained with the <em>throw</em> keyword (see example
+     *         above)
+     * @throws T
+     */
+    public static <T extends RuntimeException> T throwAsRuntimeException(Exception e, Class<T> desiredType) {
+        return throwAsRuntimeException((Throwable) e, desiredType);
+    }
+
+    /**
+     * Take a checked {@link Exception} and throw it as a
+     * {@link RuntimeException}.
+     * <p>
+     * Unlike {@link #wrapAsRuntimeException(Exception)}, this method replaces
+     * {@code e} with a RuntimeException that has the same
+     * {@link Exception#getStackTrace() stack trace} as {@code e}.
+     * </p>
+     * <h2>Example</h2>
+     * 
+     * <pre>
+     * try {
+     *     methodThatThrowsException();
+     * }
+     * catch (Exception e) {
+     *     throw Exceptions.throwAsRuntimeException(e);
+     * }
+     * </pre>
+     * 
+     * @param e the checked {@link Exception} to replace
+     * @return nothing, return type is only so that an invocation of this method
+     *         can be chained with the <em>throw</em> keyword (see example
+     *         above)
+     * @throws RuntimeException
+     */
+    public static RuntimeException throwAsRuntimeException(Throwable e) {
+        if(e instanceof RuntimeException) {
+            throw (RuntimeException) e;
+        }
+        else {
+            RuntimeException re = new RuntimeException(AnyStrings
+                    .format("{} {}", e.getClass().getName(), e.getMessage()));
+            re.setStackTrace(e.getStackTrace());
+            throw re;
+        }
+    }
+    
+    /**
+     * Take a checked {@link Exception} and throw it as a
+     * {@link RuntimeException}.
+     * <p>
+     * Unlike {@link #wrapAsRuntimeException(Exception, Class)}, this method
+     * replaces {@code e} with an instance of the {@code desiredType} that has
+     * the same {@link Exception#getStackTrace() stack trace} as {@code e}.
+     * </p>
+     * <h2>Example</h2>
+     * 
+     * <pre>
+     * try {
+     *     methodThatThrowsException();
+     * }
+     * catch (Exception e) {
+     *     throw Exceptions.throwAsRuntimeException(e,
+     *             IllegalArgumentException.class);
      * }
      * </pre>
      * 
@@ -98,7 +160,7 @@ public final class CheckedExceptions {
      */
     @SuppressWarnings("unchecked")
     public static <T extends RuntimeException> T throwAsRuntimeException(
-            Exception e, Class<T> desiredType) {
+            Throwable e, Class<T> desiredType) {
         if(e.getClass() == desiredType) {
             throw (T) e;
         }
@@ -135,6 +197,64 @@ public final class CheckedExceptions {
      * @throws RuntimeException
      */
     public static RuntimeException wrapAsRuntimeException(Exception e) {
+        return wrapAsRuntimeException((Throwable) e);
+    }
+    
+    /**
+     * Wrap a checked {@link Exception} within a {@link RuntimeException}.
+     * <p>
+     * Unlike {@link #throwAsRuntimeException(Exception, Class)} this method
+     * does not replace {@code e}. Instead it generates a new RuntimeException
+     * with {@code e} as the cause.
+     * </p>
+     * <h2>Example</h2>
+     * 
+     * <pre>
+     * try {
+     *     methodThatThrowsException();
+     * }
+     * catch (Exception e) {
+     *     throw Exceptions.wrapAsRuntimeException(e);
+     * }
+     * </pre>
+     * 
+     * @param e the checked {@link Exception} to wrap
+     * @param desiredType the type of {@link RuntimeException} with which to
+     *            wrap {@code e}
+     * @return nothing, return type is only so that an invocation of this method
+     *         can be chained with the <em>throw</em> keyword (see example
+     *         above)
+     * @throws T
+     */
+    public static <T extends RuntimeException> T wrapAsRuntimeException(Exception e, Class<T> desiredType) {
+        return wrapAsRuntimeException((Throwable) e, desiredType);
+    }
+
+    /**
+     * Wrap a checked {@link Exception} within a {@link RuntimeException}.
+     * <p>
+     * Unlike {@link #throwAsRuntimeException(Exception)} this method does not
+     * replace {@code e}. Instead it generates a new RuntimeException with
+     * {@code e} as the cause.
+     * </p>
+     * <h2>Example</h2>
+     * 
+     * <pre>
+     * try {
+     *     methodThatThrowsException();
+     * }
+     * catch (Exception e) {
+     *     throw Exceptions.wrapAsRuntimeException(e);
+     * }
+     * </pre>
+     * 
+     * @param e the checked {@link Exception} to wrap
+     * @return nothing, return type is only so that an invocation of this method
+     *         can be chained with the <em>throw</em> keyword (see example
+     *         above)
+     * @throws RuntimeException
+     */
+    public static RuntimeException wrapAsRuntimeException(Throwable e) {
         if(e instanceof RuntimeException) {
             throw (RuntimeException) e;
         }
@@ -143,7 +263,7 @@ public final class CheckedExceptions {
             throw re;
         }
     }
-
+    
     /**
      * Wrap a checked {@link Exception} within a {@link RuntimeException}.
      * <p>
@@ -172,7 +292,7 @@ public final class CheckedExceptions {
      */
     @SuppressWarnings("unchecked")
     public static <T extends RuntimeException> T wrapAsRuntimeException(
-            Exception e, Class<T> desiredType) {
+            Throwable e, Class<T> desiredType) {
         if(e.getClass() == desiredType) {
             throw (T) e;
         }

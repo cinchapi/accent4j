@@ -26,8 +26,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.cinchapi.common.base.CheckedExceptions;
-import com.cinchapi.common.base.Verify;
 import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
+import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 
 /**
  * Additional utility methods for ByteBuffers that are not found in the
@@ -36,6 +37,73 @@ import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
  * @author Jeff Nelson
  */
 public abstract class ByteBuffers {
+
+    /**
+     * The name of the Charset to use for encoding/decoding. We use the name
+     * instead of the charset object because Java caches encoders when
+     * referencing them by name, but creates a new encorder object when
+     * referencing them by Charset object.
+     */
+    private static final String CHARSET = StandardCharsets.UTF_8.name();
+
+    /**
+     * A collection of UTF-8 decoders that can be concurrently used. We use this
+     * to avoid creating a new decoder every time we need to decode a string
+     * while still allowing multi-threaded access.
+     */
+    private static final ConcurrentLinkedQueue<CharsetDecoder> DECODERS = ConcurrentLoadingQueue
+            .create(new Callable<CharsetDecoder>() {
+
+                @Override
+                public CharsetDecoder call() throws Exception {
+                    return StandardCharsets.UTF_8.newDecoder();
+                }
+
+            });
+
+    /**
+     * The number of UTF-8 decoders to create for concurrent access.
+     */
+    private static final int NUM_DECODERS = 10;
+
+    static {
+        try {
+            for (int i = 0; i < NUM_DECODERS; ++i) {
+                DECODERS.add(StandardCharsets.UTF_8.newDecoder());
+            }
+        }
+        catch (Exception e) {
+            throw CheckedExceptions.throwAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Return a byte array containing all the {@link ByteBuffer#remaining()}
+     * content within the {@code buffer}. The {@code buffer}'s mark is set to
+     * the current position. The {@code buffer}'s limit is preserved.
+     * 
+     * @param buffer
+     * @return a byte array containing the remaining the content in the
+     *         {@code buffer}.
+     */
+    public static byte[] getByteArray(ByteBuffer buffer) {
+        if(buffer.hasArray() && buffer.arrayOffset() == 0
+                && buffer.remaining() == buffer.array().length) {
+            // A sliced ByteBuffer shares the parent's backing array but has a
+            // non-zero arrayOffset, so buffer.array() would return the parent's
+            // full array rather than just the slice's content. Only take the
+            // fast path when the remaining content spans the entire backing
+            // array.
+            return buffer.array();
+        }
+        else {
+            buffer.mark();
+            byte[] array = new byte[buffer.remaining()];
+            buffer.get(array);
+            buffer.reset();
+            return array;
+        }
+    }
 
     /**
      * Return a ByteBuffer that is a new read-only buffer that shares the
@@ -104,12 +172,38 @@ public abstract class ByteBuffers {
      * @param hex
      * @return the binary data
      */
+    public static ByteBuffer decodeFromHexString(String hex) {
+        return ByteBuffer.wrap(BaseEncoding.base16().decode(hex));
+    }
+
+    /**
+     * Encode the remaining bytes in as {@link ByteBuffer} as a hex string and
+     * maintain the current position.
+     * 
+     * @param buffer
+     * @return the hex string
+     */
+    public static String encodeAsHexString(ByteBuffer buffer) {
+        buffer.rewind();
+        return BaseEncoding.base16().encode(ByteBuffers.getByteArray(buffer));
+    }
+
+    /**
+     * Decode the {@code hex}adeciaml string and return the resulting binary
+     * data.
+     * 
+     * @param hex
+     * @return the binary data
+     * @deprecated in favor of {@link #decodeFromHexString(String)}; which
+     *             expects its input in a different case format
+     */
+    @Deprecated
     public static ByteBuffer decodeFromHex(String hex) {
         int len = hex.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character
-                    .digit(hex.charAt(i + 1), 16));
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                    + Character.digit(hex.charAt(i + 1), 16));
         }
         return ByteBuffer.wrap(data);
     }
@@ -120,7 +214,10 @@ public abstract class ByteBuffers {
      * 
      * @param buffer
      * @return the hex string
+     * @deprecated in favor of {@link #encodeAsHexString(ByteBuffer)}; which
+     *             returns the value in a different case format
      */
+    @Deprecated
     public static String encodeAsHex(ByteBuffer buffer) {
         StringBuilder sb = new StringBuilder();
         buffer.mark();
@@ -157,13 +254,14 @@ public abstract class ByteBuffers {
      * @param length
      * @return a ByteBuffer that has {@code length} bytes from {@code buffer}
      */
-    public static ByteBuffer get(ByteBuffer buffer, int length) {
-        Verify.thatArgument(
-                buffer.remaining() >= length,
-                "The number of bytes remaining in the buffer cannot be less than the desired length");
+    public static ByteBuffer get(ByteBuffer source, int length) {
+        Preconditions.checkArgument(source.remaining() >= length,
+                "The number of bytes remaining in the buffer cannot be less than length");
         byte[] backingArray = new byte[length];
-        buffer.get(backingArray);
-        return ByteBuffer.wrap(backingArray);
+        source.get(backingArray);
+        ByteBuffer destination = ByteBuffer.wrap(backingArray);
+        destination.order(source.order());
+        return destination;
     }
 
     /**
@@ -188,17 +286,6 @@ public abstract class ByteBuffers {
     public static <T extends Enum<?>> T getEnum(ByteBuffer buffer,
             Class<T> clazz) {
         return clazz.getEnumConstants()[buffer.getInt()];
-    }
-
-    /**
-     * Relative <em>get</em> method. Reads the UTF-8 encoded string at
-     * the current position in {@code buffer}.
-     * 
-     * @param buffer
-     * @return the string value at the current position
-     */
-    public static String getUtf8String(ByteBuffer buffer) {
-        return getString(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -231,6 +318,17 @@ public abstract class ByteBuffers {
                 DECODERS.offer(decoder);
             }
         }
+    }
+
+    /**
+     * Relative <em>get</em> method. Reads the UTF-8 encoded string at
+     * the current position in {@code buffer}.
+     * 
+     * @param buffer
+     * @return the string value at the current position
+     */
+    public static String getUtf8String(ByteBuffer buffer) {
+        return getString(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -303,7 +401,8 @@ public abstract class ByteBuffers {
      * @return the new ByteBuffer slice
      * @see ByteBuffer#slice()
      */
-    public static ByteBuffer slice(ByteBuffer buffer, int position, int length) {
+    public static ByteBuffer slice(ByteBuffer buffer, int position,
+            int length) {
         int oldPosition = buffer.position();
         int oldLimit = buffer.limit();
         buffer.position(position);
@@ -315,6 +414,65 @@ public abstract class ByteBuffers {
     }
 
     /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at it's current position, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         it's current position and the byte at {@code length} positions
+     *         away
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int length) {
+        return share(buffer, buffer.position(), length);
+    }
+
+    /**
+     * Return a new {@link ByteBuffer} whose content is a shared subsequence of
+     * the content in {@code buffer} starting at {@code position}, for
+     * {@code length} bytes and advance the {@link ByteBuffer#position()
+     * position} of {@code buffer} by {@code length} bytes.
+     * <p>
+     * This method is a hybrid of {@link #slice(ByteBuffer, int, int)} and
+     * {@link #get(ByteBuffer, int)} that return a distinct {@link ByteBuffer}
+     * with shared content and a limited window, without making a copy.
+     * </p>
+     * 
+     * @param buffer
+     * @param position
+     * @param length
+     * @return the {@link ByteBuffer} that shares the content between
+     *         {@code position} and {@code position + length}
+     */
+    public static ByteBuffer share(ByteBuffer buffer, int position,
+            int length) {
+        int end = position + length;
+        Preconditions.checkArgument(end <= buffer.limit());
+        int limit = buffer.limit();
+
+        // Narrow the #buffer's window to be between the desired start and #end
+        // #positions so that the #slice is similarly narrowed
+        buffer.position(position);
+        buffer.limit(end);
+        ByteBuffer slice = buffer.slice();
+
+        // Reset the #buffer's original #limit, but advance it's position to the
+        // #end of the #slice.
+        buffer.limit(limit);
+        buffer.position(end);
+
+        return slice;
+    }
+
+    /**
      * Return a byte array with the content of {@code buffer}. This method
      * returns the byte array that backs {@code buffer} if one exists, otherwise
      * it creates a new byte array with the content between the current position
@@ -322,7 +480,12 @@ public abstract class ByteBuffers {
      * 
      * @param buffer
      * @return the byte array with the content of {@code buffer}
+     * @deprecated in favor of {@link #array(ByteBuffer)} because this method
+     *             returns the entire backing byte array instead of a byte array
+     *             only containing the remaining content if the buffer is backed
+     *             by a byte array
      */
+    @Deprecated
     public static byte[] toByteArray(ByteBuffer buffer) {
         if(buffer.hasArray()) {
             return buffer.array();
@@ -334,17 +497,6 @@ public abstract class ByteBuffers {
             buffer.reset();
             return array;
         }
-    }
-
-    /**
-     * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
-     * {@code buffer}.
-     * 
-     * @param buffer
-     * @return the char buffer
-     */
-    public static CharBuffer toUtf8CharBuffer(ByteBuffer buffer) {
-        return toCharBuffer(buffer, StandardCharsets.UTF_8);
     }
 
     /**
@@ -363,41 +515,14 @@ public abstract class ByteBuffers {
     }
 
     /**
-     * The name of the Charset to use for encoding/decoding. We use the name
-     * instead of the charset object because Java caches encoders when
-     * referencing them by name, but creates a new encorder object when
-     * referencing them by Charset object.
+     * Return a UTF-8 {@link CharBuffer} representation of the bytes in the
+     * {@code buffer}.
+     * 
+     * @param buffer
+     * @return the char buffer
      */
-    private static final String CHARSET = StandardCharsets.UTF_8.name();
-
-    /**
-     * The number of UTF-8 decoders to create for concurrent access.
-     */
-    private static final int NUM_DECODERS = 10;
-
-    /**
-     * A collection of UTF-8 decoders that can be concurrently used. We use this
-     * to avoid creating a new decoder every time we need to decode a string
-     * while still allowing multi-threaded access.
-     */
-    private static final ConcurrentLinkedQueue<CharsetDecoder> DECODERS = ConcurrentLoadingQueue
-            .create(new Callable<CharsetDecoder>() {
-
-                @Override
-                public CharsetDecoder call() throws Exception {
-                    return StandardCharsets.UTF_8.newDecoder();
-                }
-
-            });
-    static {
-        try {
-            for (int i = 0; i < NUM_DECODERS; ++i) {
-                DECODERS.add(StandardCharsets.UTF_8.newDecoder());
-            }
-        }
-        catch (Exception e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
-        }
+    public static CharBuffer toUtf8CharBuffer(ByteBuffer buffer) {
+        return toCharBuffer(buffer, StandardCharsets.UTF_8);
     }
 
 }

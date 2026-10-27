@@ -20,8 +20,10 @@ package com.cinchapi.common.base;
  * but it doesn't require inputs to do so.
  *
  * @author Jeff Nelson
+ * @deprecated use {@link Supplier} instead.
  */
 @FunctionalInterface
+@Deprecated
 public interface Generator<T> {
 
     /**

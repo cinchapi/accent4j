@@ -1,0 +1,225 @@
+# Copyright (c) 2013-2026 Cinchapi Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 2.1
+
+# -------------------------------------------------------------------------------------
+# References
+# -------------------------------------------------------------------------------------
+references:
+  cache_key: &cache_key v1-jars-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "~/gradle.lock" }}
+  cache_key_java21: &cache_key_java21 v1-jars-java21-{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ .Branch }}-{{ checksum "~/gradle.lock" }}
+
+# -------------------------------------------------------------------------------------
+# Executors
+# -------------------------------------------------------------------------------------
+executors:
+  java8-executor:
+    docker:
+      - image: cimg/openjdk:8.0.322
+    environment:
+      GRADLE_OPTS: "-Djenkins=true -Xmx1024m"
+      TERM: dumb
+      CONTAINER_BUILD: "true"
+
+  java21-executor:
+    docker:
+      - image: cimg/openjdk:21.0
+    environment:
+      GRADLE_OPTS: "-Xmx1024m"
+      TERM: dumb
+      CONTAINER_BUILD: "true"
+
+# -------------------------------------------------------------------------------------
+# Commands
+# -------------------------------------------------------------------------------------
+commands:
+
+  save_project:
+    steps:
+      - run:
+          name: Save project to workspace
+          command: |
+            rm -rf ~/project
+            cp -a ~/$CIRCLE_PROJECT_REPONAME ~/project
+
+  restore_project:
+    steps:
+      - run:
+          name: Restore project from workspace
+          command: |
+            rm -rf ~/$CIRCLE_PROJECT_REPONAME
+            cp -a ~/project ~/$CIRCLE_PROJECT_REPONAME
+
+  attach_project:
+    steps:
+      - attach_workspace:
+          at: ~/
+      - restore_project
+
+  persist_project:
+    steps:
+      - save_project
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project
+
+  collect_test_results:
+    steps:
+      - run:
+          name: Collect test results
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            mkdir -p ~/junit/
+            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
+          when: always
+      - store_test_results:
+          path: ~/junit
+      - store_artifacts:
+          path: ~/junit
+
+# -------------------------------------------------------------------------------------
+# Jobs
+# -------------------------------------------------------------------------------------
+jobs:
+
+  setup:
+    executor: java8-executor
+    steps:
+      - checkout:
+          path: ~/$CIRCLE_PROJECT_REPONAME
+      - run:
+          name: Generate gradle.lock
+          command: |
+            find ~/$CIRCLE_PROJECT_REPONAME -type f -name build.gradle | sort -d | awk NF | xargs cat > ~/gradle.lock
+      - save_project
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - gradle.lock
+            - project
+
+  compile:
+    executor: java8-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Compile
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew compileJava compileTestJava --no-daemon
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: *cache_key
+      - persist_project
+
+  test:
+    executor: java8-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Run Tests
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew test --no-daemon
+      - collect_test_results
+
+  test-java21:
+    executor: java21-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key_java21
+      - run:
+          name: Test RuntimeDynamics on Java 21
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            ./gradlew test --tests "com.cinchapi.common.unsafe.RuntimeDynamicsTest" -x compileJava -x compileTestJava --no-daemon
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: *cache_key_java21
+      - collect_test_results
+
+  publish:
+    executor: java8-executor
+    steps:
+      - attach_project
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Assemble and Publish
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            # Only develop and master publish to Maven Central, and only
+            # their workflow entry gives this job the release-publishing
+            # context
+            case "$CIRCLE_BRANCH" in
+              develop|master)
+                source .circleci/load-release-secrets.sh
+                load_release_secrets
+                ;;
+            esac
+            ./gradlew assemble publish closeAndReleaseSonatypeStagingRepository --no-daemon
+      - run:
+          name: Save artifacts
+          command: |
+            cd ~/$CIRCLE_PROJECT_REPONAME
+            mkdir -p ~/artifacts/
+            find . -type f -regex ".*/build/libs/.*jar" -exec cp {} ~/artifacts/ \;
+      - store_artifacts:
+          path: ~/artifacts
+
+# -------------------------------------------------------------------------------------
+# Workflows
+# -------------------------------------------------------------------------------------
+workflows:
+  build_test_publish:
+    jobs:
+      - setup
+      - compile:
+          requires:
+            - setup
+      - test:
+          requires:
+            - compile
+      - test-java21:
+          requires:
+            - compile
+      - publish:
+          name: publish-release
+          context: release-publishing
+          filters:
+            branches:
+              only:
+                - develop
+                - master
+          requires:
+            - test
+            - test-java21
+      - publish:
+          filters:
+            branches:
+              ignore:
+                - develop
+                - master
+          requires:
+            - test
+            - test-java21

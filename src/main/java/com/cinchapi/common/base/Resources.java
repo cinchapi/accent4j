@@ -26,7 +26,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 
 /**
@@ -154,7 +153,7 @@ public class Resources {
             return get(name).openStream();
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

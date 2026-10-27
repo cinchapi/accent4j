@@ -15,6 +15,8 @@
  */
 package com.cinchapi.common.base;
 
+import java.util.Arrays;
+
 /**
  * Array-related helper functions.
  *
@@ -35,6 +37,35 @@ public final class Array {
     @SafeVarargs
     public static <T> T[] containing(T... args) {
         return args;
+    }
+
+    /**
+     * Return a new array that contains the items in the {@code args} array in
+     * reverse order.
+     * 
+     * @param args
+     * @return an array containing the {@code args} in reverse
+     */
+    @SafeVarargs
+    public static <T> T[] reverse(T... args) {
+        T[] copy = Arrays.copyOf(args, args.length);
+        reverseInPlace(copy);
+        return copy;
+    }
+
+    /**
+     * Reverse the order of the items in the {@code args} array in-place (e.g.
+     * edit the input array).
+     * 
+     * @param args
+     */
+    @SafeVarargs
+    public static <T> void reverseInPlace(T... args) {
+        for (int i = 0; i < args.length / 2; ++i) {
+            T swap = args[i];
+            args[i] = args[args.length - i - 1];
+            args[args.length - i - 1] = swap;
+        }
     }
 
     private Array() {}

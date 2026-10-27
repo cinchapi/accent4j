@@ -18,19 +18,20 @@ package com.cinchapi.common.base;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.Assert;
 import org.junit.Test;
-
-import com.cinchapi.common.base.AnyObjects;
 
 /**
  * Unit tests for {@link AnyObjects} functions.
  * 
  * @author Jeff Nelson
  */
+@SuppressWarnings("deprecation")
 public class AnyObjectsTest {
 
     @Test
@@ -45,10 +46,10 @@ public class AnyObjectsTest {
 
     @Test
     public void testIsNullOrEmptyMap() {
-        Assert.assertTrue(AnyObjects
-                .isNullOrEmpty(new HashMap<Object, Object>()));
-        Assert.assertTrue(AnyObjects
-                .isNullOrEmpty(new TreeMap<Object, Object>()));
+        Assert.assertTrue(
+                AnyObjects.isNullOrEmpty(new HashMap<Object, Object>()));
+        Assert.assertTrue(
+                AnyObjects.isNullOrEmpty(new TreeMap<Object, Object>()));
     }
 
     @Test
@@ -60,6 +61,15 @@ public class AnyObjectsTest {
     @Test
     public void testIsNullOrEmptyNull() {
         Assert.assertTrue(AnyObjects.isNullOrEmpty(null));
+    }
+
+    @Test
+    public void testSplit() {
+        final List<String> result = AnyObjects
+                .split(ImmutableList.of("One, Two", "Three", "Four, Five"));
+        Assert.assertEquals(result.size(), 5);
+        Assert.assertEquals(result.get(3), "Four");
+        Assert.assertEquals(result.get(4), "Five");
     }
 
     @Test

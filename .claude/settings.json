@@ -1,0 +1,14 @@
+{
+   "hooks" : {
+      "SessionStart" : [
+         {
+            "hooks" : [
+               {
+                  "command" : "[ -e .agents/.git ] || { git submodule update --init .agents >&2 && cat .agents/instructions/AGENTS.md; }",
+                  "type" : "command"
+               }
+            ]
+         }
+      ]
+   }
+}

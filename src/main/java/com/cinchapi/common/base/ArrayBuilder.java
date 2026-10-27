@@ -19,6 +19,8 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cinchapi.common.reflect.Reflection;
+
 /**
  * A builder for arrays.
  * <p>
@@ -117,6 +119,8 @@ public class ArrayBuilder<T> {
      */
     private List<T> moreArgs = null;
 
+    private Class<?> type;
+
     /**
      * Construct a new instance.
      */
@@ -181,6 +185,8 @@ public class ArrayBuilder<T> {
             break;
         }
         ++length;
+        type = (type == null || arg.getClass() == type) ? arg.getClass()
+                : Reflection.getClosestCommonAncestor(type, arg.getClass());
         return this;
     }
 
@@ -195,7 +201,7 @@ public class ArrayBuilder<T> {
             throw new IllegalStateException();
         }
         else {
-            T[] array = (T[]) Array.newInstance(arg0.getClass(), length);
+            T[] array = (T[]) Array.newInstance(type, length);
             T current = arg0;
             boolean exit = false;
             int index = 0;

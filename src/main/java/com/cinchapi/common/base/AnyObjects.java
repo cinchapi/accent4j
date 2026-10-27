@@ -15,13 +15,16 @@
  */
 package com.cinchapi.common.base;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
-import com.cinchapi.common.base.validate.Check;
+import com.cinchapi.common.collect.Sequences;
+import com.cinchapi.common.describe.Empty;
 
 /**
  * Helper functions
@@ -32,6 +35,11 @@ import com.cinchapi.common.base.validate.Check;
  * @author Jeff Nelson
  */
 public final class AnyObjects {
+
+    /**
+     * An {@link Empty} instance to implement empty checking methods.
+     */
+    private static Empty EMPTY = Empty.is();
 
     /**
      * Check if {@code value} is {@code null} or semantically
@@ -76,8 +84,8 @@ public final class AnyObjects {
      * @return {@code theDefault} or {@code preferred} value
      */
     public static <T> T defaultUnless(T theDefault, T preferred,
-            Check<T> preferredCheck) {
-        return preferredCheck.passes(preferred) ? preferred : theDefault;
+            Predicate<T> preferredCheck) {
+        return preferredCheck.test(preferred) ? preferred : theDefault;
     }
 
     /**
@@ -114,9 +122,9 @@ public final class AnyObjects {
      */
     @SafeVarargs
     @Nullable
-    public static <T> T firstThat(Check<T> check, T... candidates) {
+    public static <T> T firstThat(Predicate<T> check, T... candidates) {
         for (T candidate : candidates) {
-            if(check.passes(candidate)) {
+            if(check.test(candidate)) {
                 return candidate;
             }
             else {
@@ -136,30 +144,12 @@ public final class AnyObjects {
      * 
      * @param value the value to check for {@code null} or emptiness
      * @return {@code true} if
+     * @deprecated use the {@link com.cinchapi.common.describe.Empty} framework
+     *             instead
      */
-    @SuppressWarnings("unchecked")
+    @Deprecated
     public static <T> boolean isNullOrEmpty(T value) {
-        if(value == null) {
-            return true;
-        }
-        else {
-            Class<T> clazz = (Class<T>) value.getClass();
-            EmptyDefinition<T> def = (EmptyDefinition<T>) defs.get(clazz);
-            if(def != null) {
-                return def.metBy(value);
-            }
-            else {
-                for (Entry<Class<?>, EmptyDefinition<?>> entry : defs
-                        .entrySet()) {
-                    Class<?> clz = entry.getKey();
-                    if(clz.isAssignableFrom(clazz)) {
-                        def = (EmptyDefinition<T>) entry.getValue();
-                        return def.metBy(value);
-                    }
-                }
-                return false;
-            }
-        }
+        return EMPTY.describes(value);
     }
 
     /**
@@ -169,8 +159,8 @@ public final class AnyObjects {
      * @param check the {@link Check} to run
      * @return {@code null} or {@code value}
      */
-    public static <T> T nullUnless(T value, Check<T> check) {
-        return check.passes(value) ? value : null;
+    public static <T> T nullUnless(T value, Predicate<T> check) {
+        return check.test(value) ? value : null;
     }
 
     /**
@@ -187,24 +177,83 @@ public final class AnyObjects {
      * 
      * @param clazz the {@link Class} to register
      * @param def the {@link EmptyDefinition} to associate with {@code clazz}
+     * @deprecated use the {@link com.cinchapi.common.describe.Empty} framework
+     *             instead
      */
+    @Deprecated
     public static <T> void registerEmptyDefinition(Class<T> clazz,
             EmptyDefinition<T> def) {
-        defs.put(clazz, def);
+        EMPTY.define(clazz, object -> def.metBy(object));
     }
 
     /**
-     * The custom {@link EmptyDefinition empty definitions} that are provided
-     * for classes.
+     * Perform a {@link #split(Object, char)} based on the a comma delimiter.
+     * 
+     * @param value the generic value
+     * @param the type of the generic value
+     * @return a list based on the {@code value} being split
      */
-    private static final Map<Class<?>, EmptyDefinition<?>> defs = new HashMap<Class<?>, EmptyDefinition<?>>();
+    public static <T> List<String> split(T value) {
+        return split(value, ',');
+    }
 
-    static {
-        registerEmptyDefinition(String.class, string -> string.isEmpty());
-        registerEmptyDefinition(Iterable.class,
-                iterable -> !iterable.iterator().hasNext());
-        registerEmptyDefinition(Map.class, map -> map.isEmpty());
-        registerEmptyDefinition(Object[].class, object -> object.length == 0);
+    /**
+     * This function takes a generic {@code value} and a character as the
+     * delimiter.
+     *
+     * <p>
+     * Firstly, if the generic is a sequence, then we iterate through each item
+     * and split the string representation, by the delimiter, of each item
+     * individually, trimming any whitespace away. We then convert this new
+     * sequence to a list and return that.
+     * </p>
+     *
+     * <p>
+     * Secondly, if the generic is not a sequence, then we simply convert the
+     * item to a String and split by the delimiter, again trimming the
+     * whitespace, and then we convert that new sequence to a list and return
+     * that.
+     * </p>
+     *
+     * @param value The generic value
+     * @param delimiter The character that we use to specify the boundary
+     *            between different parts of the text.
+     * @param The type of the generic value
+     * @return a list based on the {@code value} being split
+     */
+    public static <T> List<String> split(T value, char delimiter) {
+        return split(value, v -> new StringSplitter(v, delimiter,
+                SplitOption.TRIM_WHITESPACE));
+    }
+
+    /**
+     * Intelligently split the {@code value} using a {@link StringSplitter} that
+     * is provided by the {@code generator}.
+     * <p>
+     * If {@code value} is a {@link Sequences#isSequence(Object) sequence}, each
+     * of its items are split and collected in the {@link List} that is
+     * returned.
+     * </p>
+     * <p>
+     * Otherwise, if {@code value} is not a sequence, its {@link #toString()}
+     * representation is split and collected in the {@link List} that is
+     * returned.
+     * </p>
+     * 
+     * @param value
+     * @param generator
+     * @return a {@link List} containing all of the tokens that result from
+     *         splitting the {@code value} using a {@link StringSplitter}
+     *         produced by the {@code generator}
+     */
+    public static <T> List<String> split(T value,
+            Function<String, StringSplitter> generator) {
+        Function<Object, String[]> splitter = item -> generator
+                .apply(item.toString()).toArray();
+        return Sequences.isSequence(value)
+                ? Sequences.stream(value).map(splitter).flatMap(Arrays::stream)
+                        .collect(Collectors.toList())
+                : Arrays.asList(splitter.apply(value));
     }
 
     private AnyObjects() {/* noinit */}

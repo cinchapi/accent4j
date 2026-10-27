@@ -37,8 +37,8 @@ import com.cinchapi.common.base.Platform;
 import com.cinchapi.common.base.ReadOnlyIterator;
 import com.cinchapi.common.process.Processes;
 import com.cinchapi.common.process.Processes.ProcessResult;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.hash.Hashing;
 
 /**
@@ -73,7 +73,7 @@ public final class Files {
                 deleteDirectory(directory);
             }
             else {
-                throw Throwables.propagate(e);
+                throw CheckedExceptions.wrapAsRuntimeException(e);
             }
         }
     }
@@ -146,8 +146,9 @@ public final class Files {
                                     // second.
                 file.getParentFile().mkdirs();
                 file.createNewFile();
-                com.google.common.io.Files.write(checksum, file,
-                        StandardCharsets.UTF_8);
+                com.google.common.io.Files
+                        .asCharSink(file, StandardCharsets.UTF_8)
+                        .write(checksum);
             }
             return checksum;
 
@@ -382,7 +383,35 @@ public final class Files {
             return java.nio.file.Files.createTempDirectory(prefix).toString();
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+    }
+
+    /**
+     * Implementation of {@link java.nio.file.Files#newDirectoryStream(Path)}
+     * that returns an empty stream if {@code dir} does not exist.
+     * 
+     * @param dir
+     * @return the {@link DirectoryStream}
+     * @throws IOException
+     */
+    public static DirectoryStream<Path> newDirectoryStreamNotExistsSafe(
+            Path dir) throws IOException {
+        if(dir.toFile().exists()) {
+            return java.nio.file.Files.newDirectoryStream(dir);
+        }
+        else {
+            return new DirectoryStream<Path>() {
+
+                @Override
+                public void close() throws IOException {}
+
+                @Override
+                public Iterator<Path> iterator() {
+                    return Iterators.forArray();
+                }
+
+            };
         }
     }
 
@@ -398,7 +427,7 @@ public final class Files {
                     .getParent();
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

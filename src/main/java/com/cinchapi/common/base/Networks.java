@@ -24,8 +24,6 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
 
-import com.google.common.base.Throwables;
-
 /**
  * Utilities for dealing with networking.
  * 
@@ -81,7 +79,7 @@ public final class Networks {
             return InetAddress.getByName(host).getHostAddress();
         }
         catch (UnknownHostException | MalformedURLException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 
@@ -133,7 +131,7 @@ public final class Networks {
             return false;
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw CheckedExceptions.wrapAsRuntimeException(e);
         }
     }
 

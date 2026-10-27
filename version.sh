@@ -64,7 +64,12 @@ if [ -z "$1" ] ; then
   fi
   echo $COUNTER > $COUNTER_FILE
   VERSION=$VERSION.$COUNTER
+  # Only master builds a release version. Every other branch builds a
+  # suffixed version, so its build can never take the number of a release.
   case $BRANCH in
+    master )
+      EXTRA=""
+      ;;
     develop )
       EXTRA="-SNAPSHOT"
       ;;
@@ -75,13 +80,17 @@ if [ -z "$1" ] ; then
       EXTRA=`echo $EXTRA | tr '[:lower:]' '[:upper:]'`
       ;;
     release* )
-      EXTRA=""
+      EXTRA="-rc"
       ;;
     * )
-      # At this point we do not need to refer
-      # to any commit hash since we'll have a
-      # tag that represents the overall release
-      EXTRA=""
+      # Turn the branch name into a suffix that is safe for Maven: uppercase,
+      # with each run of other characters as one '-', at most 32 characters,
+      # or BUILD if nothing is left
+      SUFFIX=`echo "$BRANCH" | tr '[:lower:]' '[:upper:]' \
+        | sed -E 's/[^A-Z0-9]+/-/g; s/^-+//; s/-+$//'`
+      SUFFIX=${SUFFIX:0:32}
+      SUFFIX=${SUFFIX:-BUILD}
+      EXTRA="-${SUFFIX}"
       ;;
   esac
   echo $VERSION$EXTRA

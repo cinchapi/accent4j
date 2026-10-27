@@ -23,6 +23,7 @@ import javax.annotation.concurrent.Immutable;
 import org.slf4j.LoggerFactory;
 
 import com.cinchapi.common.io.Files;
+import com.cinchapi.common.reflect.Reflection;
 import com.google.common.base.Preconditions;
 
 import ch.qos.logback.classic.Level;
@@ -32,6 +33,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.rolling.FixedWindowRollingPolicy;
 import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy;
+import ch.qos.logback.core.util.FileSize;
 
 /**
  * A programmatically configurable logging facade.
@@ -76,13 +78,15 @@ public final class Logger {
 
     /**
      * Return a {@link Logger} that doesn't log messages to anywhere.
-     * 
+     * <p>
+     * Every call returns the same instance, so a caller can ask for one as
+     * often as it likes.
+     * </p>
+     *
      * @return the fake Logger
      */
     public static Logger none() {
-        return builder().name("none")
-                .directory(Files.tempDir(UUID.randomUUID().toString()))
-                .enableConsoleLogging(false).level(Level.ERROR).build();
+        return NoneHolder.INSTANCE;
     }
 
     /**
@@ -238,7 +242,14 @@ public final class Logger {
 
         // Configure Triggering Policy
         SizeBasedTriggeringPolicy<ILoggingEvent> triggering = new SizeBasedTriggeringPolicy<ILoggingEvent>();
-        triggering.setMaxFileSize(maxFileSize);
+        try {
+            triggering.setMaxFileSize(FileSize.valueOf(maxFileSize));
+        }
+        catch (NoSuchMethodError e) {
+            // Backwards compatibility with versions of logback that expected
+            // string values for #setMaxFileSize.
+            Reflection.call(triggering, "setMaxFileSize", maxFileSize);
+        }
         triggering.start();
 
         // Configure File Appender
@@ -337,6 +348,25 @@ public final class Logger {
             this.name = name;
             return this;
         }
+    }
+
+    /**
+     * Holds the {@link Logger} that {@link Logger#none()} returns. The
+     * {@link Logger} is built when {@link Logger#none()} is first called, so
+     * loading {@link Logger} creates no log files.
+     *
+     * @author Jeff Nelson
+     */
+    private static final class NoneHolder {
+
+        /**
+         * The {@link Logger} that {@link Logger#none()} returns.
+         */
+        private static final Logger INSTANCE = builder().name("none")
+                .directory(Files.tempDir(UUID.randomUUID().toString()))
+                .enableConsoleLogging(false).level(Level.ERROR).build();
+
+        private NoneHolder() {/* no-init */}
     }
 
 }
