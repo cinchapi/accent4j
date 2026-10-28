@@ -14,6 +14,12 @@
   had processors at once, and each process wrote more output than a pipe holds.
 * The methods of `Enums` create less short-lived garbage. Previously, each call
   copied every constant of the enum that it searched.
+* `ByteBuffers#getUtf8String` is faster, most of all when many threads decode at
+  once, and so is `ByteBuffers#getString` for UTF-8. Previously, every call took
+  a decoder from one pool that all threads shared and put it back when done. So
+  threads that decoded at the same time slowed each other down. Now, each thread
+  decodes with a decoder of its own. Each call returns the same string for the
+  same bytes as before and still drops bytes that are not valid UTF-8.
 * `Empty#is` and `Empty#ness` share one read-only set of default definitions
   among the instances that they return, and an instance copies the set only when
   you add a definition to it with `define`. So each call allocates 24 bytes
