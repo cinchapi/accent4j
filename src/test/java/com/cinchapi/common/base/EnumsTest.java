@@ -27,10 +27,6 @@ import org.junit.Test;
  */
 public class EnumsTest {
 
-    enum Site {
-        BLAVITY, AFROTECH, TWENTY_ONE_NINETY, TRAVEL_NOIRE, SHADOW_AND_ACT;
-    }
-
     /**
      * Custom logic that maps the short names of the {@link Site} constants,
      * such as {@code "21N"}, {@code "TN"}, and {@code "S+A"}, and returns
@@ -53,23 +49,6 @@ public class EnumsTest {
             return null;
         }
     };
-
-    @Test
-    public void testParseStringOrdinal() {
-        Assert.assertSame(Site.AFROTECH,
-                Enums.parseIgnoreCase(Site.class, "1"));
-    }
-
-    @Test
-    public void testParseOrdinal() {
-        Assert.assertSame(Site.AFROTECH, Enums.parseIgnoreCase(Site.class, 1));
-    }
-
-    @Test
-    public void testParseIgnoreCase() {
-        Assert.assertSame(Site.BLAVITY,
-                Enums.parseIgnoreCase(Site.class, "blavity"));
-    }
 
     @Test
     public void testParseCustomLogic() {
@@ -101,14 +80,48 @@ public class EnumsTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void testParseInvalid() {
-        Enums.parseIgnoreCase(Site.class, "foo");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
     public void testParseCustomLogicInvalid() {
         Enums.parseIgnoreCase(Site.class, "foo",
                 value -> value.equals("FOO") ? Site.AFROTECH : null);
+    }
+
+    @Test
+    public void testParseIgnoreCase() {
+        Assert.assertSame(Site.BLAVITY,
+                Enums.parseIgnoreCase(Site.class, "blavity"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code parseIgnoreCase} returns a
+     * constant of the enum it searches when another enum has a constant with
+     * the same name or ordinal.
+     * <p>
+     * <strong>Start state:</strong> The {@link Site} and {@link Event} enums,
+     * which each have a constant named {@code AFROTECH} and a constant at
+     * ordinal 0.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Parse {@code "afrotech"} and the ordinal 0 in {@link Site}.</li>
+     * <li>Parse {@code "afrotech"} and the ordinal 0 in {@link Event}.</li>
+     * <li>Parse both in {@link Site} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call in {@link Site} returns
+     * {@link Site#AFROTECH} and {@link Site#BLAVITY}, and each call in
+     * {@link Event} returns {@link Event#AFROTECH} and {@link Event#SUMMIT}.
+     */
+    @Test
+    public void testParseIgnoreCaseReturnsConstantOfTheEnumItSearches() {
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "afrotech"));
+        Assert.assertSame(Site.BLAVITY, Enums.parseIgnoreCase(Site.class, 0));
+        Assert.assertSame(Event.AFROTECH,
+                Enums.parseIgnoreCase(Event.class, "afrotech"));
+        Assert.assertSame(Event.SUMMIT, Enums.parseIgnoreCase(Event.class, 0));
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "afrotech"));
+        Assert.assertSame(Site.BLAVITY, Enums.parseIgnoreCase(Site.class, 0));
     }
 
     /**
@@ -127,6 +140,11 @@ public class EnumsTest {
     @Test(expected = IllegalArgumentException.class)
     public void testParseIgnoreCaseThrowsForOrdinalOutOfRange() {
         Enums.parseIgnoreCase(Site.class, "9");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testParseInvalid() {
+        Enums.parseIgnoreCase(Site.class, "foo");
     }
 
     /**
@@ -203,6 +221,17 @@ public class EnumsTest {
     public void testParseNameIgnoreCaseUsesCustomLogic() {
         Assert.assertSame(Site.SHADOW_AND_ACT,
                 Enums.parseNameIgnoreCase(Site.class, "s+a", LOGIC));
+    }
+
+    @Test
+    public void testParseOrdinal() {
+        Assert.assertSame(Site.AFROTECH, Enums.parseIgnoreCase(Site.class, 1));
+    }
+
+    @Test
+    public void testParseStringOrdinal() {
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "1"));
     }
 
     /**
@@ -355,6 +384,22 @@ public class EnumsTest {
                 Enums.tryParseNameIgnoreCase(Site.class, "TN", LOGIC));
         Assert.assertNull(
                 Enums.tryParseNameIgnoreCase(Site.class, "foo", LOGIC));
+    }
+
+    /**
+     * An enum with a constant named like a {@link Site} constant, at a
+     * different ordinal.
+     */
+    enum Event {
+        SUMMIT, AFROTECH;
+    }
+
+    /**
+     * The enum that most tests search, by name, by ordinal, and with
+     * {@link #LOGIC}.
+     */
+    enum Site {
+        BLAVITY, AFROTECH, TWENTY_ONE_NINETY, TRAVEL_NOIRE, SHADOW_AND_ACT;
     }
 
 }

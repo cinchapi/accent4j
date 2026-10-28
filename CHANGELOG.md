@@ -1,5 +1,9 @@
 # Changelog
 
+#### Version 1.18.2 (TBD)
+* The methods of `Enums` create less short-lived garbage. Previously, each call
+  copied every constant of the enum that it searched.
+
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
   and opened four log files that stayed open for the life of the JVM. A caller
