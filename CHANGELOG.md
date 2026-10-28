@@ -1,5 +1,33 @@
 # Changelog
 
+#### Version 1.18.2 (October 28, 2026)
+* Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
+  standard error for a process that wrote lines to it. It happened most often
+  when the process exited quickly. The same bug affected
+  `Processes.waitForSuccessfulCompletion`, `Processes.isPidRunning` and
+  `Files.directoryChecksum`. If `Processes.waitFor` cannot read a stream, it
+  throws an exception instead of waiting forever. If the calling thread is
+  interrupted while it waits, its interrupt status stays set.
+  ([GH-53](https://github.com/cinchapi/accent4j/issues/53))
+* Fixed a bug where concurrent calls to `Processes.waitFor` could wait forever.
+  It could happen when a JVM waited on at least twice as many processes as it
+  had processors at once, and each process wrote more output than a pipe holds.
+* The methods of `Enums` create less short-lived garbage. Previously, each call
+  copied every constant of the enum that it searched.
+* `ByteBuffers#getUtf8String` is faster, most of all when many threads decode at
+  once, and so is `ByteBuffers#getString` for UTF-8. Previously, every call took
+  a decoder from one pool that all threads shared and put it back when done. So
+  threads that decoded at the same time slowed each other down. Now, each thread
+  decodes with a decoder of its own. Each call returns the same string for the
+  same bytes as before and still drops bytes that are not valid UTF-8.
+* `Empty#is` and `Empty#ness` share one read-only set of default definitions
+  among the instances that they return, and an instance copies the set only when
+  you add a definition to it with `define`. So each call allocates 24 bytes
+  instead of 240, which helps a caller that checks many values, such as a
+  `Comparator` that calls `Empty.ness().describes(...)` for each comparison.
+  Each call still returns a new instance, and a definition that you add to one
+  instance doesn't affect any other instance or the defaults.
+
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
   and opened four log files that stayed open for the life of the JVM. A caller
