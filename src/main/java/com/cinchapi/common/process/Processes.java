@@ -23,16 +23,15 @@ import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Platform;
 import com.google.common.collect.Lists;
-import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.MoreExecutors;
 
 /**
@@ -159,58 +158,39 @@ public class Processes {
     }
 
     /**
-     * Execute {@link Process#waitFor()} while reading everything from the
-     * {@code process}'s standard out and error to prevent the process from
-     * hanging.
-     * 
+     * Wait for {@code process} to exit, and return its exit code with every
+     * line it wrote to standard output and standard error.
+     * <p>
+     * This method reads both streams while the {@link Process} runs, so that
+     * the {@link Process} does not block on a full pipe. It returns only after
+     * the {@link Process} exits and both streams end, and it closes both
+     * streams. The caller must not read either stream itself.
+     * </p>
+     *
      * @param process the {@link Process} for which to wait
-     * @return a map containing all the {@link ProcessData} (e.g. exit code,
-     *         stdout and stderr)
+     * @return the {@link ProcessResult} with the exit code, standard output and
+     *         standard error of {@code process}
+     * @throws RuntimeException if either stream cannot be read, or if the
+     *         calling thread is interrupted while it waits, which leaves the
+     *         thread's interrupt status set
      */
     public static ProcessResult waitFor(Process process) {
-        AtomicBoolean finished = new AtomicBoolean(false);
-        List<String> stdout = Lists.newArrayList();
-        List<String> stderr = Lists.newArrayList();
-        CountDownLatch latch = new CountDownLatch(2);
+        // Each stream is read on its own thread, because a process that fills
+        // the pipe of a stream nobody reads blocks until that pipe drains.
+        Future<List<String>> stdout = executor
+                .submit(() -> readStream(process.getInputStream()));
+        Future<List<String>> stderr = executor
+                .submit(() -> readStream(process.getErrorStream()));
         try {
-            // Asynchronously exhaust stdout so process doesn't hang
-            executor.execute(() -> {
-                try {
-                    InputStreamReader reader = new InputStreamReader(
-                            process.getInputStream());
-                    while (!finished.get()) {
-                        stdout.addAll(CharStreams.readLines(reader));
-                    }
-                    reader.close();
-                    latch.countDown();
-                }
-                catch (IOException e) {
-                    throw CheckedExceptions.wrapAsRuntimeException(e);
-                }
-            });
-
-            // Asynchronously exhaust stderr so process doesn't hang
-            executor.execute(() -> {
-                try {
-                    InputStreamReader reader = new InputStreamReader(
-                            process.getErrorStream());
-                    while (!finished.get()) {
-                        stderr.addAll(CharStreams.readLines(reader));
-                    }
-                    reader.close();
-                    latch.countDown();
-                }
-                catch (IOException e) {
-                    throw CheckedExceptions.wrapAsRuntimeException(e);
-                }
-            });
             int code = process.waitFor();
-            finished.set(true);
-            latch.await();
-            return new ProcessResult(code, stdout, stderr);
+            return new ProcessResult(code, stdout.get(), stderr.get());
         }
         catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw CheckedExceptions.wrapAsRuntimeException(e);
+        }
+        catch (ExecutionException e) {
+            throw CheckedExceptions.wrapAsRuntimeException(e.getCause());
         }
     }
 
@@ -254,13 +234,18 @@ public class Processes {
     }
 
     /**
-     * An {@link Executor} that is used to asynchronously read input from a
-     * processe's standard out and error streams.
+     * The {@link ExecutorService} that reads the standard output and standard
+     * error of each {@link Process} given to {@link #waitFor(Process)}.
+     * <p>
+     * It has no limit on its number of threads, because each call to
+     * {@link #waitFor(Process)} needs a thread for each stream at the same
+     * time. With a limit, concurrent calls can take every thread with one
+     * stream each, and then no {@link Process} can exit.
+     * </p>
      */
     private static final ExecutorService executor = MoreExecutors
             .getExitingExecutorService(
-                    (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                            Runtime.getRuntime().availableProcessors() * 2));
+                    (ThreadPoolExecutor) Executors.newCachedThreadPool());
 
     private Processes() {} /* no-op */
 
