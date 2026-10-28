@@ -92,6 +92,31 @@ public class EnumsTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that {@code parseIgnoreCase} finds a
+     * constant of an enum that an earlier lookup searched before the enum
+     * finished constructing its constants.
+     * <p>
+     * <strong>Start state:</strong> The {@link Phase} enum, whose constructor
+     * searches {@link Phase} before its constants exist and keeps the failure.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read {@code Phase.EARLY.failure}, which constructs the constants of
+     * {@link Phase}.</li>
+     * <li>Call {@code parseIgnoreCase(Phase.class, "early")}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search during construction failed, and the
+     * call returns {@link Phase#EARLY}.
+     */
+    @Test
+    public void testParseIgnoreCaseReturnsConstantAfterLookupDuringConstruction() {
+        Assert.assertNotNull(Phase.EARLY.failure);
+        Assert.assertSame(Phase.EARLY,
+                Enums.parseIgnoreCase(Phase.class, "early"));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code parseIgnoreCase} returns a
      * constant of the enum it searches when another enum has a constant with
      * the same name or ordinal.
@@ -392,6 +417,35 @@ public class EnumsTest {
      */
     enum Event {
         SUMMIT, AFROTECH;
+    }
+
+    /**
+     * An enum whose constructor searches it with {@link Enums} before its
+     * constants exist.
+     */
+    enum Phase {
+        EARLY, LATE;
+
+        /**
+         * The failure of the search that this constant's constructor made, or
+         * {@code null} if the search did not fail.
+         */
+        final RuntimeException failure;
+
+        /**
+         * Construct a constant, and search {@link Phase} for {@code "early"}
+         * while the constants of {@link Phase} do not exist yet.
+         */
+        Phase() {
+            RuntimeException failure = null;
+            try {
+                Enums.tryParseIgnoreCase(Phase.class, "early");
+            }
+            catch (RuntimeException e) {
+                failure = e;
+            }
+            this.failure = failure;
+        }
     }
 
     /**

@@ -280,13 +280,22 @@ public final class Enums {
      * </p>
      *
      * @param clazz the enum whose constants to return
-     * @return the constants of {@code clazz}
+     * @return the constants of {@code clazz}, or {@code null} when
+     *         {@code clazz} cannot give them yet, such as while it constructs
+     *         them
      */
+    @Nullable
     @SuppressWarnings("unchecked")
     private static <T extends Enum<T>> T[] getConstants(Class<T> clazz) {
         // Class#getEnumConstants makes a new copy of the constants on every
         // call, so every lookup shares the one copy in CONSTANTS instead.
-        return (T[]) CONSTANTS.get(clazz);
+        T[] constants = (T[]) CONSTANTS.get(clazz);
+        if(constants == null) {
+            // The JDK gives no constants while an enum constructs them, and
+            // gives them on a later call, so keep no null for that enum.
+            CONSTANTS.remove(clazz);
+        }
+        return constants;
     }
 
     /**
