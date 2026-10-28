@@ -16,7 +16,6 @@
 package com.cinchapi.common.describe;
 
 import java.lang.reflect.Array;
-import java.util.Collections;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -36,8 +35,8 @@ public class Empty extends Adjective {
 
     /**
      * The default set of definitions, which every instance from {@link #is()}
-     * starts with. The map is read-only, so it is safe to share across
-     * instances and threads.
+     * starts with. Those instances share this map on any thread, so it must
+     * never change.
      */
     private static final Map<Class<?>, Predicate<?>> DEFAULTS = newDefaults();
 
@@ -99,7 +98,7 @@ public class Empty extends Adjective {
     }
 
     /**
-     * Return a new, read-only map of the default set of definitions.
+     * Return a new map of the default set of definitions.
      * 
      * @return the default definitions
      */
@@ -111,7 +110,7 @@ public class Empty extends Adjective {
                 (Predicate<Iterable<?>>) iterable -> !iterable.iterator()
                         .hasNext());
         definitions.put(Map.class, (Predicate<Map<?, ?>>) map -> map.isEmpty());
-        return Collections.unmodifiableMap(definitions);
+        return definitions;
     }
 
     private Empty() {/* no-init */}

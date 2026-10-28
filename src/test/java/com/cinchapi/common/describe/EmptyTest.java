@@ -264,4 +264,31 @@ public class EmptyTest {
         Assert.assertFalse(empty.describes(""));
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that a default {@link Empty} keeps its
+     * default definitions after a definition is added to it.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Get a default instance with {@link Empty#ness()}.</li>
+     * <li>Define every {@link Integer} as empty in it.</li>
+     * <li>Ask whether it describes an empty {@link String}, an empty list, an
+     * empty map and a random non-empty {@link String}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> It describes each empty value and not the
+     * non-empty {@link String}.
+     */
+    @Test
+    public void testDefineKeepsDefaultDefinitions() {
+        Empty empty = Empty.ness();
+        empty.define(Integer.class, integer -> true);
+        Assert.assertTrue(empty.describes(""));
+        Assert.assertTrue(empty.describes(Lists.newArrayList()));
+        Assert.assertTrue(empty.describes(Maps.newHashMap()));
+        Assert.assertFalse(empty.describes(UUID.randomUUID().toString()));
+    }
+
 }

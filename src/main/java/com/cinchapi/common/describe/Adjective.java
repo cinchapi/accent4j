@@ -66,7 +66,7 @@ public abstract class Adjective {
      * </p>
      * 
      * @param defaults the definitions that the new instance starts with, which
-     *            never change
+     *            the caller must never change
      */
     Adjective(Map<Class<?>, Predicate<?>> defaults) {
         this.definitions = defaults;
@@ -84,8 +84,10 @@ public abstract class Adjective {
      */
     public <T> void define(Class<T> clazz, Predicate<T> definition) {
         if(isShared) {
-            // Adding each entry in turn gives the copy the capacity, and so the
-            // iteration order, of a map that received each definition directly
+            // For an object with definitions for unrelated ancestors, describes
+            // uses the one it meets first in iteration order. Adding each entry
+            // in turn gives the copy the capacity, and so the iteration order,
+            // of a map that received each definition directly.
             Map<Class<?>, Predicate<?>> copy = Maps.newHashMap();
             for (Entry<Class<?>, Predicate<?>> entry : definitions.entrySet()) {
                 copy.put(entry.getKey(), entry.getValue());
