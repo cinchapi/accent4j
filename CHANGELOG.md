@@ -12,6 +12,8 @@
 * Fixed a bug where concurrent calls to `Processes.waitFor` could wait forever.
   It could happen when a JVM waited on at least twice as many processes as it
   had processors at once, and each process wrote more output than a pipe holds.
+* The methods of `Enums` create less short-lived garbage. Previously, each call
+  copied every constant of the enum that it searched.
 
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
