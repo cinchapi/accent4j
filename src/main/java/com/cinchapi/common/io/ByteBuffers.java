@@ -292,8 +292,13 @@ public abstract class ByteBuffers {
     /**
      * Relative <em>get</em> method. Reads the UTF-8 encoded string at
      * the current position in {@code buffer}.
+     * <p>
+     * Decode every byte from the position of {@code buffer} to its limit, and
+     * leave the position at the limit. Drop each byte that is not part of a
+     * valid UTF-8 sequence instead of replacing it with U+FFFD. Threads may
+     * call this method at the same time, each with its own {@code buffer}.
      * 
-     * @param buffer
+     * @param buffer the bytes to decode; must not be {@code null}
      * @return the string value at the current position
      */
     public static String getUtf8String(ByteBuffer buffer) {
