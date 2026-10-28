@@ -20,6 +20,13 @@
   threads that decoded at the same time slowed each other down. Now, each thread
   decodes with a decoder of its own. Each call returns the same string for the
   same bytes as before and still drops bytes that are not valid UTF-8.
+* `Empty#is` and `Empty#ness` share one read-only set of default definitions
+  among the instances that they return, and an instance copies the set only when
+  you add a definition to it with `define`. So each call allocates 24 bytes
+  instead of 240, which helps a caller that checks many values, such as a
+  `Comparator` that calls `Empty.ness().describes(...)` for each comparison.
+  Each call still returns a new instance, and a definition that you add to one
+  instance doesn't affect any other instance or the defaults.
 
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
