@@ -22,11 +22,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.cinchapi.common.base.CheckedExceptions;
-import com.cinchapi.common.collect.concurrent.ConcurrentLoadingQueue;
 import com.google.common.base.Preconditions;
 import com.google.common.io.BaseEncoding;
 
@@ -47,35 +44,14 @@ public abstract class ByteBuffers {
     private static final String CHARSET = StandardCharsets.UTF_8.name();
 
     /**
-     * A collection of UTF-8 decoders that can be concurrently used. We use this
-     * to avoid creating a new decoder every time we need to decode a string
-     * while still allowing multi-threaded access.
+     * The UTF-8 {@link CharsetDecoder} of the calling thread, which lets
+     * {@link #getString(ByteBuffer, Charset)} decode without creating a decoder
+     * for each call. A {@link CharsetDecoder} holds state while it decodes, so
+     * each thread has its own. The decoder keeps the error actions of its last
+     * use, so a caller must set the actions it relies on before it decodes.
      */
-    private static final ConcurrentLinkedQueue<CharsetDecoder> DECODERS = ConcurrentLoadingQueue
-            .create(new Callable<CharsetDecoder>() {
-
-                @Override
-                public CharsetDecoder call() throws Exception {
-                    return StandardCharsets.UTF_8.newDecoder();
-                }
-
-            });
-
-    /**
-     * The number of UTF-8 decoders to create for concurrent access.
-     */
-    private static final int NUM_DECODERS = 10;
-
-    static {
-        try {
-            for (int i = 0; i < NUM_DECODERS; ++i) {
-                DECODERS.add(StandardCharsets.UTF_8.newDecoder());
-            }
-        }
-        catch (Exception e) {
-            throw CheckedExceptions.throwAsRuntimeException(e);
-        }
-    }
+    private static final ThreadLocal<CharsetDecoder> UTF_8_DECODER = ThreadLocal
+            .withInitial(StandardCharsets.UTF_8::newDecoder);
 
     /**
      * Return a byte array containing all the {@link ByteBuffer#remaining()}
@@ -297,12 +273,10 @@ public abstract class ByteBuffers {
      * @return the string value at the current position
      */
     public static String getString(ByteBuffer buffer, Charset charset) {
-        CharsetDecoder decoder = null;
         try {
+            CharsetDecoder decoder;
             if(charset == StandardCharsets.UTF_8) {
-                while (decoder == null) {
-                    decoder = DECODERS.poll();
-                }
+                decoder = UTF_8_DECODER.get();
             }
             else {
                 decoder = charset.newDecoder();
@@ -312,11 +286,6 @@ public abstract class ByteBuffers {
         }
         catch (CharacterCodingException e) {
             throw CheckedExceptions.throwAsRuntimeException(e);
-        }
-        finally {
-            if(decoder != null && charset == StandardCharsets.UTF_8) {
-                DECODERS.offer(decoder);
-            }
         }
     }
 

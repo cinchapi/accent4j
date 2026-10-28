@@ -1,5 +1,13 @@
 # Changelog
 
+#### Version 1.18.2 (TBD)
+* `ByteBuffers#getUtf8String` is faster, most of all when many threads decode at
+  once, and so is `ByteBuffers#getString` for UTF-8. Previously, every call took
+  a decoder from one pool that all threads shared and put it back when done. So
+  threads that decoded at the same time slowed each other down. Now, each thread
+  decodes with a decoder of its own. Each call returns the same string for the
+  same bytes as before and still drops bytes that are not valid UTF-8.
+
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
   and opened four log files that stayed open for the life of the JVM. A caller
