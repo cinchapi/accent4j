@@ -15,6 +15,12 @@
  */
 package com.cinchapi.common.process;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -62,6 +68,116 @@ public class ProcessesTest {
             Assert.assertEquals(0, result.exitCode());
             Assert.assertEquals(ImmutableList.of("out"), result.out());
             Assert.assertEquals(ImmutableList.of("err"), result.err());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Processes#waitFor(Process)}
+     * gives a failure to read a stream to its caller as an exception instead of
+     * a hang.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Create a {@link Process} stub that has exited with code {@code 0},
+     * whose standard output throws an {@link IOException} on each read and
+     * whose standard error is empty.</li>
+     * <li>Call {@link Processes#waitFor(Process)} on it.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws a {@link RuntimeException}
+     * whose cause is the {@link IOException} from the read, within the test
+     * timeout.
+     *
+     * @see <a href="https://github.com/cinchapi/accent4j/issues/53">GH-53</a>
+     */
+    @Test(timeout = 10000)
+    public void testGH53WaitForThrowsWhenStreamCannotBeRead() {
+        IOException failure = new IOException("read failed");
+        Process process = new Process() {
+
+            @Override
+            public void destroy() {}
+
+            @Override
+            public int exitValue() {
+                return 0;
+            }
+
+            @Override
+            public InputStream getErrorStream() {
+                return new ByteArrayInputStream(new byte[0]);
+            }
+
+            @Override
+            public InputStream getInputStream() {
+                return new InputStream() {
+
+                    @Override
+                    public int read() throws IOException {
+                        throw failure;
+                    }
+
+                };
+            }
+
+            @Override
+            public OutputStream getOutputStream() {
+                return new ByteArrayOutputStream();
+            }
+
+            @Override
+            public int waitFor() {
+                return 0;
+            }
+
+        };
+        try {
+            Processes.waitFor(process);
+            Assert.fail("Expected a RuntimeException");
+        }
+        catch (RuntimeException e) {
+            Assert.assertSame(failure, e.getCause());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Processes#waitFor(Process)}
+     * leaves the calling thread's interrupt status set when it throws because
+     * of an interrupt.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Start a {@code sleep 5} process.</li>
+     * <li>Interrupt the current thread.</li>
+     * <li>Call {@link Processes#waitFor(Process)} on the process.</li>
+     * <li>Destroy the process.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws a {@link RuntimeException}
+     * whose cause is an {@link InterruptedException}, and the current thread is
+     * still interrupted.
+     *
+     * @throws Exception if the process cannot start
+     */
+    @Test(timeout = 10000)
+    public void testWaitForKeepsInterruptStatusWhenInterrupted()
+            throws Exception {
+        Process process = new ProcessBuilder("sleep", "5").start();
+        Thread.currentThread().interrupt();
+        try {
+            Processes.waitFor(process);
+            Assert.fail("Expected a RuntimeException");
+        }
+        catch (RuntimeException e) {
+            Assert.assertTrue(e.getCause() instanceof InterruptedException);
+            Assert.assertTrue(Thread.interrupted());
+        }
+        finally {
+            process.destroy();
         }
     }
 
