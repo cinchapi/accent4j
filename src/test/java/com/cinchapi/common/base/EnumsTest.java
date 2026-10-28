@@ -412,8 +412,8 @@ public class EnumsTest {
     }
 
     /**
-     * An enum with a constant named like a {@link Site} constant, at a
-     * different ordinal.
+     * An enum that shares the constant name {@code AFROTECH} with {@link Site},
+     * and has a different constant at ordinal 0.
      */
     enum Event {
         SUMMIT, AFROTECH;
