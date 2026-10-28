@@ -226,7 +226,7 @@ public final class Enums {
         String upper = name.toUpperCase(Locale.ROOT);
         T exact = null;
         T uppercased = null;
-        for (T constant : clazz.getEnumConstants()) {
+        for (T constant : getConstants(clazz)) {
             if(constant.name().equals(name)) {
                 exact = constant;
             }
@@ -261,7 +261,7 @@ public final class Enums {
         else {
             ordinal = AnyStrings.tryParseNumber(value.toString());
         }
-        T[] constants = clazz.getEnumConstants();
+        T[] constants = getConstants(clazz);
         if(ordinal != null && ordinal.intValue() >= 0
                 && ordinal.intValue() < constants.length) {
             return constants[ordinal.intValue()];
@@ -270,6 +270,47 @@ public final class Enums {
             return null;
         }
     }
+
+    /**
+     * Return the constants of {@code clazz} in {@link Enum#ordinal() ordinal}
+     * order.
+     * <p>
+     * Every call for the same enum returns the same array, so the caller must
+     * not change it or pass it on.
+     * </p>
+     *
+     * @param clazz the enum whose constants to return
+     * @return the constants of {@code clazz}, or {@code null} when
+     *         {@code clazz} cannot give them yet, such as while it constructs
+     *         them
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static <T extends Enum<T>> T[] getConstants(Class<T> clazz) {
+        // Class#getEnumConstants makes a new copy of the constants on every
+        // call, so every lookup shares the one copy in CONSTANTS instead.
+        T[] constants = (T[]) CONSTANTS.get(clazz);
+        if(constants == null) {
+            // The JDK gives no constants while an enum constructs them, and
+            // gives them on a later call, so keep no null for that enum.
+            CONSTANTS.remove(clazz);
+        }
+        return constants;
+    }
+
+    /**
+     * The constants of each enum that the methods of this class search, in
+     * {@link Enum#ordinal() ordinal} order, kept for as long as the enum's
+     * {@link Class} is loaded.
+     */
+    private static final ClassValue<Object[]> CONSTANTS = new ClassValue<Object[]>() {
+
+        @Override
+        protected Object[] computeValue(Class<?> type) {
+            return type.getEnumConstants();
+        }
+
+    };
 
     private Enums() {/* no-init */}
 

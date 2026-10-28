@@ -27,10 +27,6 @@ import org.junit.Test;
  */
 public class EnumsTest {
 
-    enum Site {
-        BLAVITY, AFROTECH, TWENTY_ONE_NINETY, TRAVEL_NOIRE, SHADOW_AND_ACT;
-    }
-
     /**
      * Custom logic that maps the short names of the {@link Site} constants,
      * such as {@code "21N"}, {@code "TN"}, and {@code "S+A"}, and returns
@@ -53,23 +49,6 @@ public class EnumsTest {
             return null;
         }
     };
-
-    @Test
-    public void testParseStringOrdinal() {
-        Assert.assertSame(Site.AFROTECH,
-                Enums.parseIgnoreCase(Site.class, "1"));
-    }
-
-    @Test
-    public void testParseOrdinal() {
-        Assert.assertSame(Site.AFROTECH, Enums.parseIgnoreCase(Site.class, 1));
-    }
-
-    @Test
-    public void testParseIgnoreCase() {
-        Assert.assertSame(Site.BLAVITY,
-                Enums.parseIgnoreCase(Site.class, "blavity"));
-    }
 
     @Test
     public void testParseCustomLogic() {
@@ -101,14 +80,73 @@ public class EnumsTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void testParseInvalid() {
-        Enums.parseIgnoreCase(Site.class, "foo");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
     public void testParseCustomLogicInvalid() {
         Enums.parseIgnoreCase(Site.class, "foo",
                 value -> value.equals("FOO") ? Site.AFROTECH : null);
+    }
+
+    @Test
+    public void testParseIgnoreCase() {
+        Assert.assertSame(Site.BLAVITY,
+                Enums.parseIgnoreCase(Site.class, "blavity"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code parseIgnoreCase} finds a
+     * constant of an enum that an earlier lookup searched before the enum
+     * finished constructing its constants.
+     * <p>
+     * <strong>Start state:</strong> The {@link Phase} enum, whose constructor
+     * searches {@link Phase} before its constants exist and keeps the failure.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Read {@code Phase.EARLY.failure}, which constructs the constants of
+     * {@link Phase}.</li>
+     * <li>Call {@code parseIgnoreCase(Phase.class, "early")}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search during construction failed, and the
+     * call returns {@link Phase#EARLY}.
+     */
+    @Test
+    public void testParseIgnoreCaseReturnsConstantAfterLookupDuringConstruction() {
+        Assert.assertNotNull(Phase.EARLY.failure);
+        Assert.assertSame(Phase.EARLY,
+                Enums.parseIgnoreCase(Phase.class, "early"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code parseIgnoreCase} returns a
+     * constant of the enum it searches when another enum has a constant with
+     * the same name or ordinal.
+     * <p>
+     * <strong>Start state:</strong> The {@link Site} and {@link Event} enums,
+     * which each have a constant named {@code AFROTECH} and a constant at
+     * ordinal 0.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Parse {@code "afrotech"} and the ordinal 0 in {@link Site}.</li>
+     * <li>Parse {@code "afrotech"} and the ordinal 0 in {@link Event}.</li>
+     * <li>Parse both in {@link Site} again.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call in {@link Site} returns
+     * {@link Site#AFROTECH} and {@link Site#BLAVITY}, and each call in
+     * {@link Event} returns {@link Event#AFROTECH} and {@link Event#SUMMIT}.
+     */
+    @Test
+    public void testParseIgnoreCaseReturnsConstantOfTheEnumItSearches() {
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "afrotech"));
+        Assert.assertSame(Site.BLAVITY, Enums.parseIgnoreCase(Site.class, 0));
+        Assert.assertSame(Event.AFROTECH,
+                Enums.parseIgnoreCase(Event.class, "afrotech"));
+        Assert.assertSame(Event.SUMMIT, Enums.parseIgnoreCase(Event.class, 0));
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "afrotech"));
+        Assert.assertSame(Site.BLAVITY, Enums.parseIgnoreCase(Site.class, 0));
     }
 
     /**
@@ -127,6 +165,11 @@ public class EnumsTest {
     @Test(expected = IllegalArgumentException.class)
     public void testParseIgnoreCaseThrowsForOrdinalOutOfRange() {
         Enums.parseIgnoreCase(Site.class, "9");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testParseInvalid() {
+        Enums.parseIgnoreCase(Site.class, "foo");
     }
 
     /**
@@ -203,6 +246,17 @@ public class EnumsTest {
     public void testParseNameIgnoreCaseUsesCustomLogic() {
         Assert.assertSame(Site.SHADOW_AND_ACT,
                 Enums.parseNameIgnoreCase(Site.class, "s+a", LOGIC));
+    }
+
+    @Test
+    public void testParseOrdinal() {
+        Assert.assertSame(Site.AFROTECH, Enums.parseIgnoreCase(Site.class, 1));
+    }
+
+    @Test
+    public void testParseStringOrdinal() {
+        Assert.assertSame(Site.AFROTECH,
+                Enums.parseIgnoreCase(Site.class, "1"));
     }
 
     /**
@@ -355,6 +409,51 @@ public class EnumsTest {
                 Enums.tryParseNameIgnoreCase(Site.class, "TN", LOGIC));
         Assert.assertNull(
                 Enums.tryParseNameIgnoreCase(Site.class, "foo", LOGIC));
+    }
+
+    /**
+     * An enum that shares the constant name {@code AFROTECH} with {@link Site},
+     * and has a different constant at ordinal 0.
+     */
+    enum Event {
+        SUMMIT, AFROTECH;
+    }
+
+    /**
+     * An enum whose constructor searches it with {@link Enums} before its
+     * constants exist.
+     */
+    enum Phase {
+        EARLY, LATE;
+
+        /**
+         * The failure of the search that this constant's constructor made, or
+         * {@code null} if the search did not fail.
+         */
+        final RuntimeException failure;
+
+        /**
+         * Construct a constant, and search {@link Phase} for {@code "early"}
+         * while the constants of {@link Phase} do not exist yet.
+         */
+        Phase() {
+            RuntimeException failure = null;
+            try {
+                Enums.tryParseIgnoreCase(Phase.class, "early");
+            }
+            catch (RuntimeException e) {
+                failure = e;
+            }
+            this.failure = failure;
+        }
+    }
+
+    /**
+     * The enum that most tests search, by name, by ordinal, and with
+     * {@link #LOGIC}.
+     */
+    enum Site {
+        BLAVITY, AFROTECH, TWENTY_ONE_NINETY, TRAVEL_NOIRE, SHADOW_AND_ACT;
     }
 
 }
