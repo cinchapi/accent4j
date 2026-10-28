@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.18.2 (TBD)
+#### Version 1.18.2 (October 28, 2026)
 * Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
   standard error for a process that wrote lines to it. It happened most often
   when the process exited quickly. The same bug affected
