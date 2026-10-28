@@ -1,5 +1,15 @@
 # Changelog
 
+#### Version 1.18.2 (TBD)
+* Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
+  standard error for a process that wrote lines to it. It happened most often
+  when the process exited quickly. The same bug affected
+  `Processes.waitForSuccessfulCompletion`, `Processes.isPidRunning` and
+  `Files.directoryChecksum`. If `Processes.waitFor` cannot read a stream, it
+  throws an exception instead of waiting forever. If the calling thread is
+  interrupted while it waits, its interrupt status stays set.
+  ([GH-53](https://github.com/cinchapi/accent4j/issues/53))
+
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
   and opened four log files that stayed open for the life of the JVM. A caller
