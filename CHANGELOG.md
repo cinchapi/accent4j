@@ -1,6 +1,17 @@
 # Changelog
 
 #### Version 1.18.2 (TBD)
+* Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
+  standard error for a process that wrote lines to it. It happened most often
+  when the process exited quickly. The same bug affected
+  `Processes.waitForSuccessfulCompletion`, `Processes.isPidRunning` and
+  `Files.directoryChecksum`. If `Processes.waitFor` cannot read a stream, it
+  throws an exception instead of waiting forever. If the calling thread is
+  interrupted while it waits, its interrupt status stays set.
+  ([GH-53](https://github.com/cinchapi/accent4j/issues/53))
+* Fixed a bug where concurrent calls to `Processes.waitFor` could wait forever.
+  It could happen when a JVM waited on at least twice as many processes as it
+  had processors at once, and each process wrote more output than a pipe holds.
 * The methods of `Enums` create less short-lived garbage. Previously, each call
   copied every constant of the enum that it searched.
 
