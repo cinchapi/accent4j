@@ -20,12 +20,21 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import com.cinchapi.common.process.Processes.ProcessResult;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 /**
  * Unit tests for {@link Processes}.
@@ -178,6 +187,67 @@ public class ProcessesTest {
         }
         finally {
             process.destroy();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Processes#waitFor(Process)}
+     * returns every line of both streams to each caller when many callers wait
+     * at the same time, and that no call blocks forever.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Start twice as many caller threads as there are processors, and hold
+     * them on a {@link CountDownLatch}.</li>
+     * <li>Release the latch. Each caller starts a shell that writes a line of
+     * 100000 zeros to standard error and then the same line to standard output,
+     * and calls {@link Processes#waitFor(Process)} on it.</li>
+     * <li>Wait up to 30 seconds for each caller's {@link ProcessResult}.</li>
+     * <li>Destroy every shell.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Every {@link ProcessResult} arrives in time
+     * and has the line of zeros as its only line of standard output and of
+     * standard error. Each line is more than a pipe holds, so a shell whose
+     * stream nobody reads cannot exit.
+     *
+     * @throws Exception if a shell cannot start or a caller fails
+     */
+    @Test(timeout = 60000)
+    public void testWaitForReturnsAllOutputWhenCalledConcurrently()
+            throws Exception {
+        int callers = Runtime.getRuntime().availableProcessors() * 2;
+        ExecutorService threads = Executors.newFixedThreadPool(callers);
+        List<Process> processes = new CopyOnWriteArrayList<>();
+        String command = "printf '%0100000d\\n' 0 >&2; "
+                + "printf '%0100000d\\n' 0";
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<ProcessResult>> results = Lists.newArrayList();
+            for (int i = 0; i < callers; ++i) {
+                results.add(threads.submit(() -> {
+                    start.await();
+                    Process process = new ProcessBuilder("/bin/sh", "-c",
+                            command).start();
+                    processes.add(process);
+                    return Processes.waitFor(process);
+                }));
+            }
+            start.countDown();
+            String line = Strings.repeat("0", 100000);
+            for (Future<ProcessResult> result : results) {
+                ProcessResult r = result.get(30, TimeUnit.SECONDS);
+                Assert.assertEquals(ImmutableList.of(line), r.out());
+                Assert.assertEquals(ImmutableList.of(line), r.err());
+            }
+        }
+        finally {
+            // A process that is still blocked after a failure must end, so that
+            // its stream readers free their threads for later tests.
+            processes.forEach(Process::destroy);
+            threads.shutdownNow();
         }
     }
 

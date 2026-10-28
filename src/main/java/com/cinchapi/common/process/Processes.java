@@ -234,13 +234,18 @@ public class Processes {
     }
 
     /**
-     * An {@link Executor} that is used to asynchronously read input from a
-     * processe's standard out and error streams.
+     * The {@link ExecutorService} that reads the standard output and standard
+     * error of each {@link Process} given to {@link #waitFor(Process)}.
+     * <p>
+     * It has no limit on its number of threads, because each call to
+     * {@link #waitFor(Process)} needs a thread for each stream at the same
+     * time. With a limit, concurrent calls can take every thread with one
+     * stream each, and then no {@link Process} can exit.
+     * </p>
      */
     private static final ExecutorService executor = MoreExecutors
             .getExitingExecutorService(
-                    (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                            Runtime.getRuntime().availableProcessors() * 2));
+                    (ThreadPoolExecutor) Executors.newCachedThreadPool());
 
     private Processes() {} /* no-op */
 

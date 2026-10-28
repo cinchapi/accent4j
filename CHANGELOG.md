@@ -9,6 +9,9 @@
   throws an exception instead of waiting forever. If the calling thread is
   interrupted while it waits, its interrupt status stays set.
   ([GH-53](https://github.com/cinchapi/accent4j/issues/53))
+* Fixed a bug where concurrent calls to `Processes.waitFor` could wait forever.
+  It could happen when a JVM waited on at least twice as many processes as it
+  had processors at once, and each process wrote more output than a pipe holds.
 
 #### Version 1.18.1 (October 22, 2026)
 * Fixed a bug where each call to `Logger.none()` created a temporary directory
