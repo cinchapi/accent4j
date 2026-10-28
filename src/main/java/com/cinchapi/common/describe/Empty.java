@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
 /**
  * A customizable {@link Adjective} that describes emptiness for objects.
@@ -33,19 +34,25 @@ import com.google.common.collect.ImmutableMap;
 public class Empty extends Adjective {
 
     /**
+     * The default set of definitions, which every instance from {@link #is()}
+     * starts with. Those instances share this map on any thread, so it must
+     * never change.
+     */
+    private static final Map<Class<?>, Predicate<?>> DEFAULTS = newDefaults();
+
+    /**
      * Create an {@link Empty} instance with the default set of definitions.
-     * More definitions can be added using the {@link #define(Class, Check)}
+     * More definitions can be added using the {@link #define(Class, Predicate)}
      * method.
+     * <p>
+     * Each call returns a new instance, so a definition added to one instance
+     * does not affect any other.
+     * </p>
      * 
      * @return the {@link Empty} instance
      */
     public static Empty is() {
-        Empty empty = new Empty();
-        empty.define(String.class, string -> string.isEmpty());
-        empty.define(Iterable.class,
-                iterable -> !iterable.iterator().hasNext());
-        empty.define(Map.class, map -> map.isEmpty());
-        return empty;
+        return new Empty(DEFAULTS);
     }
 
     /**
@@ -90,7 +97,34 @@ public class Empty extends Adjective {
         return empty;
     }
 
+    /**
+     * Return a new map of the default set of definitions.
+     * 
+     * @return the default definitions
+     */
+    private static Map<Class<?>, Predicate<?>> newDefaults() {
+        Map<Class<?>, Predicate<?>> definitions = Maps.newHashMap();
+        definitions.put(String.class,
+                (Predicate<String>) string -> string.isEmpty());
+        definitions.put(Iterable.class,
+                (Predicate<Iterable<?>>) iterable -> !iterable.iterator()
+                        .hasNext());
+        definitions.put(Map.class, (Predicate<Map<?, ?>>) map -> map.isEmpty());
+        return definitions;
+    }
+
     private Empty() {/* no-init */}
+
+    /**
+     * Construct a new instance whose definitions start as the provided
+     * {@code defaults}.
+     * 
+     * @param defaults the definitions that the new instance starts with, which
+     *            it never changes
+     */
+    private Empty(Map<Class<?>, Predicate<?>> defaults) {
+        super(defaults);
+    }
 
     @Override
     public <T> boolean describes(@Nullable T object) {
