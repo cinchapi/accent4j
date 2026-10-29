@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.19.0 (TBD)
+#### Version 1.18.3 (TBD)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
   that grew with the square of the length of each list in the map. For example,
   `Association.of` took about 1.5 seconds for a map that held one list of 20,000
