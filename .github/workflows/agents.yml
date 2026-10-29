@@ -39,30 +39,34 @@ permissions: {}
 
 jobs:
   agents:
+    # New commits on a pull request marked pipeline:done reach the router whoever
+    # pushed them, so it takes the label off. Dependabot's do not, because GitHub
+    # gives Dependabot's runs no Actions secrets, so the router could not act.
     if: >-
-      github.event.sender.type != 'Bot' &&
-      (github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          ((github.event.action == 'labeled' &&
-              startsWith(github.event.label.name, 'agent:')) ||
-            (github.event.action == 'synchronize' &&
-              contains(github.event.pull_request.labels.*.name, 'pipeline:done')) ||
-            (github.event.action != 'labeled' && github.event.action != 'synchronize' &&
-              !github.event.pull_request.draft))) ||
-        (github.event_name == 'pull_request_review' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          (github.event.review.state == 'changes_requested' ||
-            github.event.review.user.login == github.event.pull_request.user.login)) ||
-        (github.event_name == 'issues' &&
-          startsWith(github.event.label.name, 'agent:')) ||
-        (github.event_name == 'issue_comment' &&
-          (startsWith(github.event.comment.body, '/agent') ||
-            startsWith(github.event.comment.body, '/approve'))))
+      (github.event_name == 'pull_request' && github.event.action == 'synchronize' &&
+        github.actor != 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'pipeline:done')) ||
+      (github.event.sender.type != 'Bot' &&
+        (github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            ((github.event.action == 'labeled' &&
+                startsWith(github.event.label.name, 'agent:')) ||
+              (github.event.action != 'labeled' && !github.event.pull_request.draft))) ||
+          (github.event_name == 'pull_request_review' &&
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            (github.event.review.state == 'changes_requested' ||
+              github.event.review.user.login == github.event.pull_request.user.login)) ||
+          (github.event_name == 'issues' &&
+            startsWith(github.event.label.name, 'agent:')) ||
+          (github.event_name == 'issue_comment' &&
+            (startsWith(github.event.comment.body, '/agent') ||
+              startsWith(github.event.comment.body, '/approve')))))
     concurrency:
       group: agents-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.number }}
       queue: max
-    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@0bafa495a8d1577179d29c5e2953852b22876a89
+    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@8b6e5311814bd76a3d4b0ee2e6d2191c503c66e3
     permissions:
       contents: read
       id-token: write
