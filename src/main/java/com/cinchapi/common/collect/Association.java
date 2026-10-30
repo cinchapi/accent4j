@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
@@ -86,12 +87,22 @@ public abstract class Association extends AbstractMap<String, Object> {
      * provided {@code map} and the state of both structures will immediately
      * diverge.
      * </p>
-     * 
+     * <p>
+     * A list position that a list in the {@code map} supplies does not count
+     * toward the {@value #MAX_LIST_GAP} positions that one write may fill with
+     * {@code null}, even when the element at that position is an empty
+     * container that has no flattened entries.
+     * </p>
+     *
      * @param map the data to copy; unless it is an {@link Association}, each of
      *            its flattened entries is written, in flattened order, as
      *            {@link #set(String, Object)} would write it
      * @return the new {@link Association} containing all of the data in the
      *         {@code map}
+     * @throws IllegalArgumentException if the path of a flattened entry is
+     *             invalid, or its write would fill more than
+     *             {@value #MAX_LIST_GAP} list positions that the {@code map}
+     *             does not supply
      */
     public static Association of(Map<String, Object> map) {
         LinkedHashAssociation association = new LinkedHashAssociation();
@@ -107,31 +118,11 @@ public abstract class Association extends AbstractMap<String, Object> {
             // are properly flattened and made mutable.
             Set<Collection<Object>> created = Collections
                     .newSetFromMap(new IdentityHashMap<>());
-            Associations.forEachFlattened(map,
+            ((Association) association).forEachFlattenedEntry(map,
                     (key, value) -> ((Association) association).insert(key,
                             value, created));
         }
         return association;
-    }
-
-    /**
-     * Split the {@code path} into its components and verify that a value can be
-     * written at its end.
-     * 
-     * @param path a navigable path key
-     * @return the components of the {@code path}, of which there is at least
-     *         one
-     * @throws IllegalArgumentException if the {@code path} has no components or
-     *             its first component is an integer
-     */
-    private static String[] components(String path) {
-        String[] components = path.split("\\.");
-        Verify.thatArgument(components.length > 0, "Invalid path: {}", path);
-        Verify.thatArgument(Ints.tryParse(components[0]) == null,
-                "The map cannot contain keys that start with a numeric component. "
-                        + "Therefore '{}' is an invalid path.",
-                path);
-        return components;
     }
 
     /**
@@ -198,11 +189,31 @@ public abstract class Association extends AbstractMap<String, Object> {
     };
 
     /**
+     * The largest number of {@code null} elements that one write may add to the
+     * lists of an {@link Association} to reach the positions that the integer
+     * components of its path name.
+     * <p>
+     * The limit keeps the size of a list in proportion to the data written into
+     * it, so that a short path such as {@code a.2000000000} cannot build a list
+     * of billions of elements.
+     * </p>
+     */
+    public static final int MAX_LIST_GAP = 100;
+
+    /**
      * The entries in this {@link Association}. Internally, the data is
      * maintained in exploded form to support efficient retrieval of partial
      * paths.
      */
     private Map<String, Object> exploded;
+
+    /**
+     * For the flattening write call in progress, the number of positions that
+     * each list of its input has supplied so far, keyed by the path of the
+     * list, or {@code null} when no such call is in progress.
+     */
+    @Nullable
+    private Map<String, Integer> supplied;
 
     /**
      * Construct a new instance.
@@ -314,16 +325,26 @@ public abstract class Association extends AbstractMap<String, Object> {
     /**
      * Merge the contents of the {@code map} into this {@link Association} using
      * the {@link MergeStrategies#theirs(Object, Object) theirs} merge strategy.
-     * 
+     * <p>
+     * A list position that a list in the {@code map} supplies does not count
+     * toward the {@value #MAX_LIST_GAP} positions that one write may fill with
+     * {@code null}, even when the element at that position is an empty
+     * container that has no flattened entries.
+     * </p>
+     *
      * @param map the data to merge; each of its flattened entries is written,
      *            in flattened order, as {@link #set(String, Object)} would
      *            write it
+     * @throws IllegalArgumentException if the path of a flattened entry is
+     *             invalid, or its write would fill more than
+     *             {@value #MAX_LIST_GAP} list positions that the {@code map}
+     *             does not supply; the entries before it stay written
      */
     public void merge(Map<String, Object> map) {
         if(INHERITS_ACCESSORS.get(getClass())) {
             Set<Collection<Object>> created = Collections
                     .newSetFromMap(new IdentityHashMap<>());
-            Associations.forEachFlattened(map, (key, value) -> {
+            forEachFlattenedEntry(map, (key, value) -> {
                 // Look up each entry before writing it, as #merge(Map,
                 // BiFunction) does, so that the same reads happen in the same
                 // order. A read can throw, and it reorders a map that keeps its
@@ -342,13 +363,23 @@ public abstract class Association extends AbstractMap<String, Object> {
     /**
      * Merge the contents of the {@code map} into this {@link Association} using
      * the provided merge {@code strategy}.
-     * 
+     * <p>
+     * A list position that a list in the {@code map} supplies does not count
+     * toward the {@value #MAX_LIST_GAP} positions that one write may fill with
+     * {@code null}, even when the element at that position is an empty
+     * container that has no flattened entries.
+     * </p>
+     *
      * @param map
      * @param strategy
+     * @throws IllegalArgumentException if the path of a flattened entry is
+     *             invalid, or its write would fill more than
+     *             {@value #MAX_LIST_GAP} list positions that the {@code map}
+     *             does not supply; the entries before it stay written
      */
     public void merge(Map<String, Object> map,
             BiFunction<Object, Object, Object> strategy) {
-        Associations.forEachFlattened(map, (key, value) -> {
+        forEachFlattenedEntry(map, (key, value) -> {
             Object stored = get(key);
             Object computed = stored == null ? value
                     : strategy.apply(stored, value);
@@ -387,11 +418,22 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     /**
      * Set {@code value} at the end of the {@code path}.
-     * 
+     * <p>
+     * An integer component of the {@code path} names a position in a list. When
+     * that position is past the end of the list, the write fills the positions
+     * in between with {@code null}. One write can fill at most
+     * {@value #MAX_LIST_GAP} positions this way. When {@link #merge(Map)} or
+     * {@link #merge(Map, BiFunction)} writes an entry through this method, the
+     * positions that a list in its input supplies do not count.
+     * </p>
+     *
      * @param path
      * @param value
      * @return the value that was previously at the end of the {@code path} or
      *         {@code null} if there was no value there before
+     * @throws IllegalArgumentException if the write would fill more than
+     *             {@value #MAX_LIST_GAP} positions with {@code null}, in which
+     *             case this {@link Association} does not change
      */
     @SuppressWarnings("unchecked")
     public <T> T set(String path, Object value) {
@@ -438,6 +480,99 @@ public abstract class Association extends AbstractMap<String, Object> {
     protected abstract Supplier<Map<String, Object>> mapSupplier();
 
     /**
+     * Split the {@code path} into its components and verify that a value can be
+     * written at its end.
+     * <p>
+     * A write fills each position between the end of a list and the position
+     * that an integer component names with {@code null}, and a component whose
+     * current value is not a {@link Collection} gets a new list. A position
+     * that a list in the input of the flattening write call in progress has
+     * supplied does not count. The {@code path} can be written only when its
+     * write fills at most {@value #MAX_LIST_GAP} other positions in total.
+     * </p>
+     *
+     * @param path a navigable path key
+     * @return the components of the {@code path}, of which there is at least
+     *         one
+     * @throws IllegalArgumentException if the {@code path} has no components,
+     *             its first component is an integer, or its write would fill
+     *             more than {@value #MAX_LIST_GAP} positions with {@code null}
+     *             that the input of the call in progress does not supply
+     */
+    private String[] components(String path) {
+        String[] components = path.split("\\.");
+        Verify.thatArgument(components.length > 0, "Invalid path: {}", path);
+        Verify.thatArgument(Ints.tryParse(components[0]) == null,
+                "The map cannot contain keys that start with a numeric component. "
+                        + "Therefore '{}' is an invalid path.",
+                path);
+        long skipped = 0;
+        Object source = exploded;
+        int start = 0;
+        for (String component : components) {
+            Integer index = Ints.tryParse(component);
+            if(index != null) {
+                int size = source instanceof Collection
+                        ? ((Collection<?>) source).size()
+                        : 0;
+                if(index > size) {
+                    // The flattening call keys each list of its input by the
+                    // exact text of the path before the list's positions, so
+                    // look it up by the same text.
+                    int given = supplied != null ? supplied
+                            .getOrDefault(path.substring(0, start - 1), 0) : 0;
+                    int filled = Math.max(size, given);
+                    if(index > filled) {
+                        skipped += index - filled;
+                    }
+                }
+                source = index >= 0 && index < size
+                        ? Iterables.get((Collection<?>) source, index)
+                        : null;
+            }
+            else {
+                source = source instanceof Map
+                        ? ((Map<?, ?>) source).get(component)
+                        : null;
+            }
+            start += component.length() + 1;
+        }
+        Verify.thatArgument(skipped <= MAX_LIST_GAP,
+                "The path '{}' skips {} list positions, "
+                        + "but a write can skip at most {}",
+                path, skipped, MAX_LIST_GAP);
+        return components;
+    }
+
+    /**
+     * Pass each flattened entry of the {@code map} to the {@code consumer}.
+     * <p>
+     * While it runs, this {@link Association} records how many positions each
+     * list in the {@code map} has supplied, including positions whose element
+     * is an empty container that has no flattened entries. A write that the
+     * {@code consumer} makes, directly or through {@link #set(String, Object)},
+     * does not count those positions toward {@value #MAX_LIST_GAP}.
+     * </p>
+     *
+     * @param map the data to flatten
+     * @param consumer the receiver of each flattened path and leaf value
+     */
+    private void forEachFlattenedEntry(Map<String, Object> map,
+            BiConsumer<String, Object> consumer) {
+        Map<String, Integer> outer = supplied;
+        Map<String, Integer> current = new HashMap<>();
+        supplied = current;
+        try {
+            Associations.forEachFlattened(map, consumer,
+                    (list, position) -> current.merge(list, position + 1,
+                            Math::max));
+        }
+        finally {
+            supplied = outer;
+        }
+    }
+
+    /**
      * Write the {@code value} at the end of the {@code path} as one of the
      * writes of a call that copies a whole map into this {@link Association}.
      * <p>
@@ -454,8 +589,10 @@ public abstract class Association extends AbstractMap<String, Object> {
      * @param path a navigable path key
      * @param value the value to write
      * @param created the lists that the call made so far
-     * @throws IllegalArgumentException if the {@code path} has no components or
-     *             its first component is an integer
+     * @throws IllegalArgumentException if the {@code path} has no components,
+     *             its first component is an integer, or the write would fill
+     *             more than {@value #MAX_LIST_GAP} positions with {@code null}
+     *             that the input of the call does not supply
      * @throws IndexOutOfBoundsException if a component of the {@code path} is a
      *             negative index into an existing list
      */
