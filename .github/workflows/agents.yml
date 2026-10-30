@@ -24,6 +24,7 @@ on:
           - code-comment-cleanup
           - test-cleanup
           - fix
+          - fix-conflicts
           - work-on
           - implement
       number:
@@ -66,7 +67,7 @@ jobs:
     concurrency:
       group: agents-${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.number }}
       queue: max
-    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@a7a5ef250e6be5e83a9a99e25d95b14590b185e0
+    uses: cinchapi/cinchapi-agent-skills/.github/workflows/router.yml@fb7ad081314370563b572d4f2a7a689fe018ddd6
     permissions:
       contents: read
       id-token: write
