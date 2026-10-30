@@ -17,7 +17,9 @@ package com.cinchapi.common.collect;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,31 +76,38 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
      */
     static ReferenceAssociation of(Map<String, Object> map) {
         ReferenceAssociation association = new LinkedHashReferenceAssociation();
-        forEachFlattened(map, (key, value) -> association.set(key, value));
+        association.forEachFlattenedEntry(map,
+                (key, value) -> association.set(key, value));
         return association;
     }
 
     /**
      * Pass each flattened entry of the {@code value} to the {@code consumer},
-     * using the {@code key} as the prefix of each path.
+     * using the {@code key} as the prefix of each path, and pass each element
+     * of a list to {@code onElement} before its entries.
      *
      * @param key the path of the {@code value}
      * @param value the value to flatten
      * @param consumer the receiver of each path and leaf value
+     * @param onElement the receiver of the path of a list and the position of
+     *            one of its elements, including an element that has no entries
      */
     @SuppressWarnings("unchecked")
     private static void flattenAndConsume(String key, Object value,
-            BiConsumer<String, Object> consumer) {
+            BiConsumer<String, Object> consumer,
+            BiConsumer<String, Integer> onElement) {
         if(value instanceof Map) {
             ((Map<String, Object>) value).forEach((k, v) -> {
-                flattenAndConsume(key + "." + k, v, consumer);
+                flattenAndConsume(key + "." + k, v, consumer, onElement);
             });
         }
         else if(value instanceof Iterable) {
             Iterator<Object> it = ((Iterable<Object>) value).iterator();
             int index = 0;
             while (it.hasNext()) {
-                flattenAndConsume(key + "." + index, it.next(), consumer);
+                onElement.accept(key, index);
+                flattenAndConsume(key + "." + index, it.next(), consumer,
+                        onElement);
                 ++index;
             }
         }
@@ -108,15 +117,19 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
     }
 
     /**
-     * Pass each flattened entry of the {@code map} to the {@code consumer}.
+     * Pass each flattened entry of the {@code map} to the {@code consumer}, and
+     * each element of a list in it to {@code onElement}.
      *
      * @param map the data to flatten
      * @param consumer the receiver of each path and leaf value
+     * @param onElement the receiver of the path of a list and the position of
+     *            one of its elements, including an element that has no entries
      */
     private static void forEachFlattened(Map<String, Object> map,
-            BiConsumer<String, Object> consumer) {
+            BiConsumer<String, Object> consumer,
+            BiConsumer<String, Integer> onElement) {
         map.forEach((key, value) -> {
-            flattenAndConsume(key, value, consumer);
+            flattenAndConsume(key, value, consumer, onElement);
         });
     }
 
@@ -177,6 +190,14 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
      * The entries, nested in containers that each write rebuilds.
      */
     private final Map<String, Object> exploded;
+
+    /**
+     * For the flattening call in progress, the number of positions that each
+     * list of its input has supplied so far, keyed by the path of the list, or
+     * {@code null} when no such call is in progress.
+     */
+    @Nullable
+    private Map<String, Integer> supplied;
 
     /**
      * Construct a new instance whose root comes from {@link #mapSupplier()}.
@@ -259,7 +280,7 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
      */
     public void merge(Map<String, Object> map,
             BiFunction<Object, Object, Object> strategy) {
-        forEachFlattened(map, (key, value) -> {
+        forEachFlattenedEntry(map, (key, value) -> {
             Object stored = get(key);
             Object computed = stored == null ? value
                     : strategy.apply(stored, value);
@@ -293,6 +314,7 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
                     "The map cannot contain keys that start with a numeric component. "
                             + "Therefore '{}' is an invalid path.",
                     path);
+            verifyGap(path, components);
             Stack<String> stack = new Stack<>();
             for (String component : components) {
                 stack.add(component);
@@ -343,6 +365,76 @@ abstract class ReferenceAssociation extends AbstractMap<String, Object> {
      * @return the supplier
      */
     protected abstract Supplier<Map<String, Object>> mapSupplier();
+
+    /**
+     * Pass each flattened entry of the {@code map} to the {@code consumer}, and
+     * record for the duration of the call how many positions each list of the
+     * {@code map} supplies, so that {@link #verifyGap(String, String[])} does
+     * not count them.
+     *
+     * @param map the data to flatten
+     * @param consumer the receiver of each path and leaf value
+     */
+    private void forEachFlattenedEntry(Map<String, Object> map,
+            BiConsumer<String, Object> consumer) {
+        Map<String, Integer> outer = supplied;
+        Map<String, Integer> current = new HashMap<>();
+        supplied = current;
+        try {
+            forEachFlattened(map, consumer, (list, position) -> current
+                    .merge(list, position + 1, Math::max));
+        }
+        finally {
+            supplied = outer;
+        }
+    }
+
+    /**
+     * Verify that a write of the {@code components} of the {@code path} fills
+     * at most {@link Association#MAX_LIST_GAP} list positions with
+     * {@code null}, with the rules of {@link Association#set(String, Object)}.
+     * <p>
+     * An integer component fills the positions between the end of the
+     * {@link Collection} that it indexes and its own position, and a component
+     * whose value is not a {@link Collection} gets a new list. A position that
+     * a list of the input of the flattening call in progress has supplied does
+     * not count.
+     * </p>
+     *
+     * @param path a navigable path key
+     * @param components the components of the {@code path}
+     * @throws IllegalArgumentException if the write would fill more than
+     *             {@link Association#MAX_LIST_GAP} positions
+     */
+    private void verifyGap(String path, String[] components) {
+        long skipped = 0;
+        Object source = exploded;
+        for (int i = 0; i < components.length; ++i) {
+            String component = components[i];
+            Integer index = Ints.tryParse(component);
+            if(index != null) {
+                int size = source instanceof Collection
+                        ? ((Collection<?>) source).size()
+                        : 0;
+                String list = String.join(".", Arrays.copyOf(components, i));
+                int given = supplied != null ? supplied.getOrDefault(list, 0)
+                        : 0;
+                skipped += Math.max(0L, (long) index - Math.max(size, given));
+                source = index >= 0 && index < size
+                        ? Iterables.get((Collection<?>) source, index)
+                        : null;
+            }
+            else {
+                source = source instanceof Map
+                        ? ((Map<?, ?>) source).get(component)
+                        : null;
+            }
+        }
+        Verify.thatArgument(skipped <= Association.MAX_LIST_GAP,
+                "The path '{}' skips {} list positions, "
+                        + "but a write can skip at most {}",
+                path, skipped, Association.MAX_LIST_GAP);
+    }
 
     /**
      * A {@link ReferenceAssociation} whose containers are

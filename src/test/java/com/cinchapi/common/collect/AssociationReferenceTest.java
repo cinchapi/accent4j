@@ -49,9 +49,11 @@ import com.google.common.collect.ImmutableMap;
  * nested containers share an identity, and whether a container that a caller
  * held before an operation is still in place and what it holds afterward. The
  * random inputs use dotted keys, integer components, gaps, negative indexes,
- * nulls, empty containers, {@link java.util.Set Sets}, plain
- * {@link Iterable Iterables}, nested {@link Association Associations}, and keys
- * that conflict with each other in either order.
+ * nulls, empty containers, lists that start with more than
+ * {@link Association#MAX_LIST_GAP} empty containers,
+ * {@link java.util.Set Sets}, plain {@link Iterable Iterables}, nested
+ * {@link Association Associations}, and keys that conflict with each other in
+ * either order.
  * </p>
  * <p>
  * Every assertion message starts with the seed of its trial, so a failure can
@@ -341,6 +343,26 @@ public class AssociationReferenceTest {
     }
 
     /**
+     * Return a list that starts with more than {@link Association#MAX_LIST_GAP}
+     * empty maps and empty lists, which flatten to no entries, and ends with a
+     * random value nested one level deeper than {@code depth}.
+     *
+     * @param random the source of randomness
+     * @param depth the nesting depth of the list
+     * @return the list
+     */
+    private static List<Object> randomEmptyRun(Random random, int depth) {
+        List<Object> list = new ArrayList<>();
+        int size = Association.MAX_LIST_GAP + 1 + random.nextInt(5);
+        for (int i = 0; i < size; ++i) {
+            list.add(random.nextBoolean() ? new LinkedHashMap<>()
+                    : new ArrayList<>());
+        }
+        list.add(randomValue(random, depth + 1));
+        return list;
+    }
+
+    /**
      * Return a random input for {@link Association#of(Map)} or
      * {@link Association#merge(Map)}: a map of nested values in one of several
      * map classes, sometimes with a {@code null} key.
@@ -538,8 +560,11 @@ public class AssociationReferenceTest {
             }
             return association;
         }
-        else if(roll < 97) {
+        else if(roll < 96) {
             return randomList(random, depth, 10 + random.nextInt(30));
+        }
+        else if(roll < 97) {
+            return randomEmptyRun(random, depth);
         }
         else {
             return randomMap(random, depth, 3, new LoggingMap());
@@ -648,11 +673,14 @@ public class AssociationReferenceTest {
     private static final String[] INDEXES = { "0", "1", "2", "3", "5" };
 
     /**
-     * Keys with dots, empty components, and negative or padded numbers.
+     * Keys with dots, empty components, negative or padded numbers, and indexes
+     * that skip {@link Association#MAX_LIST_GAP} list positions, or one more,
+     * when they start a new list.
      */
     private static final String[] ODD_KEYS = { "", ".", "a.", ".a", "a..b",
             "-1", "a.-1", "00", "0.a", "a.b", "a.0", "b.1.c", "tags.2", "c.0.0",
-            "a.b.c", "tags.-1", "tags.1.a" };
+            "a.b.c", "tags.-1", "tags.1.a", "tags." + Association.MAX_LIST_GAP,
+            "c." + (Association.MAX_LIST_GAP + 1) };
 
     /**
      * The merge strategies that random operations pass to

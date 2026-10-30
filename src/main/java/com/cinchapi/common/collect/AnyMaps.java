@@ -69,6 +69,10 @@ public final class AnyMaps {
      * 
      * @param map
      * @return a nested map
+     * @throws IllegalArgumentException if a key starts with an integer
+     *             component, leads to a different type tree than an earlier
+     *             key, or would fill more than {@link Association#MAX_LIST_GAP}
+     *             list positions with {@code null}
      * @deprecated in favor of the {@link Association} framework. Create an
      *             {@link Association} using {@link Association#of(Map)} with a
      *             "flat" map. The map will be exploded, implicitly and
@@ -88,6 +92,7 @@ public final class AnyMaps {
                             + "'{}' is an invalid key.",
                     key);
             String originalKey = key;
+            long skipped = 0;
             try {
                 for (String component : reversed) {
                     key = component;
@@ -102,6 +107,15 @@ public final class AnyMaps {
                             container = Lists.newArrayList();
                         }
                         List list = (List) container;
+                        if(index > list.size()) {
+                            skipped += index - list.size();
+                        }
+                        Verify.thatArgument(
+                                skipped <= Association.MAX_LIST_GAP,
+                                "The key '{}' skips {} list positions, "
+                                        + "but a key can skip at most {}",
+                                originalKey, skipped,
+                                Association.MAX_LIST_GAP);
                         for (int i = list.size(); i < index; ++i) { // Pad the
                                                                     // list, if
                                                                     // necessary

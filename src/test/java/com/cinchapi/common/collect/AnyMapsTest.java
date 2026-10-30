@@ -66,6 +66,28 @@ public class AnyMapsTest {
         Assert.assertEquals(map, AnyMaps.explode(map));
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that {@link AnyMaps#explode(Map)} rejects a
+     * key whose integer component would fill more than
+     * {@value Association#MAX_LIST_GAP} list positions with {@code null}.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Explode a map whose only key is {@code a} followed by one more than
+     * {@value Association#MAX_LIST_GAP}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws an
+     * {@link IllegalArgumentException}.
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testExplodeRejectsKeyThatSkipsMoreThanMaxListGapPositions() {
+        AnyMaps.explode(
+                ImmutableMap.of("a." + (Association.MAX_LIST_GAP + 1), 1));
+    }
+
     @Test
     public void testExplode() {
         Map<String, Object> map = Maps.newHashMap();

@@ -17,6 +17,7 @@ package com.cinchapi.common.collect;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,23 @@ import com.google.common.collect.Lists;
  * @author Jeff Nelson
  */
 public class AssociationTest {
+
+    /**
+     * Return a list of one more than {@value Association#MAX_LIST_GAP} copies
+     * of the {@code empty} element, followed by the {@code last} element. When
+     * {@code empty} is an empty container, flattening the list writes only the
+     * {@code last} element, at a position past the limit.
+     *
+     * @param empty the element to repeat
+     * @param last the element after the repeated ones
+     * @return the list
+     */
+    private static List<Object> afterEmptyRun(Object empty, Object last) {
+        List<Object> list = new ArrayList<>(
+                Collections.nCopies(Association.MAX_LIST_GAP + 1, empty));
+        list.add(last);
+        return list;
+    }
 
     /**
      * Return a list of {@value #LONG_LIST_SIZE} elements that the
@@ -272,6 +290,76 @@ public class AssociationTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that {@link Association#merge(Map)} on a
+     * subclass that overrides {@code set} counts the positions that a list of
+     * the input supplies with empty elements as supplied, so that {@code set}
+     * accepts the write past them.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link ListAssociation} whose
+     * {@code set} records each path before it writes.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Merge a map whose {@code a} entry is a list of one more than
+     * {@value Association#MAX_LIST_GAP} empty maps, followed by {@code 1}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code set} received only the path of
+     * {@code 1}, and {@code a} holds a {@code null} for each empty map,
+     * followed by {@code 1}.
+     */
+    @Test
+    public void testMergeCountsEmptyElementsAsSuppliedThroughOverriddenSet() {
+        List<String> paths = new ArrayList<>();
+        Association assoc = new ListAssociation() {
+
+            @Override
+            public <T> T set(String path, Object value) {
+                paths.add(path);
+                return super.set(path, value);
+            }
+
+        };
+        assoc.merge(
+                ImmutableMap.of("a", afterEmptyRun(ImmutableMap.of(), 1)));
+        Assert.assertEquals(
+                ImmutableList.of("a." + (Association.MAX_LIST_GAP + 1)),
+                paths);
+        Assert.assertEquals(afterEmptyRun(null, 1), assoc.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#merge(Map)} and
+     * {@link Association#merge(Map, BiFunction)} count the positions that a
+     * list of the input supplies with empty elements as supplied.
+     * <p>
+     * <strong>Start state:</strong> Two empty {@link Association Associations}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Build a map whose {@code a} entry is a list of one more than
+     * {@value Association#MAX_LIST_GAP} empty maps, followed by {@code 1}.</li>
+     * <li>Merge it into the first {@link Association}, and merge it into the
+     * second with the {@link MergeStrategies#concat(Object, Object) concat}
+     * strategy.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> In both, {@code a} holds a {@code null} for
+     * each empty map, followed by {@code 1}.
+     */
+    @Test
+    public void testMergeCountsEmptyElementsOfInputListAsSupplied() {
+        Map<String, Object> input = ImmutableMap.of("a",
+                afterEmptyRun(ImmutableMap.of(), 1));
+        Association merged = Association.of();
+        merged.merge(input);
+        Association concatenated = Association.of();
+        concatenated.merge(input, MergeStrategies::concat);
+        Assert.assertEquals(afterEmptyRun(null, 1), merged.fetch("a"));
+        Assert.assertEquals(afterEmptyRun(null, 1), concatenated.fetch("a"));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a list that a subclass's own
      * {@code fetch} returned during {@link Association#merge(Map)} keeps its
      * contents when a later entry writes into that path.
@@ -344,6 +432,44 @@ public class AssociationTest {
         Assert.assertEquals(ImmutableList.of(1, 2, 3), held);
         Assert.assertNotSame(held, assoc.fetch("a.0"));
         Assert.assertEquals(ImmutableList.of(1, 2, 3, 4), assoc.fetch("a.0"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#merge(Map)} rejects
+     * an entry whose write would fill more than
+     * {@value Association#MAX_LIST_GAP} list positions with {@code null}, and
+     * keeps the entries that it wrote before that entry.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Build an ordered input whose {@code a} entry is {@code 1}, whose
+     * {@code b} entry is a map keyed by one more than
+     * {@value Association#MAX_LIST_GAP}, and whose {@code c} entry is
+     * {@code 3}.</li>
+     * <li>Merge the input.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The merge throws an
+     * {@link IllegalArgumentException}, and the {@link Association} holds only
+     * {@code {a=1}}.
+     */
+    @Test
+    public void testMergeRejectsGapAndKeepsEarlierEntries() {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("a", 1);
+        input.put("b", ImmutableMap
+                .of(String.valueOf(Association.MAX_LIST_GAP + 1), 2));
+        input.put("c", 3);
+        Association assoc = Association.of();
+        try {
+            assoc.merge(input);
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertEquals(ImmutableMap.of("a", 1), assoc);
+        }
     }
 
     /**
@@ -434,6 +560,107 @@ public class AssociationTest {
         Assert.assertEquals(tags, assoc.get("tags"));
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#of(Map)} counts the
+     * positions of list elements that hold only empty containers as supplied.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@link Association#of(Map)} on a map whose {@code a} entry is a
+     * list of one more than {@value Association#MAX_LIST_GAP} copies of
+     * {@code {tags=[]}}, followed by {@code {tags=[x]}}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code a} holds a {@code null} for each
+     * {@code {tags=[]}}, followed by {@code {tags=[x]}}.
+     */
+    @Test
+    public void testOfCountsElementsWithOnlyEmptyFieldsAsSupplied() {
+        Map<String, Object> last = ImmutableMap.of("tags",
+                ImmutableList.of("x"));
+        Association assoc = Association.of(ImmutableMap.of("a", afterEmptyRun(
+                ImmutableMap.of("tags", ImmutableList.of()), last)));
+        Assert.assertEquals(afterEmptyRun(null, last), assoc.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#of(Map)} counts the
+     * positions that a list of the input supplies with empty maps or empty
+     * lists as supplied, so that a dense list of any length is accepted.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@link Association#of(Map)} on a map whose {@code a} entry is a
+     * list of one more than {@value Association#MAX_LIST_GAP} empty maps,
+     * followed by {@code 1}.</li>
+     * <li>Do the same with empty lists instead of empty maps.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> In both, {@code a} holds a {@code null} for
+     * each empty container, followed by {@code 1}.
+     */
+    @Test
+    public void testOfCountsEmptyElementsOfInputListAsSupplied() {
+        Association maps = Association.of(
+                ImmutableMap.of("a", afterEmptyRun(ImmutableMap.of(), 1)));
+        Association lists = Association.of(
+                ImmutableMap.of("a", afterEmptyRun(ImmutableList.of(), 1)));
+        Assert.assertEquals(afterEmptyRun(null, 1), maps.fetch("a"));
+        Assert.assertEquals(afterEmptyRun(null, 1), lists.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#of(Map)} counts a
+     * run of empty elements inside a list of the input as supplied.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@link Association#of(Map)} on a map whose {@code a} entry is
+     * {@code 1}, then one more than {@value Association#MAX_LIST_GAP} empty
+     * maps, then {@code 2}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code a} holds {@code 1}, a {@code null} for
+     * each empty map, and {@code 2}.
+     */
+    @Test
+    public void testOfCountsInteriorRunOfEmptyElementsAsSupplied() {
+        List<Object> input = new ArrayList<>();
+        input.add(1);
+        input.addAll(afterEmptyRun(ImmutableMap.of(), 2));
+        List<Object> expected = new ArrayList<>();
+        expected.add(1);
+        expected.addAll(afterEmptyRun(null, 2));
+        Association assoc = Association.of(ImmutableMap.of("a", input));
+        Assert.assertEquals(expected, assoc.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@link Association#of(Map)} rejects a
+     * key whose integer component would fill billions of list positions with
+     * {@code null}, instead of trying to build the list.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@link Association#of(Map)} on {@code {a.2147483646=1}}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The call throws an
+     * {@link IllegalArgumentException} within 10 seconds.
+     */
+    @Test(expected = IllegalArgumentException.class, timeout = 10000)
+    public void testOfRejectsPathThatSkipsBillionsOfListPositions() {
+        Association.of(ImmutableMap.of("a.2147483646", 1));
+    }
+
     @Test
     public void testPaths() {
         Map<String, Object> map = ImmutableMap.of("a", "foo", "b",
@@ -457,6 +684,90 @@ public class AssociationTest {
         assoc2.set("a.1.b", ImmutableMap.of("c", "d"));
         Assert.assertEquals("d", assoc1.fetch("a.1.b.c"));
         Assert.assertEquals("d", assoc2.fetch("a.1.b.c"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that
+     * {@link Association#set(String, Object)} counts the list positions that
+     * every integer component of a path fills with {@code null}, and limits
+     * their total to {@value Association#MAX_LIST_GAP}.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code x} at a path under {@code a} with two integer components
+     * that each skip half of {@value Association#MAX_LIST_GAP}, rounded
+     * down.</li>
+     * <li>Set {@code y} at a path under {@code b} with two integer components
+     * that each skip one more position than that.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first write succeeds; the second throws an
+     * {@link IllegalArgumentException}, and {@code b} holds nothing.
+     */
+    @Test
+    public void testSetCountsSkippedPositionsOfEveryComponent() {
+        int half = Association.MAX_LIST_GAP / 2;
+        Association assoc = Association.of();
+        assoc.set("a." + half + "." + half, "x");
+        Assert.assertEquals("x", assoc.fetch("a." + half + "." + half));
+        try {
+            assoc.set("b." + (half + 1) + "." + (half + 1), "y");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertNull(assoc.fetch("b"));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that
+     * {@link Association#set(String, Object)} measures the positions that a
+     * write skips from the end of the existing list, and leaves the
+     * {@link Association} unchanged when it rejects a write.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} built from
+     * {@code {tags=[a, b]}}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Hold the list at {@code tags}.</li>
+     * <li>Set {@code x} at the position that skips one more than
+     * {@value Association#MAX_LIST_GAP} positions past the end of the
+     * list.</li>
+     * <li>Set {@code x} at the position that skips exactly
+     * {@value Association#MAX_LIST_GAP} positions past the end of the
+     * list.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first write throws an
+     * {@link IllegalArgumentException} and {@code tags} is still the held list
+     * {@code [a, b]}; the second write succeeds and {@code tags} holds
+     * {@code a}, {@code b}, {@value Association#MAX_LIST_GAP} {@code null}
+     * elements and {@code x}.
+     */
+    @Test
+    public void testSetMeasuresGapFromEndOfExistingList() {
+        Association assoc = Association
+                .of(ImmutableMap.of("tags", ImmutableList.of("a", "b")));
+        List<Object> tags = assoc.fetch("tags");
+        int last = 2 + Association.MAX_LIST_GAP;
+        try {
+            assoc.set("tags." + (last + 1), "x");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertSame(tags, assoc.fetch("tags"));
+            Assert.assertEquals(ImmutableList.of("a", "b"), tags);
+        }
+        assoc.set("tags." + last, "x");
+        List<Object> expected = new ArrayList<>();
+        expected.add("a");
+        expected.add("b");
+        expected.addAll(Collections.nCopies(Association.MAX_LIST_GAP, null));
+        expected.add("x");
+        Assert.assertEquals(expected, assoc.fetch("tags"));
     }
 
     @Test

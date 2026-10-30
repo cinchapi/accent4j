@@ -20,6 +20,19 @@
   and `mapSupplier()` must make a new, empty container on each call and have no
   other effect, because `merge` may call them fewer times than once for each
   component of each path.
+* Fixed a bug that allowed a short path to make `Association` build a list of
+  any size. A write fills each position between the end of a list and the
+  position that an integer component of its path names with `null`, so
+  `Association.of(Map)`, `Association#set`, `Association#merge` and the
+  deprecated `AnyMaps.explode` could build a list of billions of elements from a
+  key such as `a.2000000000` and exhaust the heap. One write fills at most
+  `Association.MAX_LIST_GAP` (100) positions this way, and a write that would
+  fill more throws an `IllegalArgumentException` before it changes anything. A
+  position that a list in the input of `Association.of` or `Association#merge`
+  supplies does not count, even when its element is an empty map or list, so a
+  list of any length is unaffected. A caller whose paths skip more positions
+  must first write the positions in between.
+  ([GHSA-q78v-mv7v-mvfx](https://github.com/cinchapi/accent4j/security/advisories/GHSA-q78v-mv7v-mvfx))
 
 #### Version 1.18.2 (October 28, 2026)
 * Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
