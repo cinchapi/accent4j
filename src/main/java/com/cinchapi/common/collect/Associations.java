@@ -18,6 +18,7 @@ package com.cinchapi.common.collect;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.ObjIntConsumer;
 
 /**
  * Utilities for {@link Association} objects.
@@ -34,19 +35,58 @@ public final class Associations {
      * @param value
      * @param consumer
      */
-    @SuppressWarnings("unchecked")
     public static void flattenAndConsume(String key, Object value,
             BiConsumer<String, Object> consumer) {
+        flattenAndConsume(key, value, consumer, (list, position) -> {});
+    }
+
+    /**
+     * Consume the flattened entries in the {@code map} using the
+     * {@code consumer}.
+     *
+     * @param map
+     * @param consumer
+     */
+    public static void forEachFlattened(Map<String, Object> map,
+            BiConsumer<String, Object> consumer) {
+        map.forEach((key, value) -> {
+            flattenAndConsume(key, value, consumer);
+        });
+    }
+
+    /**
+     * Flatten the {@code value} using the {@code key} as an entrypoint, consume
+     * the result using the {@code consumer}, and report each element of a list
+     * in the {@code value} to {@code onElement}.
+     * <p>
+     * {@code onElement} receives the path of the list and the position of the
+     * element before the {@code consumer} receives any entry of that element.
+     * It receives every element, including one that is an empty container and
+     * so gives the {@code consumer} no entries.
+     * </p>
+     *
+     * @param key the path of the {@code value}
+     * @param value the value to flatten
+     * @param consumer the receiver of each flattened path and leaf value
+     * @param onElement the receiver of the path of a list and the position of
+     *            one of its elements
+     */
+    @SuppressWarnings("unchecked")
+    static void flattenAndConsume(String key, Object value,
+            BiConsumer<String, Object> consumer,
+            ObjIntConsumer<String> onElement) {
         if(value instanceof Map) {
             ((Map<String, Object>) value).forEach((k, v) -> {
-                flattenAndConsume(key + "." + k, v, consumer);
+                flattenAndConsume(key + "." + k, v, consumer, onElement);
             });
         }
         else if(value instanceof Iterable) {
             Iterator<Object> it = ((Iterable<Object>) value).iterator();
             int index = 0;
             while (it.hasNext()) {
-                flattenAndConsume(key + "." + index, it.next(), consumer);
+                onElement.accept(key, index);
+                flattenAndConsume(key + "." + index, it.next(), consumer,
+                        onElement);
                 ++index;
             }
         }
@@ -57,15 +97,21 @@ public final class Associations {
 
     /**
      * Consume the flattened entries in the {@code map} using the
-     * {@code consumer}.
-     * 
-     * @param map
-     * @param consumer
+     * {@code consumer}, and report each element of a list in the {@code map} to
+     * {@code onElement}, as
+     * {@link #flattenAndConsume(String, Object, BiConsumer, ObjIntConsumer)}
+     * does.
+     *
+     * @param map the data to flatten
+     * @param consumer the receiver of each flattened path and leaf value
+     * @param onElement the receiver of the path of a list and the position of
+     *            one of its elements
      */
-    public static void forEachFlattened(Map<String, Object> map,
-            BiConsumer<String, Object> consumer) {
+    static void forEachFlattened(Map<String, Object> map,
+            BiConsumer<String, Object> consumer,
+            ObjIntConsumer<String> onElement) {
         map.forEach((key, value) -> {
-            flattenAndConsume(key, value, consumer);
+            flattenAndConsume(key, value, consumer, onElement);
         });
     }
 

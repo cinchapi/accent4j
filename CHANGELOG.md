@@ -1,5 +1,39 @@
 # Changelog
 
+#### Version 1.18.3 (October 30, 2026)
+* Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
+  that grew with the square of the length of each list in the map. For example,
+  `Association.of` took about 1.5 seconds for a map that held one list of 20,000
+  strings, so a server that turned the JSON of a small request into an
+  `Association` could spend seconds of CPU on it. Both methods take time in
+  proportion to the size of the result, which holds a `null` for each list
+  position that an integer key skips, and give the same result as before, down
+  to the order of the entries, the type of each container, and whether a
+  container that a caller already holds is replaced or updated. `merge` has this
+  cost when the `Association` keeps its maps in `LinkedHashMap` or `HashMap`
+  containers and its lists in `ArrayList` or `LinkedList` containers, and its
+  class does not override `get`, `fetch`, `set` or `merge(Map, BiFunction)`, as
+  for `Association.of()`. For any other `Association`, the cost of `merge` can
+  still grow with the square of the length of a list. A subclass that overrides
+  one of those methods has them called as `merge(map, MergeStrategies::theirs)`
+  calls them. The suppliers that a subclass returns from `collectionSupplier()`
+  and `mapSupplier()` must make a new, empty container on each call and have no
+  other effect, because `merge` may call them fewer times than once for each
+  component of each path.
+* Fixed a bug that allowed a short path to make `Association` build a list of
+  any size. A write fills each position between the end of a list and the
+  position that an integer component of its path names with `null`, so
+  `Association.of(Map)`, `Association#set`, `Association#merge` and the
+  deprecated `AnyMaps.explode` could build a list of billions of elements from a
+  key such as `a.2000000000` and exhaust the heap. One write fills at most
+  `Association.MAX_LIST_GAP` (100) positions this way, and a write that would
+  fill more throws an `IllegalArgumentException` before it changes anything. A
+  position that a list in the input of `Association.of` or `Association#merge`
+  supplies does not count, even when its element is an empty map or list, so a
+  list of any length is unaffected. A caller whose paths skip more positions
+  must first write the positions in between.
+  ([GHSA-q78v-mv7v-mvfx](https://github.com/cinchapi/accent4j/security/advisories/GHSA-q78v-mv7v-mvfx))
+
 #### Version 1.18.2 (October 28, 2026)
 * Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
   standard error for a process that wrote lines to it. It happened most often
