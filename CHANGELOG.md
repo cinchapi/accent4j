@@ -6,18 +6,20 @@
   `Association.of` took about 1.5 seconds for a map that held one list of 20,000
   strings, so a server that turned the JSON of a small request into an
   `Association` could spend seconds of CPU on it. Both methods take time in
-  proportion to the size of the data and give the same result as before, down to
-  the order of the entries, the type of each container, and whether a container
-  that a caller already holds is replaced or updated. `merge` has this cost when
-  the `Association` keeps its maps in `LinkedHashMap` or `HashMap` containers
-  and its lists in `ArrayList` or `LinkedList` containers, and its class does
-  not override `get`, `fetch`, `set` or `merge(Map, BiFunction)`, as for
-  `Association.of()`. When that `Association` is a subclass, `merge` may call
-  its `collectionSupplier()` and `mapSupplier()` fewer times than once for each
-  component of the path of each entry, so each supplier must return a new, empty
-  container on each call and have no other effect. Otherwise, its cost can still
-  grow with the square of the length of a list, and it calls each overridden
-  method for each entry.
+  proportion to the size of the result, which holds a `null` for each list
+  position that an integer key skips, and give the same result as before, down
+  to the order of the entries, the type of each container, and whether a
+  container that a caller already holds is replaced or updated. `merge` has this
+  cost when the `Association` keeps its maps in `LinkedHashMap` or `HashMap`
+  containers and its lists in `ArrayList` or `LinkedList` containers, and its
+  class does not override `get`, `fetch`, `set` or `merge(Map, BiFunction)`, as
+  for `Association.of()`. For any other `Association`, the cost of `merge` can
+  still grow with the square of the length of a list. A subclass that overrides
+  one of those methods has them called as `merge(map, MergeStrategies::theirs)`
+  calls them. The suppliers that a subclass returns from `collectionSupplier()`
+  and `mapSupplier()` must make a new, empty container on each call and have no
+  other effect, because `merge` may call them fewer times than once for each
+  component of each path.
 
 #### Version 1.18.2 (October 28, 2026)
 * Fixed a bug where `Processes.waitFor` sometimes returned no standard output or
