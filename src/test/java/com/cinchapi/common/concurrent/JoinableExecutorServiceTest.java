@@ -496,6 +496,56 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that {@code shutdownNow} after a graceful
+     * {@code shutdown} returns the tasks that the queue still holds, and none
+     * of them runs.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task that ignores interrupts.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Queue three tasks, which no worker is free to run.</li>
+     * <li>Call {@code shutdown}, then {@code shutdownNow}.</li>
+     * <li>Release the workers and wait for the executor to terminate.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks, and
+     * none of them runs.
+     */
+    @Test
+    public void testShutdownNowAfterShutdownReturnsTheTasksTheQueueHolds()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch started = new CountDownLatch(4);
+        CountDownLatch release = new CountDownLatch(1);
+        for (int i = 0; i < 4; ++i) {
+            joinable.execute(() -> {
+                started.countDown();
+                Uninterruptibles.awaitUninterruptibly(release);
+            });
+        }
+        started.await();
+        try {
+            AtomicInteger ran = new AtomicInteger();
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(ran::incrementAndGet);
+            }
+
+            joinable.shutdown();
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            Assert.assertEquals(3, unfinished.size());
+            release.countDown();
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(0, ran.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code shutdownNow} omits the helper
      * that a join queues for a worker that counts as idle but is busy in
      * another join.

@@ -262,7 +262,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     @Override
     public List<Runnable> shutdownNow() {
         List<Runnable> unfinished = new ArrayList<>();
-        if(state.compareAndSet(RUNNING, STOP)) {
+        if(state.compareAndSet(RUNNING, STOP)
+                || state.compareAndSet(SHUTDOWN, STOP)) {
             for (Thread worker : workers) {
                 worker.interrupt();
             }

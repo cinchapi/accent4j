@@ -14,6 +14,9 @@
   after the executor terminated, so the task never ran, `shutdownNow` did not
   return it, and its `Future` never completed. Such a task runs, comes back from
   `shutdownNow`, or is rejected with a `RejectedExecutionException`.
+* Fixed a bug that caused `JoinableExecutorService#shutdownNow` to return no
+  tasks and let the waiting tasks run when a graceful `shutdown` came first. The
+  call returns the tasks that are still waiting, and none of them runs.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
