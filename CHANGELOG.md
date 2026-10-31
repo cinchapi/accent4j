@@ -16,6 +16,19 @@
   was asked about, so a caller could not search an `Association` built from data
   that held a `null`. It answers whether any path holds a value equal to the one
   it is asked about, and answers `true` for `null` when a path holds `null`.
+* Fixed a bug where `Association#remove` took nothing out of an `Association`
+  and answered `null` for a key that named more than one component, even though
+  `Association#put` stored a value under such a key and `Association#get`
+  answered it, so a caller that removed the keys of a flattened `Association`
+  left every nested value in place. It takes the value at the end of the path
+  out of the container that holds it and answers that value. A component that
+  names a position of a list leaves the list as long as it was, with `null` at
+  that position, so every other position still names the element it named
+  before. The containers that the components before the last one name stay in
+  place, even when the removal leaves one of them empty. A removal changes the
+  container that holds the end of the path, so a container that does not permit
+  the change, such as an immutable list a caller stored, throws an
+  `UnsupportedOperationException`.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time

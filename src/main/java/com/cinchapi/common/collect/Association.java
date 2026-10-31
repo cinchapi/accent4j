@@ -48,6 +48,15 @@ import com.google.common.primitives.Ints;
  * objects) to values that are either other {@link Association Associations}
  * (e.g. maps), collections or flat (e.g. primitive) objects.
  * <p>
+ * The {@link Map} operations read a key as a path, so {@link #get(Object)},
+ * {@link #put(String, Object)} and {@link #remove(Object)} reach the value at
+ * the end of one. The entries are those of the outermost mapping, and
+ * therefore so are {@link #size()}, {@link #keySet()} and
+ * {@link #entrySet()}, which means a path of several components contributes
+ * the one entry that its first component names. A removal changes the
+ * container that holds the end of its path, so that container must permit the
+ * change.
+ * </p>
  *
  * @author Jeff Nelson
  */
@@ -421,6 +430,24 @@ public abstract class Association extends AbstractMap<String, Object> {
         return set(key, value);
     }
 
+    @Override
+    public Object remove(Object key) {
+        if(key instanceof String) {
+            String path = (String) key;
+            if(path.indexOf('.') >= 0 && exploded.containsKey(path)) {
+                // The map holds the whole path as a key of its own, as #set
+                // leaves it when a write finds the path there.
+                return exploded.remove(path);
+            }
+            else {
+                return detach(path);
+            }
+        }
+        else {
+            return null;
+        }
+    }
+
     /**
      * Set {@code value} at the end of the {@code path}.
      * <p>
@@ -570,6 +597,55 @@ public abstract class Association extends AbstractMap<String, Object> {
                     path, skipped, MAX_LIST_GAP);
         }
         return components;
+    }
+
+    /**
+     * Take the value at the end of the {@code path} out of the container that
+     * holds it and return that value.
+     * <p>
+     * The container that holds the end of the {@code path} is the one that the
+     * components before it name, read as {@link #get(Object)} reads them, or
+     * the outermost mapping when the {@code path} names one component. A
+     * component that names a position of a
+     * list leaves the list as long as it was, with {@code null} at that
+     * position, so that every other position names the element it named
+     * before. The containers that the components before the last one name stay
+     * in place, even when the removal leaves one of them empty.
+     * </p>
+     *
+     * @param path a navigable path key
+     * @return the value that was at the end of the {@code path}, or
+     *         {@code null} if no container held one there
+     * @throws UnsupportedOperationException if the container that holds the
+     *             end of the {@code path} does not permit the change
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private Object detach(String path) {
+        int end = path.lastIndexOf('.');
+        Object holder;
+        String last;
+        if(end < 0) {
+            holder = exploded;
+            last = path;
+        }
+        else {
+            holder = fetch(path.substring(0, end));
+            last = path.substring(end + 1);
+        }
+        Integer index = Ints.tryParse(last);
+        Object detached;
+        if(index == null && holder instanceof Map) {
+            detached = ((Map<String, Object>) holder).remove(last);
+        }
+        else if(index != null && holder instanceof List && index >= 0
+                && index < ((List<Object>) holder).size()) {
+            detached = ((List<Object>) holder).set(index, null);
+        }
+        else {
+            detached = null;
+        }
+        return detached;
     }
 
     /**

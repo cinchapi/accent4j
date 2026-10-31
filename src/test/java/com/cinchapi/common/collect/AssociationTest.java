@@ -1278,4 +1278,185 @@ public class AssociationTest {
 
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that removing a path of several components
+     * takes the value from the container that holds it and answers it.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map of
+     * two keys under one key of the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Set {@code "user.age"} to {@code 3}.</li>
+     * <li>Remove {@code "user.name"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code "jeff"}, the path
+     * then reads as {@code null}, and the other key keeps its value.
+     */
+    @Test
+    public void testRemoveOfPathOfSeveralComponentsTakesTheValue() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+        assoc.set("user.age", 3);
+
+        Object removed = assoc.remove("user.name");
+
+        Assert.assertEquals("jeff", removed);
+        Assert.assertNull(assoc.fetch("user.name"));
+        Assert.assertEquals(3, (Object) assoc.fetch("user.age"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path whose last component
+     * names a list position clears that position and leaves every other
+     * position naming the element it named before.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a list of
+     * two elements.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to a list of two elements.</li>
+     * <li>Remove {@code "a.0"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers the first element, that
+     * position then reads as {@code null}, and the second position still reads
+     * as the second element.
+     */
+    @Test
+    public void testRemoveOfListPositionClearsThatPosition() {
+        Association assoc = Association.of();
+        assoc.set("a", Lists.newArrayList("x", "y"));
+
+        Object removed = assoc.remove("a.0");
+
+        Assert.assertEquals("x", removed);
+        Assert.assertNull(assoc.fetch("a.0"));
+        Assert.assertEquals("y", assoc.fetch("a.1"));
+        Assert.assertEquals(Lists.newArrayList(null, "y"), assoc.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path of several components
+     * leaves the containers above it in place.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * under one key of the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Remove {@code "user.name"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The {@link Association} still holds one
+     * entry, and the map that held the removed key is empty.
+     */
+    @Test
+    public void testRemoveLeavesTheContainersAbovePathInPlace() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+
+        assoc.remove("user.name");
+
+        Assert.assertEquals(1, assoc.size());
+        Assert.assertEquals(ImmutableMap.of(), assoc.fetch("user"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a key of one component takes
+     * the entry out of the map itself.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key of
+     * the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to {@code 1}.</li>
+     * <li>Remove {@code "a"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code 1} and the
+     * {@link Association} is empty.
+     */
+    @Test
+    public void testRemoveOfKeyOfOneComponentTakesTheEntry() {
+        Association assoc = Association.of();
+        assoc.set("a", 1);
+
+        Object removed = assoc.remove("a");
+
+        Assert.assertEquals(1, removed);
+        Assert.assertTrue(assoc.isEmpty());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path that holds no value
+     * answers {@code null} and changes nothing.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one path of
+     * two components.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Remove {@code "user.absent"}, whose container exists.</li>
+     * <li>Remove {@code "absent.absent"}, whose container does not.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both removals answer {@code null} and the
+     * held path keeps its value.
+     */
+    @Test
+    public void testRemoveOfAbsentPathAnswersNull() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+
+        Assert.assertNull(assoc.remove("user.absent"));
+        Assert.assertNull(assoc.remove("absent.absent"));
+        Assert.assertEquals("jeff", assoc.fetch("user.name"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a removal from a container that does
+     * not permit the change is refused.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding an
+     * immutable list under one key and an immutable map under another.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Remove the first position of the list.</li>
+     * <li>Remove the key of the map.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both removals throw an
+     * {@link UnsupportedOperationException}.
+     */
+    @Test
+    public void testRemoveRefusesAContainerThatDoesNotPermitTheChange() {
+        Association assoc = Association.of();
+        assoc.set("list", ImmutableList.of("x", "y"));
+        assoc.set("map", ImmutableMap.of("b", 1));
+
+        try {
+            assoc.remove("list.0");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableList.of("x", "y"),
+                    assoc.fetch("list"));
+        }
+        try {
+            assoc.remove("map.b");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableMap.of("b", 1), assoc.fetch("map"));
+        }
+    }
+
 }
