@@ -25,23 +25,21 @@ import org.junit.Test;
 import com.cinchapi.common.profile.Benchmark;
 
 /**
- * Measure what an {@link Association} costs for the keys that most callers
- * write, which are keys naming one component.
+ * Measure how fast an {@link Association} reads and writes keys without a dot,
+ * which are most of the keys that callers use.
  * <p>
- * An {@link Association} keeps its data so that a key naming several
- * components reads as a path into nested containers. A key naming one
- * component needs none of that, and a caller that serializes a record writes
- * almost nothing else, so what a one-component key costs sets what such a
- * caller pays. A {@link LinkedHashMap} of the same keys stands in for the
- * floor.
+ * A key with dots is a path into nested containers, and a key without a dot is
+ * a top-level key. A caller that serializes a record writes almost only keys
+ * without a dot, so their cost decides what that caller pays. A
+ * {@link LinkedHashMap} with the same keys shows the lowest cost to expect.
  * </p>
  * <p>
- * These tests measure rather than assert, so they are {@link Ignore ignored}.
- * JUnit skips an ignored class even when a filter selects it, so to run them,
- * remove the annotation in a local checkout and run
- * {@code ./gradlew test --tests "AssociationPerformanceTest"}. The printed
- * lines appear in the test report. The numbers move with the machine, so
- * compare runs from one machine.
+ * These tests print timings and assert nothing, so they are
+ * {@link Ignore ignored}. JUnit skips an ignored class even when a filter
+ * selects it. To run them, remove the annotation in a local checkout and run
+ * {@code ./gradlew test --tests "AssociationPerformanceTest"}. The timings
+ * appear in the test report. They vary from machine to machine, so compare runs
+ * on the same machine.
  * </p>
  *
  * @author Jeff Nelson
@@ -60,12 +58,12 @@ public class AssociationPerformanceTest {
     private static final int ROUNDS = 20000;
 
     /**
-     * The keys naming one component that each round uses.
+     * The keys without a dot that each round uses.
      */
     private static final String[] FLAT = new String[KEYS];
 
     /**
-     * The keys naming two components that each round uses.
+     * The keys with one dot that each round uses.
      */
     private static final String[] NESTED = new String[KEYS];
 
@@ -77,9 +75,9 @@ public class AssociationPerformanceTest {
     }
 
     /**
-     * Measure {@code work} over {@code ROUNDS} rounds and print its average
-     * time for one round and for one key, after a warmup of a tenth as many
-     * rounds that the average leaves out.
+     * Run {@code work} for {@code ROUNDS / 10} rounds to warm up, and then time
+     * it over {@code ROUNDS} rounds. Print the average time for one round and
+     * for one key.
      *
      * @param label the operation being measured, for the printed line
      * @param work the operation to measure

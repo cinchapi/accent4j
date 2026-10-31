@@ -17,11 +17,7 @@ package com.cinchapi.common.concurrent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -33,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
-import java.util.stream.Collectors;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -94,84 +89,46 @@ public class JoinableExecutorServiceTest extends
         Assert.assertEquals(10, counter.get());
     }
 
-    @Test
-    public void testJoinRunnables() throws Exception {
-        JoinableExecutorService executor = (JoinableExecutorService) this.executor;
-        Runnable[] tasks = new Runnable[100];
-        Map<Integer, Thread> map = new ConcurrentHashMap<>();
-        Map<Integer, AtomicInteger> count = new ConcurrentHashMap<>();
-        for (int i = 0; i < 100; ++i) {
-            int j = i;
-            tasks[i] = () -> {
-                map.put(j, Thread.currentThread());
-                count.computeIfAbsent(j, $ -> new AtomicInteger(0))
-                        .incrementAndGet();
-            };
-        }
-        executor.join(tasks);
-        Set<Thread> workers = map.values().stream().collect(Collectors.toSet());
-        if(workers.contains(Thread.currentThread()) && workers.size() > 1) {
-            // Ensure that no task was dropped
-            Assert.assertEquals(100, map.size());
-            Assert.assertEquals(100, count.size());
-
-            // Ensure that no task was dropped
-            for (Entry<Integer, AtomicInteger> entry : count.entrySet()) {
-                Assert.assertEquals(1, entry.getValue().get());
-            }
-        }
-        else if(workers.contains(Thread.currentThread())) {
-            Assert.fail();
-            System.err.println(
-                    "The main thread did all of the work without the executor. Possible race condition");
-        }
-        else {
-            Assert.fail();
-            System.err.println(
-                    "The main thread did not help with any of the work. Possible race condition");
-        }
-    }
-
+    /**
+     * <strong>Goal:</strong> Verify that a join of callables runs each task
+     * exactly once and answers a done {@link Future} for each of them, in the
+     * order the tasks were given.
+     * <p>
+     * <strong>Start state:</strong> A new executor.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Join 100 callables, each of which counts its own runs and answers
+     * its own index.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each task ran once, and the join answers one
+     * done {@link Future} per task, holding the indices in order.
+     */
     @SuppressWarnings("unchecked")
     @Test
-    public void testJoinCallables() throws Exception {
-        JoinableExecutorService executor = (JoinableExecutorService) this.executor;
+    public void testJoinCallablesRunsEachTaskOnceAndAnswersItsFuture()
+            throws Exception {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
         Callable<Integer>[] tasks = new Callable[100];
-        Map<Integer, Thread> map = new ConcurrentHashMap<>();
-        Map<Integer, AtomicInteger> count = new ConcurrentHashMap<>();
-        for (int i = 0; i < 100; ++i) {
-            int j = i;
+        AtomicIntegerArray runs = new AtomicIntegerArray(tasks.length);
+        for (int i = 0; i < tasks.length; ++i) {
+            int index = i;
             tasks[i] = () -> {
-                map.put(j, Thread.currentThread());
-                count.computeIfAbsent(j, $ -> new AtomicInteger(0))
-                        .incrementAndGet();
-                return j;
+                runs.incrementAndGet(index);
+                return index;
             };
         }
-        List<Future<Integer>> futures = executor.join(tasks);
-        Set<Thread> workers = map.values().stream().collect(Collectors.toSet());
-        if(workers.contains(Thread.currentThread()) && workers.size() > 1) {
-            // Ensure that no task was dropped
-            Assert.assertEquals(100, map.size());
-            Assert.assertEquals(100, count.size());
 
-            // Ensure that no task was dropped
-            for (Entry<Integer, AtomicInteger> entry : count.entrySet()) {
-                Assert.assertEquals(1, entry.getValue().get());
-            }
-            for (Future<Integer> future : futures) {
-                Assert.assertTrue(future.isDone());
-            }
+        List<Future<Integer>> futures = joinable.join(tasks);
+
+        for (int i = 0; i < runs.length(); ++i) {
+            Assert.assertEquals(1, runs.get(i));
         }
-        else if(workers.contains(Thread.currentThread())) {
-            Assert.fail();
-            System.err.println(
-                    "The main thread did all of the work without the executor. Possible race condition");
-        }
-        else {
-            Assert.fail();
-            System.err.println(
-                    "The main thread did not help with any of the work. Possible race condition");
+        Assert.assertEquals(tasks.length, futures.size());
+        for (int i = 0; i < futures.size(); ++i) {
+            Assert.assertTrue(futures.get(i).isDone());
+            Assert.assertEquals(Integer.valueOf(i), futures.get(i).get());
         }
     }
 

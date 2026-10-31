@@ -49,20 +49,28 @@ import com.google.common.primitives.Ints;
  * objects) to values that are either other {@link Association Associations}
  * (e.g. maps), collections or flat (e.g. primitive) objects.
  * <p>
- * The {@link Map} operations read a key as a path, so {@link #get(Object)},
- * {@link #put(String, Object)} and {@link #remove(Object)} reach the value at
- * the end of one. The entries are those of the outermost mapping, and therefore
- * so are {@link #size()}, {@link #keySet()} and {@link #entrySet()}, which
- * means a path of several components contributes the one entry that its first
- * component names. {@link #containsValue(Object)} answers whether any value
- * that the {@link Association} stores, or that a {@link Map} or
- * {@link Collection} it stores holds at any depth, is equal to the one it is
- * asked about.
+ * {@link #get(Object)}, {@link #put(String, Object)} and
+ * {@link #remove(Object)} read a key as a path. The dots in a path separate its
+ * components, and an integer component is a list position. For example,
+ * {@code get("user.tags.0")} returns the first element of the {@code tags} list
+ * inside the {@code user} map.
  * </p>
  * <p>
- * A removal changes the container that holds the end of its path, so that
- * container must permit the change. A removal of a position clears it in place,
- * so the position must be one of a {@link List}.
+ * The entries of an {@link Association} are its top-level keys only. So
+ * {@link #size()}, {@link #keySet()} and {@link #entrySet()} count {@code user}
+ * once, however many paths start with it.
+ * </p>
+ * <p>
+ * {@link #containsValue(Object)} returns {@code true} if the
+ * {@link Association} stores an equal value at any depth of its maps and
+ * collections.
+ * </p>
+ * <p>
+ * A removal changes the map or list that holds the value, so that container
+ * must allow the change. Removing a list position sets it to {@code null}, so
+ * the other elements keep their positions. Only a {@link List} allows that, so
+ * removing a position from any other collection, such as a set, throws an
+ * {@link UnsupportedOperationException}.
  * </p>
  *
  * @author Jeff Nelson
@@ -144,14 +152,13 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
-     * Return whether any of the {@code values}, or any value that a {@link Map}
-     * or {@link Collection} among them holds at any depth, is equal to the
-     * {@code value}.
+     * Return whether the {@code values}, or any {@link Map} or
+     * {@link Collection} nested inside them at any depth, contain a value equal
+     * to the {@code value}.
      *
      * @param values the values to search
-     * @param value the value to look for, which may be {@code null}
-     * @return {@code true} if one of the values searched is equal to the
-     *         {@code value}
+     * @param value the value to look for; it may be {@code null}
+     * @return {@code true} if an equal value is found
      */
     private static boolean holds(Collection<?> values,
             @Nullable Object value) {
@@ -301,25 +308,23 @@ public abstract class Association extends AbstractMap<String, Object> {
             return (T) navigate(components, components.length);
         }
         else {
-            // A path of one component names a value of the map itself, which
-            // the lookup above already read, rather than a value of a container
-            // below it.
+            // A path without a dot is a top-level key, so the lookup above
+            // already checked the only place its value can be.
             return value;
         }
     }
 
     /**
-     * Return the value at the end of the {@code path}, or the
-     * {@code defaultValue} if this {@link Association} holds none there.
+     * Return the value at the {@code path}, or the {@code defaultValue} if
+     * there is none.
      * <p>
-     * A {@code path} whose value is {@code null} holds none for this purpose,
-     * so such a {@code path} answers the {@code defaultValue}.
+     * If the {@code path} holds {@code null}, this method also returns the
+     * {@code defaultValue}.
      * </p>
      *
      * @param path a navigable path key (e.g. foo.bar.1.baz)
-     * @param defaultValue the value to answer when the {@code path} holds none
-     * @return the value at the end of the {@code path}, or the
-     *         {@code defaultValue}
+     * @param defaultValue the value to return if the {@code path} has no value
+     * @return the value at the {@code path}, or the {@code defaultValue}
      */
     @Nullable
     public <T> T fetchOrDefault(String path, T defaultValue) {
@@ -470,19 +475,20 @@ public abstract class Association extends AbstractMap<String, Object> {
             T prev = fetch(path);
             String[] components = components(path);
             if(!isPlainMap(exploded)) {
-                // A supplied map can give put effects of its own, such as
-                // refusing a key, so the outermost container is built as well.
+                // A map that a subclass supplies can do more in put, such as
+                // reject a key, so build the outer map and let its put run.
                 MergeStrategies.upsert(exploded, wrap(components, 0, value));
             }
             else {
-                // The first component of a path is never an integer, so the
-                // container that #wrap builds for it is a map that holds the
-                // one entry that upserting it into #exploded reads.
+                // The first component is never an integer, so the outer
+                // container that #wrap would build is a map with one entry.
+                // Merging that entry into #exploded directly has the same
+                // result.
                 Object theirs = components.length == 1 ? value
                         : wrap(components, 1, value);
                 if(theirs == null) {
-                    // A merge cannot write a null value, as
-                    // MergeStrategies#upsert also finds.
+                    // Map#merge throws for a null value, so store it with put,
+                    // as MergeStrategies#upsert does.
                     exploded.put(components[0], theirs);
                 }
                 else {
@@ -565,8 +571,8 @@ public abstract class Association extends AbstractMap<String, Object> {
             indexed = Ints.tryParse(components[i]) != null;
         }
         if(indexed) {
-            // Only a component that names a list position can make a write
-            // fill one, so the structure below the map bounds no other path.
+            // Only a list position in the path can make a write pad a list with
+            // nulls, so no other path can pass the limit.
             long skipped = 0;
             Object source = exploded;
             int start = 0;
@@ -619,28 +625,24 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
-     * Take the value at the end of the {@code path} out of the container that
-     * holds it and return that value.
+     * Remove the value at the {@code path} and return it.
      * <p>
-     * The {@code path} splits into components as {@link #fetch(String)} splits
-     * it. The container that holds the end of the {@code path} is the stored
-     * container that the components before the last one name, or the outermost
-     * mapping when the {@code path} names one component. A last component that
-     * names a position of a list leaves the list as long as it was, with
-     * {@code null} at that position, so that every other position names the
-     * element it named before. The containers that the components before the
-     * last one name stay in place, even when the removal leaves one of them
-     * empty.
+     * The {@code path} splits into components the same way that
+     * {@link #fetch(String)} splits it, and this method reads them in the
+     * stored containers. If the last component is a list position, the position
+     * is set to {@code null}, so the later elements keep their positions. The
+     * containers along the {@code path} stay, even if the removal leaves one of
+     * them empty.
      * </p>
      *
      * @param path a navigable path key
-     * @return the value that was at the end of the {@code path}, or
-     *         {@code null} if no container held one there
-     * @throws IllegalArgumentException if the {@code path} names no component
-     * @throws UnsupportedOperationException if the container that holds the end
-     *             of the {@code path} does not permit the change, or is a
-     *             {@link Collection} other than a {@link List} and the last
-     *             component names one of its positions
+     * @return the removed value, or {@code null} if there was no value at the
+     *         {@code path}
+     * @throws IllegalArgumentException if the {@code path} has no components,
+     *             such as {@code "."}
+     * @throws UnsupportedOperationException if the container that holds the
+     *             value does not allow the change, or if the last component is
+     *             a position in a {@link Collection} that is not a {@link List}
      */
     @SuppressWarnings("unchecked")
     @Nullable
@@ -661,8 +663,8 @@ public abstract class Association extends AbstractMap<String, Object> {
         }
         else if(index != null && holder instanceof Collection && index >= 0
                 && index < ((Collection<Object>) holder).size()) {
-            // Only a list can hold null at one position while every other
-            // element keeps the position it had.
+            // Only a list can set one position to null and keep every other
+            // element in place.
             throw new UnsupportedOperationException(AnyStrings.format(
                     "Cannot clear position {} of a {}, which is not a list",
                     index, holder.getClass().getSimpleName()));
@@ -736,17 +738,20 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
-     * Return the value that the first {@code count} of the {@code components}
-     * name in the stored containers, or {@code null} if no container holds one
-     * there. An integer component names a position of a {@link Collection}, and
-     * any other component names a key of a {@link Map}. A {@code count} of zero
-     * names the outermost mapping.
+     * Follow the first {@code count} {@code components} through the stored
+     * containers, and return the value they lead to.
+     * <p>
+     * An integer component is a position in a {@link Collection}. Any other
+     * component is a key in a {@link Map}. A {@code count} of zero returns the
+     * outermost map.
+     * </p>
      *
      * @param components the components of a path
-     * @param count how many of the {@code components} to read, from the first
-     * @return the value at the end of those components, or {@code null}
-     * @throws IndexOutOfBoundsException if a component that the read reaches
-     *             names a negative position of a {@link Collection}
+     * @param count how many components to follow, from the first
+     * @return the value the components lead to, or {@code null} if there is
+     *         none
+     * @throws IndexOutOfBoundsException if a component is a negative position
+     *             in a {@link Collection} along the way
      */
     @Nullable
     private Object navigate(String[] components, int count) {
