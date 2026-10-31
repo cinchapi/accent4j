@@ -21,10 +21,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -229,13 +231,12 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public boolean containsValue(Object value) {
-        for (String path : paths()) {
-            Object stored = fetch(path);
-            if(stored.equals(value)) {
-                return true;
-            }
+        boolean contained = false;
+        Iterator<String> paths = paths().iterator();
+        while (!contained && paths.hasNext()) {
+            contained = Objects.equals(fetch(paths.next()), value);
         }
-        return false;
+        return contained;
     }
 
     @Override
@@ -254,9 +255,9 @@ public abstract class Association extends AbstractMap<String, Object> {
     public <T> T fetch(String path) {
         T value = (T) exploded.get(path); // first, check to see if the path has
                                           // been directly added to the map
-        if(value == null) {
+        if(value == null && path.indexOf('.') >= 0) {
             String[] components = path.split("\\.");
-            Verify.thatArgument(components.length > 0, "Invalid path " + path);
+            Verify.thatArgument(components.length > 0, "Invalid path {}", path);
             Object source = exploded;
             for (String component : components) {
                 Integer index;
@@ -281,27 +282,30 @@ public abstract class Association extends AbstractMap<String, Object> {
             return source != null ? (T) source : null;
         }
         else {
+            // A path of one component names a value of the map itself, which
+            // the lookup above already read, rather than a value of a container
+            // below it.
             return value;
         }
     }
 
     /**
-     * Return a possibly nested value from with the {@link Associaiton}, if it
-     * is present. Otherwise, return the {@code defaultValue}.
+     * Return the value at the end of the {@code path}, or the
+     * {@code defaultValue} if this {@link Association} holds none there.
      * <p>
-     * NOTE: The returned value may be {@code null} if this {@link Associaiton}
-     * permits the storage of {@code null} values.
+     * A {@code path} whose value is {@code null} holds none for this purpose,
+     * so such a {@code path} answers the {@code defaultValue}.
      * </p>
-     * 
+     *
      * @param path a navigable path key (e.g. foo.bar.1.baz)
-     * @param defaultValue
-     * @return the associated value, if it exists or the {@code defaultValue}
+     * @param defaultValue the value to answer when the {@code path} holds none
+     * @return the value at the end of the {@code path}, or the
+     *         {@code defaultValue}
      */
     @Nullable
     public <T> T fetchOrDefault(String path, T defaultValue) {
-        T value;
-        return ((value = fetch(path)) != null || containsKey(path)) ? value
-                : defaultValue;
+        T value = fetch(path);
+        return value != null ? value : defaultValue;
     }
 
     /**
@@ -399,14 +403,15 @@ public abstract class Association extends AbstractMap<String, Object> {
      */
     public Set<String> paths() {
         Set<String> paths = Sets.newLinkedHashSet();
+        // Every prefix of a flattened path is itself a path, and the text of
+        // the flattened path holds each one of them.
         flatten().keySet().forEach(key -> {
-            String[] parts = key.split("\\.");
-            StringBuilder sb = new StringBuilder();
-            for (String path : parts) {
-                sb.append(path);
-                paths.add(sb.toString());
-                sb.append(".");
+            int end = key.indexOf('.');
+            while (end >= 0) {
+                paths.add(key.substring(0, end));
+                end = key.indexOf('.', end + 1);
             }
+            paths.add(key);
         });
         return paths;
     }
@@ -440,7 +445,20 @@ public abstract class Association extends AbstractMap<String, Object> {
         T stored = (T) exploded.get(path);
         if(stored == null) {
             T prev = fetch(path);
-            MergeStrategies.upsert(exploded, wrap(components(path), 0, value));
+            String[] components = components(path);
+            // The first component of a path is never an integer, so the
+            // container that #wrap builds for it is a map that holds the one
+            // entry that upserting it into #exploded reads.
+            Object theirs = components.length == 1 ? value
+                    : wrap(components, 1, value);
+            if(theirs == null) {
+                // A merge cannot write a null value, as MergeStrategies#upsert
+                // also finds.
+                exploded.put(components[0], theirs);
+            }
+            else {
+                exploded.merge(components[0], theirs, MergeStrategies::upsert);
+            }
             return prev;
         }
         else {
@@ -506,41 +524,51 @@ public abstract class Association extends AbstractMap<String, Object> {
                 "The map cannot contain keys that start with a numeric component. "
                         + "Therefore '{}' is an invalid path.",
                 path);
-        long skipped = 0;
-        Object source = exploded;
-        int start = 0;
-        for (String component : components) {
-            Integer index = Ints.tryParse(component);
-            if(index != null) {
-                int size = source instanceof Collection
-                        ? ((Collection<?>) source).size()
-                        : 0;
-                if(index > size) {
-                    // The flattening call keys each list of its input by the
-                    // exact text of the path before the list's positions, so
-                    // look it up by the same text.
-                    int given = supplied != null ? supplied
-                            .getOrDefault(path.substring(0, start - 1), 0) : 0;
-                    int filled = Math.max(size, given);
-                    if(index > filled) {
-                        skipped += index - filled;
-                    }
-                }
-                source = index >= 0 && index < size
-                        ? Iterables.get((Collection<?>) source, index)
-                        : null;
-            }
-            else {
-                source = source instanceof Map
-                        ? ((Map<?, ?>) source).get(component)
-                        : null;
-            }
-            start += component.length() + 1;
+        boolean indexed = false;
+        for (int i = 1; i < components.length && !indexed; ++i) {
+            indexed = Ints.tryParse(components[i]) != null;
         }
-        Verify.thatArgument(skipped <= MAX_LIST_GAP,
-                "The path '{}' skips {} list positions, "
-                        + "but a write can skip at most {}",
-                path, skipped, MAX_LIST_GAP);
+        if(indexed) {
+            // Only a component that names a list position can make a write
+            // fill one, so the structure below the map bounds no other path.
+            long skipped = 0;
+            Object source = exploded;
+            int start = 0;
+            for (String component : components) {
+                Integer index = Ints.tryParse(component);
+                if(index != null) {
+                    int size = source instanceof Collection
+                            ? ((Collection<?>) source).size()
+                            : 0;
+                    if(index > size) {
+                        // The flattening call keys each list of its input by
+                        // the exact text of the path before the list's
+                        // positions, so look it up by the same text.
+                        int given = supplied != null
+                                ? supplied.getOrDefault(
+                                        path.substring(0, start - 1), 0)
+                                : 0;
+                        int filled = Math.max(size, given);
+                        if(index > filled) {
+                            skipped += index - filled;
+                        }
+                    }
+                    source = index >= 0 && index < size
+                            ? Iterables.get((Collection<?>) source, index)
+                            : null;
+                }
+                else {
+                    source = source instanceof Map
+                            ? ((Map<?, ?>) source).get(component)
+                            : null;
+                }
+                start += component.length() + 1;
+            }
+            Verify.thatArgument(skipped <= MAX_LIST_GAP,
+                    "The path '{}' skips {} list positions, "
+                            + "but a write can skip at most {}",
+                    path, skipped, MAX_LIST_GAP);
+        }
         return components;
     }
 
