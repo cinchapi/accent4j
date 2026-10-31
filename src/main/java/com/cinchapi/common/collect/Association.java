@@ -54,12 +54,15 @@ import com.google.common.primitives.Ints;
  * the end of one. The entries are those of the outermost mapping, and therefore
  * so are {@link #size()}, {@link #keySet()} and {@link #entrySet()}, which
  * means a path of several components contributes the one entry that its first
- * component names. A removal changes the container that holds the end of its
- * path, so that container must permit the change. A removal of a position
- * clears it in place, so the position must be one of a {@link List}.
- * {@link #containsValue(Object)} answers whether any value that the
- * {@link Association} stores, at any depth, is equal to the one it is asked
- * about.
+ * component names. {@link #containsValue(Object)} answers whether any value
+ * that the {@link Association} stores, or that a {@link Map} or
+ * {@link Collection} it stores holds at any depth, is equal to the one it is
+ * asked about.
+ * </p>
+ * <p>
+ * A removal changes the container that holds the end of its path, so that
+ * container must permit the change. A removal of a position clears it in place,
+ * so the position must be one of a {@link List}.
  * </p>
  *
  * @author Jeff Nelson
