@@ -70,6 +70,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     private static final int TERMINATED = 3;
 
     /**
+     * Indicates that the executor is in a {@link #state} that prevents the
+     * submission of new tasks and leaves the tasks that it has not started to
+     * the {@link #shutdownNow()} call that asked it to halt, which returns
+     * them.
+     */
+    private static final int STOP = 4;
+
+    /**
      * The state of the executor.
      */
     private AtomicInteger state;
@@ -150,7 +158,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     @Override
     public void execute(Runnable command) {
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            this.tasks.offer(new FutureTask<Void>(command, null));
+            FutureTask<Void> task = new FutureTask<>(command, null);
+            tasks.offer(task);
+            if(state.get() != RUNNING && tasks.remove(task)) {
+                // A shutdown that began after the check above may have taken
+                // the queue or let every worker exit before the offer, so no
+                // thread would ever run the task
+                throw new RejectedExecutionException();
+            }
         }
         else {
             throw new RejectedExecutionException();
@@ -247,7 +262,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     @Override
     public List<Runnable> shutdownNow() {
         List<Runnable> unfinished = new ArrayList<>();
-        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
+        if(state.compareAndSet(RUNNING, STOP)
+                || state.compareAndSet(SHUTDOWN, STOP)) {
             for (Thread worker : workers) {
                 worker.interrupt();
             }
@@ -264,7 +280,9 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
      * executor runs, the worker runs a queued task if there is one; otherwise
      * it helps each join in progress, then waits for a task. After
      * {@link #shutdown()}, the worker runs the tasks that remain in the queue
-     * and exits. The last worker to exit marks the executor terminated.
+     * and exits. After {@link #shutdownNow()}, even one that follows
+     * {@link #shutdown()}, the worker exits without taking a task from the
+     * queue. The last worker to exit marks the executor terminated.
      */
     private void executeTaskLoop() {
         try {
@@ -288,10 +306,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                     }
                     catch (InterruptedException e) {
                         // Interrupt signals a request to shutdown or
-                        // shutdownNow. In either case, re-loop and
-                        // check the #state. If an immediate halt is
-                        // required, the internal task queue will be
-                        // emptied and we don't have to worry here
+                        // shutdownNow, so re-loop and let the #state decide
+                        // whether this worker runs what the queue holds
                         Thread.currentThread().interrupt();
                         continue;
                     }
@@ -311,6 +327,12 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                         task.run();
                     }
                 }
+                else if(state.compareAndSet(STOP, STOP)) {
+                    // The tasks that the queue still holds belong to the
+                    // shutdownNow call, which returns them, so this worker
+                    // takes none of them.
+                    break;
+                }
                 else if(state.compareAndSet(TERMINATED, TERMINATED)) {
                     break;
                 }
@@ -323,7 +345,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
         finally {
             termination.countDown();
             if(termination.getCount() == 0) {
+                // The executor reached one of these states to get here, so at
+                // most one of these moves it on.
                 state.compareAndSet(SHUTDOWN, TERMINATED);
+                state.compareAndSet(STOP, TERMINATED);
             }
         }
     }

@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -294,6 +295,42 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a graceful {@code shutdown} runs the
+     * tasks that the queue holds before its workers exit.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Queue three tasks, which no worker is free to run.</li>
+     * <li>Call {@code shutdown} and wait for the executor to terminate.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> All three tasks ran.
+     */
+    @Test
+    public void testShutdownRunsTheTasksTheQueueHolds()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            AtomicInteger ran = new AtomicInteger();
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(ran::incrementAndGet);
+            }
+
+            joinable.shutdown();
+
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(3, ran.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code shutdownNow} returns only the
      * tasks that never ran, even after a join whose tasks the calling thread
      * ran while every worker was busy.
@@ -308,7 +345,8 @@ public class JoinableExecutorServiceTest extends
      * <li>Call {@code shutdownNow}.</li>
      * </ul>
      * <p>
-     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks.
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks, and
+     * none of them runs.
      */
     @Test
     public void testShutdownNowAfterJoinReturnsOnlyTasksThatNeverRan()
@@ -321,10 +359,186 @@ public class JoinableExecutorServiceTest extends
                 tasks[i] = () -> {};
             }
             joinable.join(tasks);
+            AtomicInteger ran = new AtomicInteger();
             for (int i = 0; i < 3; ++i) {
-                joinable.execute(() -> {});
+                joinable.execute(ran::incrementAndGet);
             }
-            Assert.assertEquals(3, joinable.shutdownNow().size());
+
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            Assert.assertEquals(3, unfinished.size());
+            // Read the count once every worker has exited, so that a worker
+            // that would run one of these tasks has already run it.
+            release.countDown();
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(0, ran.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code shutdownNow} returns the tasks
+     * that the queue holds, and none of them runs, when each worker that the
+     * call frees reaches the queue before the call takes the tasks.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task, and whose threads return from an interrupt that
+     * another thread sends only once they exit.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Queue three tasks, which no worker is free to run.</li>
+     * <li>Call {@code shutdownNow}.</li>
+     * <li>Release the workers and wait for the executor to terminate.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks, and
+     * none of them runs.
+     *
+     * @see <a href="https://github.com/cinchapi/accent4j/issues/63">GH-63</a>
+     */
+    @Test
+    public void testGH63ShutdownNowReturnsTheTasksThatAFreedWorkerReaches()
+            throws InterruptedException {
+        ThreadFactory factory = runnable -> new Thread(runnable) {
+
+            @Override
+            public void interrupt() {
+                super.interrupt();
+                if(Thread.currentThread() != this) {
+                    // A worker also interrupts itself to restore its flag, so
+                    // only an interrupt from another thread waits for its exit
+                    Uninterruptibles.joinUninterruptibly(this, 10,
+                            TimeUnit.SECONDS);
+                }
+            }
+
+        };
+        JoinableExecutorService joinable = JoinableExecutorService.create(4,
+                factory);
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            AtomicInteger ran = new AtomicInteger();
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(ran::incrementAndGet);
+            }
+
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            Assert.assertEquals(3, unfinished.size());
+            release.countDown();
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(0, ran.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that each task that {@code execute} accepts
+     * while {@code shutdownNow} runs either runs or comes back from
+     * {@code shutdownNow}.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Make an executor, and start two threads that each call
+     * {@code execute} until it throws a
+     * {@link RejectedExecutionException}.</li>
+     * <li>Call {@code shutdownNow}, join both threads, and wait for the
+     * executor to terminate.</li>
+     * <li>Repeat 1,000 times.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> In each round, the tasks that ran and the
+     * tasks that {@code shutdownNow} returned add up to the tasks that
+     * {@code execute} accepted.
+     */
+    @Test(timeout = 60000)
+    public void testShutdownNowAccountsForEachTaskThatExecuteAccepts()
+            throws InterruptedException {
+        for (int round = 0; round < 1000; ++round) {
+            JoinableExecutorService joinable = JoinableExecutorService
+                    .create(4);
+            AtomicInteger accepted = new AtomicInteger();
+            AtomicInteger ran = new AtomicInteger();
+            CountDownLatch started = new CountDownLatch(2);
+            Thread[] submitters = new Thread[2];
+            for (int i = 0; i < submitters.length; ++i) {
+                submitters[i] = new Thread(() -> {
+                    started.countDown();
+                    try {
+                        for (;;) {
+                            joinable.execute(ran::incrementAndGet);
+                            accepted.incrementAndGet();
+                        }
+                    }
+                    catch (RejectedExecutionException e) {
+                        // The executor is shut down, so this thread is done
+                    }
+                });
+                submitters[i].start();
+            }
+            started.await();
+
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            for (Thread submitter : submitters) {
+                submitter.join();
+            }
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(accepted.get(), ran.get() + unfinished.size());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code shutdownNow} after a graceful
+     * {@code shutdown} returns the tasks that the queue still holds, and none
+     * of them runs.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task that ignores interrupts.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Queue three tasks, which no worker is free to run.</li>
+     * <li>Call {@code shutdown}, then {@code shutdownNow}.</li>
+     * <li>Release the workers and wait for the executor to terminate.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks, and
+     * none of them runs.
+     */
+    @Test
+    public void testShutdownNowAfterShutdownReturnsTheTasksTheQueueHolds()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch started = new CountDownLatch(4);
+        CountDownLatch release = new CountDownLatch(1);
+        for (int i = 0; i < 4; ++i) {
+            joinable.execute(() -> {
+                started.countDown();
+                Uninterruptibles.awaitUninterruptibly(release);
+            });
+        }
+        started.await();
+        try {
+            AtomicInteger ran = new AtomicInteger();
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(ran::incrementAndGet);
+            }
+
+            joinable.shutdown();
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            Assert.assertEquals(3, unfinished.size());
+            release.countDown();
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(0, ran.get());
         }
         finally {
             release.countDown();

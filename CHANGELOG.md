@@ -63,6 +63,22 @@
   and Windows assign ports in that range to outgoing connections, so another
   socket can take such a port before you bind it. To choose a port, use
   `Networks.getPreferredOpenPort()` instead.
+* Fixed a bug that allowed `JoinableExecutorService#shutdownNow` to run the
+  tasks that were waiting to run instead of returning them. A worker that the
+  call freed could take the waiting tasks and run them, so the work went ahead
+  after a caller asked the executor to halt and the call answered a list that
+  did not hold it. The call answers every task that was waiting, none of those
+  tasks runs, and a task that a worker had already started is not among them. A
+  graceful `shutdown` still runs the tasks that are waiting before its workers
+  exit. ([GH-63](https://github.com/cinchapi/accent4j/issues/63))
+* Fixed a bug that allowed a task that `JoinableExecutorService#execute` or
+  `submit` accepted while `shutdown` or `shutdownNow` ran to stay in the queue
+  after the executor terminated, so the task never ran, `shutdownNow` did not
+  return it, and its `Future` never completed. Such a task runs, comes back from
+  `shutdownNow`, or is rejected with a `RejectedExecutionException`.
+* Fixed a bug that caused `JoinableExecutorService#shutdownNow` to return no
+  tasks and let the waiting tasks run when a graceful `shutdown` came first. The
+  call returns the tasks that are still waiting, and none of them runs.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
