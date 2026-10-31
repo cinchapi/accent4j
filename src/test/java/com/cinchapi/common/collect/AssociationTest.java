@@ -1336,6 +1336,71 @@ public class AssociationTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a write of a key that names one
+     * component is refused when the maps that a subclass supplies refuse that
+     * key, so that a supplied map can validate the keys of a write.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link ListAssociation} whose maps
+     * are {@link RefusingMap RefusingMaps}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@link RefusingMap#REFUSED} to {@code 1}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The write throws an
+     * {@link IllegalArgumentException} and the {@link Association} stays empty.
+     */
+    @Test
+    public void testSetThrowsWhenASuppliedMapRefusesTheKey() {
+        Association assoc = new ListAssociation() {
+
+            @Override
+            protected Supplier<Map<String, Object>> mapSupplier() {
+                return RefusingMap::new;
+            }
+
+        };
+        try {
+            assoc.set(RefusingMap.REFUSED, 1);
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertTrue(assoc.isEmpty());
+        }
+    }
+
+    /**
+     * A {@link LinkedHashMap} whose {@code put} refuses the key
+     * {@value #REFUSED}, as a map that validates its keys does.
+     *
+     * @author Jeff Nelson
+     */
+    private static class RefusingMap extends LinkedHashMap<String, Object> {
+
+        /**
+         * The key that {@code put} refuses.
+         */
+        private static final String REFUSED = "reserved";
+
+        /**
+         * The version of the serialized form.
+         */
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Object put(String key, Object value) {
+            if(REFUSED.equals(key)) {
+                throw new IllegalArgumentException("Refused key " + key);
+            }
+            else {
+                return super.put(key, value);
+            }
+        }
+
+    }
+
+    /**
      * An {@link Association} whose {@code fetch} makes up a value from the
      * path, as a view that generates its entries does.
      *
