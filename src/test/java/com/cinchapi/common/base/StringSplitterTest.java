@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -187,6 +188,11 @@ public class StringSplitterTest {
     }
 
     @Test
+    public void testStringSplitterMetaCharacterDelim() {
+        doTestStringSplitter("a*b*c", '*');
+    }
+
+    @Test
     public void testStringSplitterReproA() {
         doTestStringSplitter("wnwo69", 'w');
     }
@@ -292,8 +298,10 @@ public class StringSplitterTest {
         while (splitter.hasNext()) {
             actual.add(splitter.next());
         }
-        List<String> expected = Lists
-                .newArrayList(string.split(String.valueOf(delimiter)));
+        // The delimiter may be a character that means something to the
+        // expression parser, such as '*', so match it literally.
+        List<String> expected = Lists.newArrayList(
+                string.split(Pattern.quote(String.valueOf(delimiter))));
         Assert.assertEquals(expected, actual);
     }
 
