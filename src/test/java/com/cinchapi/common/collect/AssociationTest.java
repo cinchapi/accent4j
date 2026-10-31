@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -1518,6 +1519,38 @@ public class AssociationTest {
         catch (IllegalArgumentException e) {
             Assert.assertEquals(ImmutableMap.of("a", 1),
                     new LinkedHashMap<>(assoc));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a removal whose last component names a
+     * position of a collection that is not a list is refused, because only a
+     * list can clear one position and keep every other position in place.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a set of two
+     * elements.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "tags"} to a {@link LinkedHashSet} of two elements.</li>
+     * <li>Remove {@code "tags.0"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal throws an
+     * {@link UnsupportedOperationException}, and the set still holds both
+     * elements in their order.
+     */
+    @Test
+    public void testRemoveRefusesAPositionOfASet() {
+        Association assoc = Association.of();
+        assoc.set("tags", new LinkedHashSet<>(ImmutableList.of("x", "y")));
+        try {
+            assoc.remove("tags.0");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableList.of("x", "y"),
+                    ImmutableList.copyOf((Collection<?>) assoc.fetch("tags")));
         }
     }
 

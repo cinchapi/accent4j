@@ -35,6 +35,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
+import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Verify;
 import com.google.common.collect.Iterables;
@@ -50,12 +51,12 @@ import com.google.common.primitives.Ints;
  * <p>
  * The {@link Map} operations read a key as a path, so {@link #get(Object)},
  * {@link #put(String, Object)} and {@link #remove(Object)} reach the value at
- * the end of one. The entries are those of the outermost mapping, and
- * therefore so are {@link #size()}, {@link #keySet()} and
- * {@link #entrySet()}, which means a path of several components contributes
- * the one entry that its first component names. A removal changes the
- * container that holds the end of its path, so that container must permit the
- * change.
+ * the end of one. The entries are those of the outermost mapping, and therefore
+ * so are {@link #size()}, {@link #keySet()} and {@link #entrySet()}, which
+ * means a path of several components contributes the one entry that its first
+ * component names. A removal changes the container that holds the end of its
+ * path, so that container must permit the change. A removal of a position
+ * clears it in place, so the position must be one of a {@link List}.
  * </p>
  *
  * @author Jeff Nelson
@@ -597,8 +598,10 @@ public abstract class Association extends AbstractMap<String, Object> {
      * @return the value that was at the end of the {@code path}, or
      *         {@code null} if no container held one there
      * @throws IllegalArgumentException if the {@code path} names no component
-     * @throws UnsupportedOperationException if the container that holds the
-     *             end of the {@code path} does not permit the change
+     * @throws UnsupportedOperationException if the container that holds the end
+     *             of the {@code path} does not permit the change, or is a
+     *             {@link Collection} other than a {@link List} and the last
+     *             component names one of its positions
      */
     @SuppressWarnings("unchecked")
     @Nullable
@@ -616,6 +619,14 @@ public abstract class Association extends AbstractMap<String, Object> {
         else if(index != null && holder instanceof List && index >= 0
                 && index < ((List<Object>) holder).size()) {
             detached = ((List<Object>) holder).set(index, null);
+        }
+        else if(index != null && holder instanceof Collection && index >= 0
+                && index < ((Collection<Object>) holder).size()) {
+            // Only a list can hold null at one position while every other
+            // element keeps the position it had.
+            throw new UnsupportedOperationException(AnyStrings.format(
+                    "Cannot clear position {} of a {}, which is not a list",
+                    index, holder.getClass().getSimpleName()));
         }
         else {
             detached = null;

@@ -28,7 +28,9 @@
   place, even when the removal leaves one of them empty. A removal changes the
   container that holds the end of the path, so a container that does not permit
   the change, such as an immutable list a caller stored, throws an
-  `UnsupportedOperationException`.
+  `UnsupportedOperationException`. So does a removal of a position of a
+  collection that is not a list, such as a set, because such a collection cannot
+  clear one position and keep every other position in place.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
