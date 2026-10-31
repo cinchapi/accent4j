@@ -407,9 +407,9 @@ public class JoinableExecutorServiceTest extends
             @Override
             public void interrupt() {
                 super.interrupt();
-                // A worker interrupts itself to restore its flag, and must not
-                // wait for its own exit
                 if(Thread.currentThread() != this) {
+                    // A worker also interrupts itself to restore its flag, so
+                    // only an interrupt from another thread waits for its exit
                     Uninterruptibles.joinUninterruptibly(this, 10,
                             TimeUnit.SECONDS);
                 }
