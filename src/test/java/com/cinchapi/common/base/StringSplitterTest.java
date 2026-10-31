@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -186,6 +187,26 @@ public class StringSplitterTest {
         doTestStringSplitter("w  8", ' ');
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that a delimiter that has a meaning in a
+     * regular expression, such as {@code '*'}, splits the string as a plain
+     * character.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Split {@code "a*b*c"} on {@code '*'}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The tokens are {@code "a"}, {@code "b"} and
+     * {@code "c"}, in that order.
+     */
+    @Test
+    public void testStringSplitterMetaCharacterDelim() {
+        doTestStringSplitter("a*b*c", '*');
+    }
+
     @Test
     public void testStringSplitterReproA() {
         doTestStringSplitter("wnwo69", 'w');
@@ -292,8 +313,10 @@ public class StringSplitterTest {
         while (splitter.hasNext()) {
             actual.add(splitter.next());
         }
-        List<String> expected = Lists
-                .newArrayList(string.split(String.valueOf(delimiter)));
+        // The delimiter may be a character that means something to the
+        // expression parser, such as '*', so match it literally.
+        List<String> expected = Lists.newArrayList(
+                string.split(Pattern.quote(String.valueOf(delimiter))));
         Assert.assertEquals(expected, actual);
     }
 
