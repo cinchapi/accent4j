@@ -1059,6 +1059,59 @@ public class AssociationTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a search for a value finds a value
+     * that a nested map holds under a key with a dot, and does not take that
+     * key for a path that holds {@code null}.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map whose
+     * one key is an email address.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Put {@code "emails"} to a map from {@code "jeff@example.com"} to
+     * {@code true}.</li>
+     * <li>Search for {@code true}.</li>
+     * <li>Search for {@code null}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search for {@code true} answers
+     * {@code true}, and the search for {@code null} answers {@code false}.
+     */
+    @Test
+    public void testContainsValueFindsAValueUnderANestedKeyWithADot() {
+        Association assoc = Association.of();
+        Map<String, Object> emails = new LinkedHashMap<>();
+        emails.put("jeff@example.com", true);
+        assoc.put("emails", emails);
+
+        Assert.assertTrue(assoc.containsValue(true));
+        Assert.assertFalse(assoc.containsValue(null));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a search for a value finds an empty
+     * container that a path holds.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding an empty
+     * list.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to an empty list.</li>
+     * <li>Search for an empty list.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search answers {@code true}.
+     */
+    @Test
+    public void testContainsValueFindsAnEmptyContainer() {
+        Association assoc = Association.of();
+        assoc.set("a", new ArrayList<>());
+
+        Assert.assertTrue(assoc.containsValue(new ArrayList<>()));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a path whose value is {@code null}
      * answers the default value.
      * <p>

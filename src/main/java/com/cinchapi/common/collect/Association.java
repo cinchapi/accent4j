@@ -57,6 +57,9 @@ import com.google.common.primitives.Ints;
  * component names. A removal changes the container that holds the end of its
  * path, so that container must permit the change. A removal of a position
  * clears it in place, so the position must be one of a {@link List}.
+ * {@link #containsValue(Object)} answers whether any value that the
+ * {@link Association} stores, at any depth, is equal to the one it is asked
+ * about.
  * </p>
  *
  * @author Jeff Nelson
@@ -135,6 +138,35 @@ public abstract class Association extends AbstractMap<String, Object> {
                             value, created));
         }
         return association;
+    }
+
+    /**
+     * Return whether any of the {@code values}, or any value that a {@link Map}
+     * or {@link Collection} among them holds at any depth, is equal to the
+     * {@code value}.
+     *
+     * @param values the values to search
+     * @param value the value to look for, which may be {@code null}
+     * @return {@code true} if one of the values searched is equal to the
+     *         {@code value}
+     */
+    private static boolean holds(Collection<?> values,
+            @Nullable Object value) {
+        boolean held = false;
+        Iterator<?> it = values.iterator();
+        while (!held && it.hasNext()) {
+            Object element = it.next();
+            if(Objects.equals(element, value)) {
+                held = true;
+            }
+            else if(element instanceof Map) {
+                held = holds(((Map<?, ?>) element).values(), value);
+            }
+            else if(element instanceof Collection) {
+                held = holds((Collection<?>) element, value);
+            }
+        }
+        return held;
     }
 
     /**
@@ -241,12 +273,7 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public boolean containsValue(Object value) {
-        boolean contained = false;
-        Iterator<String> paths = paths().iterator();
-        while (!contained && paths.hasNext()) {
-            contained = Objects.equals(fetch(paths.next()), value);
-        }
-        return contained;
+        return holds(exploded.values(), value);
     }
 
     @Override

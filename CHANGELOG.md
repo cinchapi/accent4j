@@ -12,10 +12,13 @@
   what it did, down to the order of the entries, the type of each container, and
   whether a container that a caller already holds is replaced or updated.
 * Fixed a bug where `Association#containsValue` threw a `NullPointerException`
-  whenever any path of the `Association` held a `null` value, whatever value it
-  was asked about, so a caller could not search an `Association` built from data
-  that held a `null`. It answers whether any path holds a value equal to the one
-  it is asked about, and answers `true` for `null` when a path holds `null`.
+  when its search reached a path that held `null` before it found a match, so a
+  caller could not search an `Association` built from data that held a `null`.
+  It answers whether any value that the `Association` stores, at any depth, is
+  equal to the one it is asked about. That includes an empty container and a
+  value that a nested map holds under a key with a dot, such as an email
+  address. It answers `true` for `null` only when the `Association` stores
+  `null`.
 * Fixed a bug where `Association#remove` took nothing out of an `Association`
   and answered `null` for a key that named more than one component, even though
   `Association#put` stored a value under such a key and `Association#get`
