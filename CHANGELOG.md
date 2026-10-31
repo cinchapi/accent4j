@@ -20,13 +20,15 @@
   `Association#put` stored a value under such a key and `Association#get`
   answered it, so a caller that removed the keys of a flattened `Association`
   left every nested value in place. It takes the value at the end of the path
-  out of the container that holds it and answers that value. A component that
-  names a position of a list leaves the list as long as it was, with `null` at
-  that position, so every other position still names the element it named
-  before. The containers that the components before the last one name stay in
-  place, even when the removal leaves one of them empty. A removal changes the
-  container that holds the end of the path, so a container that does not permit
-  the change, such as an immutable list a caller stored, throws an
+  out of the container that holds it and answers that value. It reads the path
+  as `Association#get` reads it, so a path that names no component, such as
+  `"."`, throws an `IllegalArgumentException` rather than answering `null`. A
+  component that names a position of a list leaves the list as long as it was,
+  with `null` at that position, so every other position still names the element
+  it named before. The containers that the components before the last one name
+  stay in place, even when the removal leaves one of them empty. A removal
+  changes the container that holds the end of the path, so a container that does
+  not permit the change, such as an immutable list a caller stored, throws an
   `UnsupportedOperationException`. So does a removal of a position of a
   collection that is not a list, such as a set, because such a collection cannot
   clear one position and keep every other position in place.
