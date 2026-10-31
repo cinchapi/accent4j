@@ -187,6 +187,21 @@ public class StringSplitterTest {
         doTestStringSplitter("w  8", ' ');
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that a delimiter that has a meaning in a
+     * regular expression, such as {@code '*'}, splits the string as a plain
+     * character.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Split {@code "a*b*c"} on {@code '*'}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The tokens are {@code "a"}, {@code "b"} and
+     * {@code "c"}, in that order.
+     */
     @Test
     public void testStringSplitterMetaCharacterDelim() {
         doTestStringSplitter("a*b*c", '*');

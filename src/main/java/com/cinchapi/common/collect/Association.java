@@ -469,18 +469,26 @@ public abstract class Association extends AbstractMap<String, Object> {
         if(stored == null) {
             T prev = fetch(path);
             String[] components = components(path);
-            // The first component of a path is never an integer, so the
-            // container that #wrap builds for it is a map that holds the one
-            // entry that upserting it into #exploded reads.
-            Object theirs = components.length == 1 ? value
-                    : wrap(components, 1, value);
-            if(theirs == null) {
-                // A merge cannot write a null value, as MergeStrategies#upsert
-                // also finds.
-                exploded.put(components[0], theirs);
+            if(!isPlainMap(exploded)) {
+                // A supplied map can give put effects of its own, such as
+                // refusing a key, so the outermost container is built as well.
+                MergeStrategies.upsert(exploded, wrap(components, 0, value));
             }
             else {
-                exploded.merge(components[0], theirs, MergeStrategies::upsert);
+                // The first component of a path is never an integer, so the
+                // container that #wrap builds for it is a map that holds the
+                // one entry that upserting it into #exploded reads.
+                Object theirs = components.length == 1 ? value
+                        : wrap(components, 1, value);
+                if(theirs == null) {
+                    // A merge cannot write a null value, as
+                    // MergeStrategies#upsert also finds.
+                    exploded.put(components[0], theirs);
+                }
+                else {
+                    exploded.merge(components[0], theirs,
+                            MergeStrategies::upsert);
+                }
             }
             return prev;
         }
