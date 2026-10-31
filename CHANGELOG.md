@@ -1,5 +1,36 @@
 # Changelog
 
+#### Version 1.18.4 (TBD)
+* `Networks.getPreferredOpenPort()` returns an open port from 16384 to 32767. By
+  default, Linux, macOS and Windows assign only higher ports to outgoing
+  connections and to binds to port 0, so another socket is unlikely to take the
+  port before you bind it. `Networks.getOpenPortWithinRange(int, int)` returns
+  an open port from the specified range, inclusive, and throws an
+  `IllegalStateException` if no port in the range is open. A port is open when
+  no socket on the local machine binds it on all addresses or on `127.0.0.1`.
+  For example, a test can start its server on a port that no other process
+  holds:
+
+  ```java
+  int port = Networks.getPreferredOpenPort();
+  server = new TestServer(port);
+  server.start();
+  ```
+* Fixed a bug where `Networks.getOpenPort()` could return a port that another
+  socket bound on one address alone, such as `127.0.0.1`, `::1` or the IPv4
+  wildcard address. A server that then bound the port on all addresses started,
+  but a connection to the port at `localhost` could reach the other socket
+  instead. This happened on macOS, where every Gradle daemon listens on
+  `127.0.0.1` at a port in the range that `getOpenPort()` chooses from.
+  `getOpenPort()` also returned ports from 16383 to 65534, although its
+  documentation says 49152 to 65535, and it returns only ports in the documented
+  range. ([GH-60](https://github.com/cinchapi/accent4j/issues/60))
+* Deprecated `Networks.getOpenPort()` and both forms of
+  `Networks.getCompanionPort`. They return ports from 49152 up, and Linux, macOS
+  and Windows assign ports in that range to outgoing connections, so another
+  socket can take such a port before you bind it. To choose a port, use
+  `Networks.getPreferredOpenPort()` instead.
+
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
   that grew with the square of the length of each list in the map. For example,
