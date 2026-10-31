@@ -1,14 +1,14 @@
 # Changelog
 
 #### Version 1.18.4 (TBD)
-* Fixed a bug where `JoinableExecutorService#shutdownNow` ran the tasks that
-  were waiting to run instead of returning them. A worker that the call freed
-  took the waiting tasks and ran them, so the work went ahead after a caller
-  asked the executor to halt and the call answered a list that did not hold it.
-  The call answers every task that was waiting, none of those tasks runs, and a
-  task that a worker had already started is not among them. A graceful
-  `shutdown` still runs the tasks that are waiting before its workers exit.
-  ([GH-63](https://github.com/cinchapi/accent4j/issues/63))
+* Fixed a bug that allowed `JoinableExecutorService#shutdownNow` to run the
+  tasks that were waiting to run instead of returning them. A worker that the
+  call freed could take the waiting tasks and run them, so the work went ahead
+  after a caller asked the executor to halt and the call answered a list that
+  did not hold it. The call answers every task that was waiting, none of those
+  tasks runs, and a task that a worker had already started is not among them. A
+  graceful `shutdown` still runs the tasks that are waiting before its workers
+  exit. ([GH-63](https://github.com/cinchapi/accent4j/issues/63))
 * Fixed a bug that allowed a task that `JoinableExecutorService#execute` or
   `submit` accepted while `shutdown` or `shutdownNow` ran to stay in the queue
   after the executor terminated, so the task never ran, `shutdownNow` did not
