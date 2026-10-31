@@ -8,9 +8,12 @@
   write stores the first component of its path in the map directly, and reads
   the structure below the map only for a path that names a list position, since
   no other path can make a write fill one. `paths()` takes each prefix from the
-  text of the flattened path that holds it. Each of these operations answers
-  what it did, down to the order of the entries, the type of each container, and
-  whether a container that a caller already holds is replaced or updated.
+  text of the flattened path that holds it. `Association.of(Map)` reads each
+  path of its input once, because the read that reports the paths a write
+  refuses is the one the write makes to find the containers to write into. Each
+  of these operations answers what it did, down to the order of the entries, the
+  type of each container, and whether a container that a caller already holds is
+  replaced or updated.
 * Fixed a bug where `Association#containsValue` threw a `NullPointerException`
   whenever any path of the `Association` held a `null` value, whatever value it
   was asked about, so a caller could not search an `Association` built from data

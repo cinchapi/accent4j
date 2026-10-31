@@ -533,7 +533,9 @@ public abstract class Association extends AbstractMap<String, Object> {
      * current value is not a {@link Collection} gets a new list. A position
      * that a list in the input of the flattening write call in progress has
      * supplied does not count. The {@code path} can be written only when its
-     * write fills at most {@value #MAX_LIST_GAP} other positions in total.
+     * write fills at most {@value #MAX_LIST_GAP} other positions in total, and
+     * when no component of it names a negative position of a collection that
+     * the structure already holds.
      * </p>
      *
      * @param path a navigable path key
@@ -543,6 +545,9 @@ public abstract class Association extends AbstractMap<String, Object> {
      *             its first component is an integer, or its write would fill
      *             more than {@value #MAX_LIST_GAP} positions with {@code null}
      *             that the input of the call in progress does not supply
+     * @throws IndexOutOfBoundsException if a component of the {@code path}
+     *             names a negative position of a collection that the
+     *             structure already holds
      */
     private String[] components(String path) {
         String[] components = path.split("\\.");
@@ -580,9 +585,19 @@ public abstract class Association extends AbstractMap<String, Object> {
                             skipped += index - filled;
                         }
                     }
-                    source = index >= 0 && index < size
-                            ? Iterables.get((Collection<?>) source, index)
-                            : null;
+                    if(index < 0 && source instanceof Collection) {
+                        // A negative position of a collection that the
+                        // structure already holds rejects the write, and
+                        // reading it here reports that before anything
+                        // changes.
+                        source = Iterables.get((Collection<?>) source, index);
+                    }
+                    else if(index >= 0 && index < size) {
+                        source = Iterables.get((Collection<?>) source, index);
+                    }
+                    else {
+                        source = null;
+                    }
                 }
                 else {
                     source = source instanceof Map
@@ -703,10 +718,6 @@ public abstract class Association extends AbstractMap<String, Object> {
     private void insert(String path, Object value,
             Set<Collection<Object>> created) {
         if(exploded.get(path) == null) {
-            // Read the current value, as #set does, because that read rejects
-            // some paths, such as a negative index into an existing list,
-            // before anything changes.
-            fetch(path);
             upsertPath(exploded, components(path), 0, value, created);
         }
         else {

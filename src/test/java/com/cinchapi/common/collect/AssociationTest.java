@@ -1459,4 +1459,87 @@ public class AssociationTest {
         }
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that building an {@link Association} from
+     * a map holding a path that names no component is refused.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Build an {@link Association} from a map whose only key is
+     * {@code "."}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The build throws an
+     * {@link IllegalArgumentException} that names the path.
+     */
+    @Test
+    public void testOfRefusesAPathOfOnlyDots() {
+        try {
+            Association.of(ImmutableMap.of(".", 1));
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertEquals("Invalid path .", e.getMessage());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that building an {@link Association} from
+     * a map holding a path whose component names a negative position of a
+     * list that the map already supplied is refused.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Build an {@link Association} from a map that supplies a list under
+     * {@code "a"} and then writes {@code "a.-1"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The build throws an
+     * {@link IndexOutOfBoundsException}.
+     */
+    @Test
+    public void testOfRefusesANegativePositionOfASuppliedList() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("a", ImmutableList.of("x"));
+        map.put("a.-1", 1);
+        try {
+            Association.of(map);
+            Assert.fail("Expected an IndexOutOfBoundsException");
+        }
+        catch (IndexOutOfBoundsException e) {
+            Assert.assertTrue(true);
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that building an {@link Association} from
+     * a map holding a path whose first component reads as an integer is
+     * refused.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Build an {@link Association} from a map whose only key is
+     * {@code "0.a"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The build throws an
+     * {@link IllegalArgumentException} that names the path.
+     */
+    @Test
+    public void testOfRefusesALeadingIntegerComponent() {
+        try {
+            Association.of(ImmutableMap.of("0.a", 1));
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("'0.a'"));
+        }
+    }
+
 }
