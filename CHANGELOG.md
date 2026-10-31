@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.18.4 (TBD)
+#### Version 1.18.4 (October 31, 2026)
 * **Reading and writing a path on an `Association` costs less.** A read of a key
   that names one component and that the `Association` does not hold, and a write
   of a path that names no list position, take less time. `Association.of(Map)`
