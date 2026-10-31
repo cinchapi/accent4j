@@ -438,20 +438,7 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public Object remove(Object key) {
-        if(key instanceof String) {
-            String path = (String) key;
-            if(path.indexOf('.') >= 0 && exploded.containsKey(path)) {
-                // The map holds the whole path as a key of its own, as #set
-                // leaves it when a write finds the path there.
-                return exploded.remove(path);
-            }
-            else {
-                return detach(path);
-            }
-        }
-        else {
-            return null;
-        }
+        return key instanceof String ? detach((String) key) : null;
     }
 
     /**
