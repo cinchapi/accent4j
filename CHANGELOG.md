@@ -1,6 +1,68 @@
 # Changelog
 
 #### Version 1.18.4 (TBD)
+* **Reading and writing a path on an `Association` costs less.** A read of a key
+  that names one component and that the `Association` does not hold, and a write
+  of a path that names no list position, take less time. `Association.of(Map)`
+  reads each path of its input once, because the read that reports the paths a
+  write refuses is the one the write makes to find the containers to write into.
+  Each of these operations answers what it did, down to the order of the
+  entries, the type of each container, and whether a container that a caller
+  already holds is replaced or updated.
+* Fixed a bug where `Association#containsValue` threw a `NullPointerException`
+  when its search reached a path that held `null` before it found a match, so a
+  caller could not search an `Association` built from data that held a `null`.
+  It answers whether any value that the `Association` stores, at any depth, is
+  equal to the one it is asked about. That includes an empty container and a
+  value that a nested map holds under a key with a dot, such as an email
+  address. It answers `true` for `null` only when the `Association` stores
+  `null`.
+* Fixed a bug where `Association#remove` took nothing out of an `Association`
+  and answered `null` for a key that named more than one component, even though
+  `Association#put` stored a value under such a key and `Association#get`
+  answered it, so a caller that removed the keys of a flattened `Association`
+  left every nested value in place. It takes the value at the end of the path
+  out of the container that holds it and answers that value. It reads the path
+  as `Association#get` reads it, so a path that names no component, such as
+  `"."`, throws an `IllegalArgumentException` rather than answering `null`. A
+  component that names a position of a list leaves the list as long as it was,
+  with `null` at that position, so every other position still names the element
+  it named before. The containers that the components before the last one name
+  stay in place, even when the removal leaves one of them empty. A removal
+  changes the container that holds the end of the path, so a container that does
+  not permit the change, such as an immutable list a caller stored, throws an
+  `UnsupportedOperationException`. So does a removal of a position of a
+  collection that is not a list, such as a set, because such a collection cannot
+  clear one position and keep every other position in place.
+* `Networks.getPreferredOpenPort()` returns an open port from 16384 to 32767. By
+  default, Linux, macOS and Windows assign only higher ports to outgoing
+  connections and to binds to port 0, so another socket is unlikely to take the
+  port before you bind it. `Networks.getOpenPortWithinRange(int, int)` returns
+  an open port from the specified range, inclusive, and throws an
+  `IllegalStateException` if no port in the range is open. A port is open when
+  no socket on the local machine binds it on all addresses or on `127.0.0.1`.
+  For example, a test can start its server on a port that no other process
+  holds:
+
+  ```java
+  int port = Networks.getPreferredOpenPort();
+  server = new TestServer(port);
+  server.start();
+  ```
+* Fixed a bug where `Networks.getOpenPort()` could return a port that another
+  socket bound on one address alone, such as `127.0.0.1`, `::1` or the IPv4
+  wildcard address. A server that then bound the port on all addresses started,
+  but a connection to the port at `localhost` could reach the other socket
+  instead. This happened on macOS, where every Gradle daemon listens on
+  `127.0.0.1` at a port in the range that `getOpenPort()` chooses from.
+  `getOpenPort()` also returned ports from 16383 to 65534, although its
+  documentation says 49152 to 65535, and it returns only ports in the documented
+  range. ([GH-60](https://github.com/cinchapi/accent4j/issues/60))
+* Deprecated `Networks.getOpenPort()` and both forms of
+  `Networks.getCompanionPort`. They return ports from 49152 up, and Linux, macOS
+  and Windows assign ports in that range to outgoing connections, so another
+  socket can take such a port before you bind it. To choose a port, use
+  `Networks.getPreferredOpenPort()` instead.
 * Fixed a bug that allowed `JoinableExecutorService#shutdownNow` to run the
   tasks that were waiting to run instead of returning them. A worker that the
   call freed could take the waiting tasks and run them, so the work went ahead
