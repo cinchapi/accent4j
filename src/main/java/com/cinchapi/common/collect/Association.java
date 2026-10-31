@@ -546,7 +546,7 @@ public abstract class Association extends AbstractMap<String, Object> {
      */
     private String[] components(String path) {
         String[] components = path.split("\\.");
-        Verify.thatArgument(components.length > 0, "Invalid path: {}", path);
+        Verify.thatArgument(components.length > 0, "Invalid path {}", path);
         Verify.thatArgument(Ints.tryParse(components[0]) == null,
                 "The map cannot contain keys that start with a numeric component. "
                         + "Therefore '{}' is an invalid path.",
