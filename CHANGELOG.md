@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.19.0 (TBD)
+#### Version 1.18.4 (TBD)
 * `Networks.getPreferredOpenPort()` returns an open port from 16384 to 32767. By
   default, Linux, macOS and Windows assign only higher ports to outgoing
   connections and to binds to port 0, so another socket is unlikely to take the
