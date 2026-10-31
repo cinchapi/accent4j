@@ -9,6 +9,11 @@
   task that a worker had already started is not among them. A graceful
   `shutdown` still runs the tasks that are waiting before its workers exit.
   ([GH-63](https://github.com/cinchapi/accent4j/issues/63))
+* Fixed a bug that allowed a task that `JoinableExecutorService#execute` or
+  `submit` accepted while `shutdown` or `shutdownNow` ran to stay in the queue
+  after the executor terminated, so the task never ran, `shutdownNow` did not
+  return it, and its `Future` never completed. Such a task runs, comes back from
+  `shutdownNow`, or is rejected with a `RejectedExecutionException`.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time

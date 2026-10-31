@@ -438,6 +438,64 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that each task that {@code execute} accepts
+     * while {@code shutdownNow} runs either runs or comes back from
+     * {@code shutdownNow}.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Make an executor, and start two threads that each call
+     * {@code execute} until it throws a
+     * {@link RejectedExecutionException}.</li>
+     * <li>Call {@code shutdownNow}, join both threads, and wait for the
+     * executor to terminate.</li>
+     * <li>Repeat 1,000 times.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> In each round, the tasks that ran and the
+     * tasks that {@code shutdownNow} returned add up to the tasks that
+     * {@code execute} accepted.
+     */
+    @Test(timeout = 60000)
+    public void testShutdownNowAccountsForEachTaskThatExecuteAccepts()
+            throws InterruptedException {
+        for (int round = 0; round < 1000; ++round) {
+            JoinableExecutorService joinable = JoinableExecutorService
+                    .create(4);
+            AtomicInteger accepted = new AtomicInteger();
+            AtomicInteger ran = new AtomicInteger();
+            CountDownLatch started = new CountDownLatch(2);
+            Thread[] submitters = new Thread[2];
+            for (int i = 0; i < submitters.length; ++i) {
+                submitters[i] = new Thread(() -> {
+                    started.countDown();
+                    try {
+                        for (;;) {
+                            joinable.execute(ran::incrementAndGet);
+                            accepted.incrementAndGet();
+                        }
+                    }
+                    catch (RejectedExecutionException e) {
+                        // The executor is shut down, so this thread is done
+                    }
+                });
+                submitters[i].start();
+            }
+            started.await();
+
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            for (Thread submitter : submitters) {
+                submitter.join();
+            }
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(accepted.get(), ran.get() + unfinished.size());
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code shutdownNow} omits the helper
      * that a join queues for a worker that counts as idle but is busy in
      * another join.

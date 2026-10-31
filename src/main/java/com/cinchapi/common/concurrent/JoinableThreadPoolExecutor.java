@@ -158,7 +158,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     @Override
     public void execute(Runnable command) {
         if(state.compareAndSet(RUNNING, RUNNING)) {
-            this.tasks.offer(new FutureTask<Void>(command, null));
+            FutureTask<Void> task = new FutureTask<>(command, null);
+            tasks.offer(task);
+            if(state.get() != RUNNING && tasks.remove(task)) {
+                // A shutdown that began after the check above may have taken
+                // the queue or let every worker exit before the offer, so no
+                // thread would ever run the task
+                throw new RejectedExecutionException();
+            }
         }
         else {
             throw new RejectedExecutionException();
