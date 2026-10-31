@@ -11,6 +11,11 @@
   text of the flattened path that holds it. Each of these operations answers
   what it did, down to the order of the entries, the type of each container, and
   whether a container that a caller already holds is replaced or updated.
+* Fixed a bug where `Association#containsValue` threw a `NullPointerException`
+  whenever any path of the `Association` held a `null` value, whatever value it
+  was asked about, so a caller could not search an `Association` built from data
+  that held a `null`. It answers whether any path holds a value equal to the one
+  it is asked about, and answers `true` for `null` when a path holds `null`.
 
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time

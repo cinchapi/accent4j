@@ -21,10 +21,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -229,13 +231,12 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public boolean containsValue(Object value) {
-        for (String path : paths()) {
-            Object stored = fetch(path);
-            if(stored.equals(value)) {
-                return true;
-            }
+        boolean contained = false;
+        Iterator<String> paths = paths().iterator();
+        while (!contained && paths.hasNext()) {
+            contained = Objects.equals(fetch(paths.next()), value);
         }
-        return false;
+        return contained;
     }
 
     @Override
@@ -289,22 +290,22 @@ public abstract class Association extends AbstractMap<String, Object> {
     }
 
     /**
-     * Return a possibly nested value from with the {@link Associaiton}, if it
-     * is present. Otherwise, return the {@code defaultValue}.
+     * Return the value at the end of the {@code path}, or the
+     * {@code defaultValue} if this {@link Association} holds none there.
      * <p>
-     * NOTE: The returned value may be {@code null} if this {@link Associaiton}
-     * permits the storage of {@code null} values.
+     * A {@code path} whose value is {@code null} holds none for this purpose,
+     * so such a {@code path} answers the {@code defaultValue}.
      * </p>
-     * 
+     *
      * @param path a navigable path key (e.g. foo.bar.1.baz)
-     * @param defaultValue
-     * @return the associated value, if it exists or the {@code defaultValue}
+     * @param defaultValue the value to answer when the {@code path} holds none
+     * @return the value at the end of the {@code path}, or the
+     *         {@code defaultValue}
      */
     @Nullable
     public <T> T fetchOrDefault(String path, T defaultValue) {
-        T value;
-        return ((value = fetch(path)) != null || containsKey(path)) ? value
-                : defaultValue;
+        T value = fetch(path);
+        return value != null ? value : defaultValue;
     }
 
     /**

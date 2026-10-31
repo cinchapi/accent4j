@@ -1030,6 +1030,59 @@ public class AssociationTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a search for a value answers for an
+     * {@link Association} that holds a {@code null} value.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * whose value is {@code null} and one key whose value is not.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Search for the value that the second key holds.</li>
+     * <li>Search for {@code null}.</li>
+     * <li>Search for a value that neither key holds.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first two searches answer {@code true}
+     * and the third answers {@code false}.
+     */
+    @Test
+    public void testContainsValueAnswersWhenAPathHoldsNull() {
+        Association assoc = Association.of();
+        assoc.set("a", null);
+        assoc.set("b", "value");
+
+        Assert.assertTrue(assoc.containsValue("value"));
+        Assert.assertTrue(assoc.containsValue(null));
+        Assert.assertFalse(assoc.containsValue("absent"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a path whose value is {@code null}
+     * answers the default value.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * whose value is {@code null}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Fetch {@code "a"} with a default value.</li>
+     * <li>Fetch a key that was never written, with a default value.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both fetches answer the default value.
+     */
+    @Test
+    public void testFetchOrDefaultAnswersTheDefaultWhenThePathHoldsNull() {
+        Association assoc = Association.of();
+        assoc.set("a", null);
+
+        Assert.assertEquals("default", assoc.fetchOrDefault("a", "default"));
+        Assert.assertEquals("default",
+                assoc.fetchOrDefault("absent", "default"));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a read of a key that names one
      * component answers what an overridden {@code fetch} supplies, as it does
      * for a key that names more.
