@@ -1,6 +1,37 @@
 # Changelog
 
 #### Version 1.18.4 (TBD)
+* **Reading and writing a path on an `Association` costs less.** A read of a key
+  that names one component and that the `Association` does not hold, and a write
+  of a path that names no list position, take less time. Each of these
+  operations answers what it did, down to the order of the entries, the type of
+  each container, and whether a container that a caller already holds is
+  replaced or updated.
+* Fixed a bug where `Association#containsValue` threw a `NullPointerException`
+  when its search reached a path that held `null` before it found a match, so a
+  caller could not search an `Association` built from data that held a `null`.
+  It answers whether any value that the `Association` stores, at any depth, is
+  equal to the one it is asked about. That includes an empty container and a
+  value that a nested map holds under a key with a dot, such as an email
+  address. It answers `true` for `null` only when the `Association` stores
+  `null`.
+* Fixed a bug where `Association#remove` took nothing out of an `Association`
+  and answered `null` for a key that named more than one component, even though
+  `Association#put` stored a value under such a key and `Association#get`
+  answered it, so a caller that removed the keys of a flattened `Association`
+  left every nested value in place. It takes the value at the end of the path
+  out of the container that holds it and answers that value. It reads the path
+  as `Association#get` reads it, so a path that names no component, such as
+  `"."`, throws an `IllegalArgumentException` rather than answering `null`. A
+  component that names a position of a list leaves the list as long as it was,
+  with `null` at that position, so every other position still names the element
+  it named before. The containers that the components before the last one name
+  stay in place, even when the removal leaves one of them empty. A removal
+  changes the container that holds the end of the path, so a container that does
+  not permit the change, such as an immutable list a caller stored, throws an
+  `UnsupportedOperationException`. So does a removal of a position of a
+  collection that is not a list, such as a set, because such a collection cannot
+  clear one position and keep every other position in place.
 * `Networks.getPreferredOpenPort()` returns an open port from 16384 to 32767. By
   default, Linux, macOS and Windows assign only higher ports to outgoing
   connections and to binds to port 0, so another socket is unlikely to take the

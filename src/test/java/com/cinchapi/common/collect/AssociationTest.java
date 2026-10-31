@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -946,6 +947,758 @@ public class AssociationTest {
             return LinkedHashMap::new;
         }
 
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that an {@link Association} refuses a key
+     * that names one component and reads as an integer, because the map cannot
+     * hold a key whose first component is an integer.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "3"} to {@code "value"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The write throws an
+     * {@link IllegalArgumentException} and the {@link Association} stays empty.
+     */
+    @Test
+    public void testSetRefusesIntegerKeyWithOneComponent() {
+        Association assoc = Association.of();
+        try {
+            assoc.set("3", "value");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertTrue(assoc.isEmpty());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a fetch of a key that names one
+     * component and was never written answers {@code null}.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one
+     * unrelated key.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "present"} to {@code 1}.</li>
+     * <li>Fetch {@code "absent"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The fetch answers {@code null}.
+     */
+    @Test
+    public void testFetchOfAbsentKeyWithOneComponentIsNull() {
+        Association assoc = Association.of();
+        assoc.set("present", 1);
+
+        Assert.assertNull(assoc.fetch("absent"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a write to a key that names one
+     * component answers what that key held before, and that reading the key
+     * answers what the write stored.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "name"} to {@code "first"} and keep what it
+     * answers.</li>
+     * <li>Set {@code "name"} to {@code "second"} and keep what it
+     * answers.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first write answers {@code null}, the
+     * second answers {@code "first"}, and the key then reads as
+     * {@code "second"}.
+     */
+    @Test
+    public void testSetOfKeyWithOneComponentAnswersThePreviousValue() {
+        Association assoc = Association.of();
+
+        Object first = assoc.set("name", "first");
+        Object second = assoc.set("name", "second");
+
+        Assert.assertNull(first);
+        Assert.assertEquals("first", second);
+        Assert.assertEquals("second", assoc.fetch("name"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a search for a value answers for an
+     * {@link Association} that holds a {@code null} value.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * whose value is {@code null} and one key whose value is not.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Search for the value that the second key holds.</li>
+     * <li>Search for {@code null}.</li>
+     * <li>Search for a value that neither key holds.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first two searches answer {@code true}
+     * and the third answers {@code false}.
+     */
+    @Test
+    public void testContainsValueAnswersWhenAPathHoldsNull() {
+        Association assoc = Association.of();
+        assoc.set("a", null);
+        assoc.set("b", "value");
+
+        Assert.assertTrue(assoc.containsValue("value"));
+        Assert.assertTrue(assoc.containsValue(null));
+        Assert.assertFalse(assoc.containsValue("absent"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a search for a value finds a value
+     * that a nested map holds under a key with a dot, and does not take that
+     * key for a path that holds {@code null}.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map whose
+     * one key is an email address.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Put {@code "emails"} to a map from {@code "jeff@example.com"} to
+     * {@code true}.</li>
+     * <li>Search for {@code true}.</li>
+     * <li>Search for {@code null}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search for {@code true} answers
+     * {@code true}, and the search for {@code null} answers {@code false}.
+     */
+    @Test
+    public void testContainsValueFindsAValueUnderANestedKeyWithADot() {
+        Association assoc = Association.of();
+        Map<String, Object> emails = new LinkedHashMap<>();
+        emails.put("jeff@example.com", true);
+        assoc.put("emails", emails);
+
+        Assert.assertTrue(assoc.containsValue(true));
+        Assert.assertFalse(assoc.containsValue(null));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a search for a value finds an empty
+     * container that a path holds.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding an empty
+     * list.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to an empty list.</li>
+     * <li>Search for an empty list.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The search answers {@code true}.
+     */
+    @Test
+    public void testContainsValueFindsAnEmptyContainer() {
+        Association assoc = Association.of();
+        assoc.set("a", new ArrayList<>());
+
+        Assert.assertTrue(assoc.containsValue(new ArrayList<>()));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a path whose value is {@code null}
+     * answers the default value.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * whose value is {@code null}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Fetch {@code "a"} with a default value.</li>
+     * <li>Fetch a key that was never written, with a default value.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both fetches answer the default value.
+     */
+    @Test
+    public void testFetchOrDefaultAnswersTheDefaultWhenThePathHoldsNull() {
+        Association assoc = Association.of();
+        assoc.set("a", null);
+
+        Assert.assertEquals("default", assoc.fetchOrDefault("a", "default"));
+        Assert.assertEquals("default",
+                assoc.fetchOrDefault("absent", "default"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a read of a key that names one
+     * component answers what an overridden {@code fetch} supplies, as it does
+     * for a key that names more.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} whose {@code fetch}
+     * makes up a value from the path, as a view that generates its entries
+     * does.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Get {@code "host"}, which names one component.</li>
+     * <li>Get {@code "a.b"}, which names two.</li>
+     * <li>Ask whether the {@link Association} holds {@code "host"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both reads answer what {@code fetch}
+     * supplies, and the {@link Association} holds {@code "host"}.
+     */
+    @Test
+    public void testGetAnswersWhatAnOverriddenFetchSupplies() {
+        Association assoc = new GeneratedAssociation();
+
+        Assert.assertEquals("generated:host", assoc.get("host"));
+        Assert.assertEquals("generated:a.b", assoc.get("a.b"));
+        Assert.assertTrue(assoc.containsKey("host"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a fetch of a path that names no
+     * component is refused.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Fetch {@code "."}, which names no component.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The fetch throws an
+     * {@link IllegalArgumentException} that names the path.
+     */
+    @Test
+    public void testFetchRefusesAPathOfOnlyDots() {
+        Association assoc = Association.of();
+        try {
+            assoc.fetch(".");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertEquals("Invalid path .", e.getMessage());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a key that names one component holds
+     * a {@code null} value that a write stores there.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to {@code null}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The write answers {@code null}, the
+     * {@link Association} holds one entry, and that entry maps {@code "a"} to
+     * {@code null}.
+     */
+    @Test
+    public void testSetStoresANullValueUnderAKeyOfOneComponent() {
+        Association assoc = Association.of();
+
+        Object previous = assoc.set("a", null);
+
+        Assert.assertNull(previous);
+        Assert.assertEquals(1, assoc.size());
+        Assert.assertEquals(Collections.singletonMap("a", null),
+                new LinkedHashMap<>(assoc));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a write to a path that names several
+     * components answers what the end of that path held before.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "first"} and keep what it
+     * answers.</li>
+     * <li>Set {@code "user.name"} to {@code "second"} and keep what it
+     * answers.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The first write answers {@code null}, the
+     * second answers {@code "first"}, and the path then reads as
+     * {@code "second"}.
+     */
+    @Test
+    public void testSetOfPathOfSeveralComponentsAnswersThePreviousValue() {
+        Association assoc = Association.of();
+
+        Object first = assoc.set("user.name", "first");
+        Object second = assoc.set("user.name", "second");
+
+        Assert.assertNull(first);
+        Assert.assertEquals("first", second);
+        Assert.assertEquals("second", assoc.fetch("user.name"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that the paths of an {@link Association}
+     * hold every prefix of every flattened path, in the order the flattened
+     * paths reach them.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a nested
+     * map whose second key holds a list.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Set {@code "user.tags"} to a list of two elements.</li>
+     * <li>Read the paths.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The paths are {@code "user"},
+     * {@code "user.name"}, {@code "user.tags"}, {@code "user.tags.0"} and
+     * {@code "user.tags.1"}, in that order.
+     */
+    @Test
+    public void testPathsHoldsEveryPrefixOfEveryFlattenedPath() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+        assoc.set("user.tags", ImmutableList.of("a", "b"));
+
+        Assert.assertEquals(
+                ImmutableList.of("user", "user.name", "user.tags",
+                        "user.tags.0", "user.tags.1"),
+                ImmutableList.copyOf(assoc.paths()));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a nested key that ends with a dot adds
+     * no path that ends with a dot, because a path drops an empty last
+     * component.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map whose
+     * one key ends with a dot.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Put {@code "company"} to a map from {@code "Acme Inc."} to
+     * {@code 5}.</li>
+     * <li>Read the paths.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The paths are {@code "company"} and
+     * {@code "company.Acme Inc"}, in that order.
+     */
+    @Test
+    public void testPathsDropTheEmptyLastComponentOfANestedKey() {
+        Association assoc = Association.of();
+        Map<String, Object> company = new LinkedHashMap<>();
+        company.put("Acme Inc.", 5);
+        assoc.put("company", company);
+
+        Assert.assertEquals(ImmutableList.of("company", "company.Acme Inc"),
+                ImmutableList.copyOf(assoc.paths()));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a write whose path names a list
+     * position beyond the limit is refused and changes nothing.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link Association}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set a path whose second component names the position one past
+     * {@link Association#MAX_LIST_GAP}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The write throws an
+     * {@link IllegalArgumentException} and the {@link Association} stays
+     * empty.
+     */
+    @Test
+    public void testSetRefusesAListPositionBeyondTheLimit() {
+        Association assoc = Association.of();
+        try {
+            assoc.set("a." + (Association.MAX_LIST_GAP + 1), "value");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertTrue(assoc.isEmpty());
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a write of a key that names one
+     * component is refused when the maps that a subclass supplies refuse that
+     * key, so that a supplied map can validate the keys of a write.
+     * <p>
+     * <strong>Start state:</strong> An empty {@link ListAssociation} whose maps
+     * are {@link RefusingMap RefusingMaps}.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@link RefusingMap#REFUSED} to {@code 1}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The write throws an
+     * {@link IllegalArgumentException} and the {@link Association} stays empty.
+     */
+    @Test
+    public void testSetThrowsWhenASuppliedMapRefusesTheKey() {
+        Association assoc = new ListAssociation() {
+
+            @Override
+            protected Supplier<Map<String, Object>> mapSupplier() {
+                return RefusingMap::new;
+            }
+
+        };
+        try {
+            assoc.set(RefusingMap.REFUSED, 1);
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertTrue(assoc.isEmpty());
+        }
+    }
+
+    /**
+     * A {@link LinkedHashMap} whose {@code put} refuses the key
+     * {@value #REFUSED}, as a map that validates its keys does.
+     *
+     * @author Jeff Nelson
+     */
+    private static class RefusingMap extends LinkedHashMap<String, Object> {
+
+        /**
+         * The key that {@code put} refuses.
+         */
+        private static final String REFUSED = "reserved";
+
+        /**
+         * The version of the serialized form.
+         */
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Object put(String key, Object value) {
+            if(REFUSED.equals(key)) {
+                throw new IllegalArgumentException("Refused key " + key);
+            }
+            else {
+                return super.put(key, value);
+            }
+        }
+
+    }
+
+    /**
+     * An {@link Association} whose {@code fetch} makes up a value from the
+     * path, as a view that generates its entries does.
+     *
+     * @author Jeff Nelson
+     */
+    private static class GeneratedAssociation extends Association {
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> T fetch(String path) {
+            return (T) ("generated:" + path);
+        }
+
+        @Override
+        protected Supplier<Collection<Object>> collectionSupplier() {
+            return ArrayList::new;
+        }
+
+        @Override
+        protected Supplier<Map<String, Object>> mapSupplier() {
+            return LinkedHashMap::new;
+        }
+
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path of several components
+     * takes the value from the container that holds it and answers it.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map of
+     * two keys under one key of the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Set {@code "user.age"} to {@code 3}.</li>
+     * <li>Remove {@code "user.name"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code "jeff"}, the path
+     * then reads as {@code null}, and the other key keeps its value.
+     */
+    @Test
+    public void testRemoveOfPathOfSeveralComponentsTakesTheValue() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+        assoc.set("user.age", 3);
+
+        Object removed = assoc.remove("user.name");
+
+        Assert.assertEquals("jeff", removed);
+        Assert.assertNull(assoc.fetch("user.name"));
+        Assert.assertEquals(3, (Object) assoc.fetch("user.age"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path whose last component
+     * names a list position clears that position and leaves every other
+     * position naming the element it named before.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a list of
+     * two elements.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to a list of two elements.</li>
+     * <li>Remove {@code "a.0"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers the first element, that
+     * position then reads as {@code null}, and the second position still reads
+     * as the second element.
+     */
+    @Test
+    public void testRemoveOfListPositionClearsThatPosition() {
+        Association assoc = Association.of();
+        assoc.set("a", Lists.newArrayList("x", "y"));
+
+        Object removed = assoc.remove("a.0");
+
+        Assert.assertEquals("x", removed);
+        Assert.assertNull(assoc.fetch("a.0"));
+        Assert.assertEquals("y", assoc.fetch("a.1"));
+        Assert.assertEquals(Lists.newArrayList(null, "y"), assoc.fetch("a"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path of several components
+     * leaves the containers above it in place.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key
+     * under one key of the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Remove {@code "user.name"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The {@link Association} still holds one
+     * entry, and the map that held the removed key is empty.
+     */
+    @Test
+    public void testRemoveLeavesTheContainersAbovePathInPlace() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+
+        assoc.remove("user.name");
+
+        Assert.assertEquals(1, assoc.size());
+        Assert.assertEquals(ImmutableMap.of(), assoc.fetch("user"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a key of one component takes
+     * the entry out of the map itself.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key of
+     * the map itself.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to {@code 1}.</li>
+     * <li>Remove {@code "a"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code 1} and the
+     * {@link Association} is empty.
+     */
+    @Test
+    public void testRemoveOfKeyOfOneComponentTakesTheEntry() {
+        Association assoc = Association.of();
+        assoc.set("a", 1);
+
+        Object removed = assoc.remove("a");
+
+        Assert.assertEquals(1, removed);
+        Assert.assertTrue(assoc.isEmpty());
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path that holds no value
+     * answers {@code null} and changes nothing.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one path of
+     * two components.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "user.name"} to {@code "jeff"}.</li>
+     * <li>Remove {@code "user.absent"}, whose container exists.</li>
+     * <li>Remove {@code "absent.absent"}, whose container does not.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both removals answer {@code null} and the
+     * held path keeps its value.
+     */
+    @Test
+    public void testRemoveOfAbsentPathAnswersNull() {
+        Association assoc = Association.of();
+        assoc.set("user.name", "jeff");
+
+        Assert.assertNull(assoc.remove("user.absent"));
+        Assert.assertNull(assoc.remove("absent.absent"));
+        Assert.assertEquals("jeff", assoc.fetch("user.name"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a removal from a container that does
+     * not permit the change is refused.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding an
+     * immutable list under one key and an immutable map under another.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Remove the first position of the list.</li>
+     * <li>Remove the key of the map.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Both removals throw an
+     * {@link UnsupportedOperationException}.
+     */
+    @Test
+    public void testRemoveRefusesAContainerThatDoesNotPermitTheChange() {
+        Association assoc = Association.of();
+        assoc.set("list", ImmutableList.of("x", "y"));
+        assoc.set("map", ImmutableMap.of("b", 1));
+
+        try {
+            assoc.remove("list.0");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableList.of("x", "y"),
+                    assoc.fetch("list"));
+        }
+        try {
+            assoc.remove("map.b");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableMap.of("b", 1), assoc.fetch("map"));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path with an empty
+     * component takes out the value that reading the path answers, rather than
+     * the value at the path without that component.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding
+     * {@code "a.b"} and {@code "a..b"}, which name different values.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a.b"} to {@code 1}.</li>
+     * <li>Set {@code "a..b"} to {@code 2}.</li>
+     * <li>Remove {@code "a..b"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code 2}, the path
+     * {@code "a..b"} then reads as {@code null}, and {@code "a.b"} still reads
+     * as {@code 1}.
+     */
+    @Test
+    public void testRemoveOfPathWithAnEmptyComponentTakesWhatGetReads() {
+        Association assoc = Association.of();
+        assoc.set("a.b", 1);
+        assoc.set("a..b", 2);
+
+        Object removed = assoc.remove("a..b");
+
+        Assert.assertEquals(2, removed);
+        Assert.assertNull(assoc.fetch("a..b"));
+        Assert.assertEquals(1, (Object) assoc.fetch("a.b"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path that names no
+     * component is refused, as reading it is.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to {@code 1}.</li>
+     * <li>Remove {@code "."}, which names no component.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal throws an
+     * {@link IllegalArgumentException} and the {@link Association} still maps
+     * {@code "a"} to {@code 1}.
+     */
+    @Test
+    public void testRemoveRefusesAPathOfOnlyDots() {
+        Association assoc = Association.of();
+        assoc.set("a", 1);
+        try {
+            assoc.remove(".");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertEquals(ImmutableMap.of("a", 1),
+                    new LinkedHashMap<>(assoc));
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that a removal whose last component names a
+     * position of a collection that is not a list is refused, because only a
+     * list can clear one position and keep every other position in place.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a set of two
+     * elements.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "tags"} to a {@link LinkedHashSet} of two elements.</li>
+     * <li>Remove {@code "tags.0"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal throws an
+     * {@link UnsupportedOperationException}, and the set still holds both
+     * elements in their order.
+     */
+    @Test
+    public void testRemoveRefusesAPositionOfASet() {
+        Association assoc = Association.of();
+        assoc.set("tags", new LinkedHashSet<>(ImmutableList.of("x", "y")));
+        try {
+            assoc.remove("tags.0");
+            Assert.fail("Expected an UnsupportedOperationException");
+        }
+        catch (UnsupportedOperationException e) {
+            Assert.assertEquals(ImmutableList.of("x", "y"),
+                    ImmutableList.copyOf((Collection<?>) assoc.fetch("tags")));
+        }
     }
 
 }
