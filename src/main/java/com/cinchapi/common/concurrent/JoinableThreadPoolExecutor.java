@@ -70,6 +70,14 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     private static final int TERMINATED = 3;
 
     /**
+     * Indicates that the executor is in a {@link #state} that prevents the
+     * submission of new tasks and leaves the tasks that it has not started to
+     * the {@link #shutdownNow()} call that asked it to halt, which returns
+     * them.
+     */
+    private static final int STOP = 4;
+
+    /**
      * The state of the executor.
      */
     private AtomicInteger state;
@@ -247,7 +255,7 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
     @Override
     public List<Runnable> shutdownNow() {
         List<Runnable> unfinished = new ArrayList<>();
-        if(state.compareAndSet(RUNNING, SHUTDOWN)) {
+        if(state.compareAndSet(RUNNING, STOP)) {
             for (Thread worker : workers) {
                 worker.interrupt();
             }
@@ -311,6 +319,12 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                         task.run();
                     }
                 }
+                else if(state.compareAndSet(STOP, STOP)) {
+                    // The tasks that the queue still holds belong to the
+                    // shutdownNow call, which returns them, so this worker
+                    // takes none of them.
+                    break;
+                }
                 else if(state.compareAndSet(TERMINATED, TERMINATED)) {
                     break;
                 }
@@ -323,7 +337,10 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
         finally {
             termination.countDown();
             if(termination.getCount() == 0) {
+                // The executor reached one of these states to get here, so at
+                // most one of these moves it on.
                 state.compareAndSet(SHUTDOWN, TERMINATED);
+                state.compareAndSet(STOP, TERMINATED);
             }
         }
     }

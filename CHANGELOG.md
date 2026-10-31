@@ -1,5 +1,15 @@
 # Changelog
 
+#### Version 1.18.4 (TBD)
+* Fixed a bug where `JoinableExecutorService#shutdownNow` ran the tasks that
+  were waiting to run instead of returning them. A worker that the call freed
+  took the waiting tasks and ran them, so the work went ahead after a caller
+  asked the executor to halt and the call answered a list that did not hold it.
+  The call answers every task that was waiting, none of those tasks runs, and a
+  task that a worker had already started is not among them. A graceful
+  `shutdown` still runs the tasks that are waiting before its workers exit.
+  ([GH-63](https://github.com/cinchapi/accent4j/issues/63))
+
 #### Version 1.18.3 (October 30, 2026)
 * Fixed a bug where `Association.of(Map)` and `Association#merge(Map)` took time
   that grew with the square of the length of each list in the map. For example,

@@ -294,6 +294,42 @@ public class JoinableExecutorServiceTest extends
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a graceful {@code shutdown} runs the
+     * tasks that the queue holds before its workers exit.
+     * <p>
+     * <strong>Start state:</strong> An executor whose four workers are each
+     * blocked on a task.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Queue three tasks, which no worker is free to run.</li>
+     * <li>Call {@code shutdown} and wait for the executor to terminate.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> All three tasks ran.
+     */
+    @Test
+    public void testShutdownRunsTheTasksTheQueueHolds()
+            throws InterruptedException {
+        JoinableExecutorService joinable = (JoinableExecutorService) executor;
+        CountDownLatch release = blockWorkers(joinable, 4);
+        try {
+            AtomicInteger ran = new AtomicInteger();
+            for (int i = 0; i < 3; ++i) {
+                joinable.execute(ran::incrementAndGet);
+            }
+
+            joinable.shutdown();
+
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(3, ran.get());
+        }
+        finally {
+            release.countDown();
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code shutdownNow} returns only the
      * tasks that never ran, even after a join whose tasks the calling thread
      * ran while every worker was busy.
@@ -308,7 +344,8 @@ public class JoinableExecutorServiceTest extends
      * <li>Call {@code shutdownNow}.</li>
      * </ul>
      * <p>
-     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks.
+     * <strong>Expected:</strong> {@code shutdownNow} returns three tasks, and
+     * none of them runs.
      */
     @Test
     public void testShutdownNowAfterJoinReturnsOnlyTasksThatNeverRan()
@@ -321,10 +358,19 @@ public class JoinableExecutorServiceTest extends
                 tasks[i] = () -> {};
             }
             joinable.join(tasks);
+            AtomicInteger ran = new AtomicInteger();
             for (int i = 0; i < 3; ++i) {
-                joinable.execute(() -> {});
+                joinable.execute(ran::incrementAndGet);
             }
-            Assert.assertEquals(3, joinable.shutdownNow().size());
+
+            List<Runnable> unfinished = joinable.shutdownNow();
+
+            Assert.assertEquals(3, unfinished.size());
+            // Read the count once every worker has exited, so that a worker
+            // that would run one of these tasks has already run it.
+            release.countDown();
+            Assert.assertTrue(joinable.awaitTermination(10, TimeUnit.SECONDS));
+            Assert.assertEquals(0, ran.get());
         }
         finally {
             release.countDown();
