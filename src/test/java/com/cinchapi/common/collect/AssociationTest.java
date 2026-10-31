@@ -1459,4 +1459,66 @@ public class AssociationTest {
         }
     }
 
+    /**
+     * <strong>Goal:</strong> Verify that removing a path with an empty
+     * component takes out the value that reading the path answers, rather than
+     * the value at the path without that component.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding
+     * {@code "a.b"} and {@code "a..b"}, which name different values.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a.b"} to {@code 1}.</li>
+     * <li>Set {@code "a..b"} to {@code 2}.</li>
+     * <li>Remove {@code "a..b"}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal answers {@code 2}, the path
+     * {@code "a..b"} then reads as {@code null}, and {@code "a.b"} still reads
+     * as {@code 1}.
+     */
+    @Test
+    public void testRemoveOfPathWithAnEmptyComponentTakesWhatGetReads() {
+        Association assoc = Association.of();
+        assoc.set("a.b", 1);
+        assoc.set("a..b", 2);
+
+        Object removed = assoc.remove("a..b");
+
+        Assert.assertEquals(2, removed);
+        Assert.assertNull(assoc.fetch("a..b"));
+        Assert.assertEquals(1, (Object) assoc.fetch("a.b"));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that removing a path that names no
+     * component is refused, as reading it is.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding one key.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Set {@code "a"} to {@code 1}.</li>
+     * <li>Remove {@code "."}, which names no component.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The removal throws an
+     * {@link IllegalArgumentException} and the {@link Association} still maps
+     * {@code "a"} to {@code 1}.
+     */
+    @Test
+    public void testRemoveRefusesAPathOfOnlyDots() {
+        Association assoc = Association.of();
+        assoc.set("a", 1);
+        try {
+            assoc.remove(".");
+            Assert.fail("Expected an IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e) {
+            Assert.assertEquals(ImmutableMap.of("a", 1),
+                    new LinkedHashMap<>(assoc));
+        }
+    }
+
 }

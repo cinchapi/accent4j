@@ -267,28 +267,7 @@ public abstract class Association extends AbstractMap<String, Object> {
         if(value == null && path.indexOf('.') >= 0) {
             String[] components = path.split("\\.");
             Verify.thatArgument(components.length > 0, "Invalid path {}", path);
-            Object source = exploded;
-            for (String component : components) {
-                Integer index;
-                if(source == null) {
-                    break;
-                }
-                else if((index = Ints.tryParse(component)) != null) {
-                    if(source instanceof Collection
-                            && ((Collection<T>) source).size() > index) {
-                        source = Iterables.get((Collection<T>) source, index);
-                    }
-                    else {
-                        source = null;
-                    }
-                }
-                else {
-                    source = source instanceof Map
-                            ? ((Map<String, Object>) source).get(component)
-                            : null;
-                }
-            }
-            return source != null ? (T) source : null;
+            return (T) navigate(components, components.length);
         }
         else {
             // A path of one component names a value of the map itself, which
@@ -603,36 +582,32 @@ public abstract class Association extends AbstractMap<String, Object> {
      * Take the value at the end of the {@code path} out of the container that
      * holds it and return that value.
      * <p>
-     * The container that holds the end of the {@code path} is the one that the
-     * components before it name, read as {@link #get(Object)} reads them, or
-     * the outermost mapping when the {@code path} names one component. A
-     * component that names a position of a
-     * list leaves the list as long as it was, with {@code null} at that
-     * position, so that every other position names the element it named
-     * before. The containers that the components before the last one name stay
-     * in place, even when the removal leaves one of them empty.
+     * The {@code path} splits into components as {@link #fetch(String)} splits
+     * it. The container that holds the end of the {@code path} is the stored
+     * container that the components before the last one name, or the outermost
+     * mapping when the {@code path} names one component. A last component that
+     * names a position of a list leaves the list as long as it was, with
+     * {@code null} at that position, so that every other position names the
+     * element it named before. The containers that the components before the
+     * last one name stay in place, even when the removal leaves one of them
+     * empty.
      * </p>
      *
      * @param path a navigable path key
      * @return the value that was at the end of the {@code path}, or
      *         {@code null} if no container held one there
+     * @throws IllegalArgumentException if the {@code path} names no component
      * @throws UnsupportedOperationException if the container that holds the
      *             end of the {@code path} does not permit the change
      */
     @SuppressWarnings("unchecked")
     @Nullable
     private Object detach(String path) {
-        int end = path.lastIndexOf('.');
-        Object holder;
-        String last;
-        if(end < 0) {
-            holder = exploded;
-            last = path;
-        }
-        else {
-            holder = fetch(path.substring(0, end));
-            last = path.substring(end + 1);
-        }
+        String[] components = path.split("\\.");
+        Verify.thatArgument(components.length > 0, "Invalid path {}", path);
+        int end = components.length - 1;
+        Object holder = navigate(components, end);
+        String last = components[end];
         Integer index = Ints.tryParse(last);
         Object detached;
         if(index == null && holder instanceof Map) {
@@ -712,6 +687,39 @@ public abstract class Association extends AbstractMap<String, Object> {
         else {
             exploded.put(path, value);
         }
+    }
+
+    /**
+     * Return the value that the first {@code count} of the {@code components}
+     * name in the stored containers, or {@code null} if no container holds one
+     * there. An integer component names a position of a {@link Collection}, and
+     * any other component names a key of a {@link Map}. A {@code count} of zero
+     * names the outermost mapping.
+     *
+     * @param components the components of a path
+     * @param count how many of the {@code components} to read, from the first
+     * @return the value at the end of those components, or {@code null}
+     * @throws IndexOutOfBoundsException if a component that the read reaches
+     *             names a negative position of a {@link Collection}
+     */
+    @Nullable
+    private Object navigate(String[] components, int count) {
+        Object source = exploded;
+        for (int i = 0; i < count && source != null; ++i) {
+            Integer index = Ints.tryParse(components[i]);
+            if(index != null) {
+                source = source instanceof Collection
+                        && ((Collection<?>) source).size() > index
+                                ? Iterables.get((Collection<?>) source, index)
+                                : null;
+            }
+            else {
+                source = source instanceof Map
+                        ? ((Map<?, ?>) source).get(components[i])
+                        : null;
+            }
+        }
+        return source;
     }
 
     /**
