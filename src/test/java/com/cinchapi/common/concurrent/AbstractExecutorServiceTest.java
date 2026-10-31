@@ -108,7 +108,10 @@ public abstract class AbstractExecutorServiceTest {
     @Test
     public void testIsTerminated() throws InterruptedException {
         executor.shutdown();
-        executor.awaitTermination(50, TimeUnit.MILLISECONDS);
+        // The wait answers whether the executor terminated, so a timeout that
+        // only a stuck executor reaches tells the two apart.
+        Assert.assertTrue("Executor should terminate after shutdown",
+                executor.awaitTermination(10, TimeUnit.SECONDS));
         Assert.assertTrue("Executor should be terminated",
                 executor.isTerminated());
     }
