@@ -419,15 +419,14 @@ public abstract class Association extends AbstractMap<String, Object> {
      */
     public Set<String> paths() {
         Set<String> paths = Sets.newLinkedHashSet();
-        // Every prefix of a flattened path is itself a path, and the text of
-        // the flattened path holds each one of them.
         flatten().keySet().forEach(key -> {
-            int end = key.indexOf('.');
-            while (end >= 0) {
-                paths.add(key.substring(0, end));
-                end = key.indexOf('.', end + 1);
+            String[] parts = key.split("\\.");
+            StringBuilder sb = new StringBuilder();
+            for (String path : parts) {
+                sb.append(path);
+                paths.add(sb.toString());
+                sb.append(".");
             }
-            paths.add(key);
         });
         return paths;
     }

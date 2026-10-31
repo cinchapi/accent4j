@@ -7,9 +7,8 @@
   splitting it and walking the containers that the components of a path name. A
   write stores the first component of its path in the map directly, and reads
   the structure below the map only for a path that names a list position, since
-  no other path can make a write fill one. `paths()` takes each prefix from the
-  text of the flattened path that holds it. Each of these operations answers
-  what it did, down to the order of the entries, the type of each container, and
+  no other path can make a write fill one. Each of these operations answers what
+  it did, down to the order of the entries, the type of each container, and
   whether a container that a caller already holds is replaced or updated.
 * Fixed a bug where `Association#containsValue` threw a `NullPointerException`
   when its search reached a path that held `null` before it found a match, so a

@@ -1279,6 +1279,35 @@ public class AssociationTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that a nested key that ends with a dot adds
+     * no path that ends with a dot, because a path drops an empty last
+     * component.
+     * <p>
+     * <strong>Start state:</strong> An {@link Association} holding a map whose
+     * one key ends with a dot.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Put {@code "company"} to a map from {@code "Acme Inc."} to
+     * {@code 5}.</li>
+     * <li>Read the paths.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> The paths are {@code "company"} and
+     * {@code "company.Acme Inc"}, in that order.
+     */
+    @Test
+    public void testPathsDropTheEmptyLastComponentOfANestedKey() {
+        Association assoc = Association.of();
+        Map<String, Object> company = new LinkedHashMap<>();
+        company.put("Acme Inc.", 5);
+        assoc.put("company", company);
+
+        Assert.assertEquals(ImmutableList.of("company", "company.Acme Inc"),
+                ImmutableList.copyOf(assoc.paths()));
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that a write whose path names a list
      * position beyond the limit is refused and changes nothing.
      * <p>
