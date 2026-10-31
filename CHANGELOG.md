@@ -3,10 +3,12 @@
 #### Version 1.18.4 (TBD)
 * **Reading and writing a path on an `Association` costs less.** A read of a key
   that names one component and that the `Association` does not hold, and a write
-  of a path that names no list position, take less time. Each of these
-  operations answers what it did, down to the order of the entries, the type of
-  each container, and whether a container that a caller already holds is
-  replaced or updated.
+  of a path that names no list position, take less time. `Association.of(Map)`
+  reads each path of its input once, because the read that reports the paths a
+  write refuses is the one the write makes to find the containers to write into.
+  Each of these operations answers what it did, down to the order of the
+  entries, the type of each container, and whether a container that a caller
+  already holds is replaced or updated.
 * Fixed a bug where `Association#containsValue` threw a `NullPointerException`
   when its search reached a path that held `null` before it found a match, so a
   caller could not search an `Association` built from data that held a `null`.

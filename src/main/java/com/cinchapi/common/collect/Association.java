@@ -535,28 +535,28 @@ public abstract class Association extends AbstractMap<String, Object> {
     protected abstract Supplier<Map<String, Object>> mapSupplier();
 
     /**
-     * Split the {@code path} into its components and verify that a value can be
-     * written at its end.
+     * Split the {@code path} into its components, and check that a value can be
+     * written there.
      * <p>
-     * A write fills each position between the end of a list and the position
-     * that an integer component names with {@code null}, and a component whose
-     * current value is not a {@link Collection} gets a new list. A position
-     * that a list in the input of the flattening write call in progress has
-     * supplied does not count. The {@code path} can be written only when its
-     * write fills at most {@value #MAX_LIST_GAP} other positions in total.
+     * A write to a position past the end of a list fills the gap with
+     * {@code null} values. Where the path names a position but no collection
+     * exists yet, the write starts a new list, so the gap starts at position 0.
+     * One write can add at most {@value #MAX_LIST_GAP} of those {@code null}
+     * values. While {@link #of(Map)} or a {@code merge} copies a map in, the
+     * positions that the map's own lists supply do not count toward the limit.
      * </p>
      *
      * @param path a navigable path key
-     * @return the components of the {@code path}, of which there is at least
-     *         one
+     * @return the components of the {@code path}; there is at least one
      * @throws IllegalArgumentException if the {@code path} has no components,
-     *             its first component is an integer, or its write would fill
-     *             more than {@value #MAX_LIST_GAP} positions with {@code null}
-     *             that the input of the call in progress does not supply
+     *             its first component is an integer, or the write would add
+     *             more than {@value #MAX_LIST_GAP} {@code null} values
+     * @throws IndexOutOfBoundsException if a component is a negative position
+     *             in a collection that already exists
      */
     private String[] components(String path) {
         String[] components = path.split("\\.");
-        Verify.thatArgument(components.length > 0, "Invalid path: {}", path);
+        Verify.thatArgument(components.length > 0, "Invalid path {}", path);
         Verify.thatArgument(Ints.tryParse(components[0]) == null,
                 "The map cannot contain keys that start with a numeric component. "
                         + "Therefore '{}' is an invalid path.",
@@ -590,9 +590,18 @@ public abstract class Association extends AbstractMap<String, Object> {
                             skipped += index - filled;
                         }
                     }
-                    source = index >= 0 && index < size
-                            ? Iterables.get((Collection<?>) source, index)
-                            : null;
+                    if(index < 0 && source instanceof Collection) {
+                        // Reading a negative position of an existing collection
+                        // throws, which rejects the write before anything
+                        // changes.
+                        source = Iterables.get((Collection<?>) source, index);
+                    }
+                    else if(index >= 0 && index < size) {
+                        source = Iterables.get((Collection<?>) source, index);
+                    }
+                    else {
+                        source = null;
+                    }
                 }
                 else {
                     source = source instanceof Map
@@ -715,10 +724,6 @@ public abstract class Association extends AbstractMap<String, Object> {
     private void insert(String path, Object value,
             Set<Collection<Object>> created) {
         if(exploded.get(path) == null) {
-            // Read the current value, as #set does, because that read rejects
-            // some paths, such as a negative index into an existing list,
-            // before anything changes.
-            fetch(path);
             upsertPath(exploded, components(path), 0, value, created);
         }
         else {
