@@ -280,7 +280,9 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
      * executor runs, the worker runs a queued task if there is one; otherwise
      * it helps each join in progress, then waits for a task. After
      * {@link #shutdown()}, the worker runs the tasks that remain in the queue
-     * and exits. The last worker to exit marks the executor terminated.
+     * and exits. After {@link #shutdownNow()}, even one that follows
+     * {@link #shutdown()}, the worker exits without taking a task from the
+     * queue. The last worker to exit marks the executor terminated.
      */
     private void executeTaskLoop() {
         try {
@@ -304,10 +306,8 @@ class JoinableThreadPoolExecutor extends AbstractExecutorService implements
                     }
                     catch (InterruptedException e) {
                         // Interrupt signals a request to shutdown or
-                        // shutdownNow. In either case, re-loop and
-                        // check the #state. If an immediate halt is
-                        // required, the internal task queue will be
-                        // emptied and we don't have to worry here
+                        // shutdownNow, so re-loop and let the #state decide
+                        // whether this worker runs what the queue holds
                         Thread.currentThread().interrupt();
                         continue;
                     }
