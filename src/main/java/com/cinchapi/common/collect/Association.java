@@ -535,29 +535,24 @@ public abstract class Association extends AbstractMap<String, Object> {
     protected abstract Supplier<Map<String, Object>> mapSupplier();
 
     /**
-     * Split the {@code path} into its components and verify that a value can be
-     * written at its end.
+     * Split the {@code path} into its components, and check that a value can be
+     * written there.
      * <p>
-     * A write fills each position between the end of a list and the position
-     * that an integer component names with {@code null}, and a component whose
-     * current value is not a {@link Collection} gets a new list. A position
-     * that a list in the input of the flattening write call in progress has
-     * supplied does not count. The {@code path} can be written only when its
-     * write fills at most {@value #MAX_LIST_GAP} other positions in total, and
-     * when no component of it names a negative position of a collection that
-     * the structure already holds.
+     * A write to a position past the end of a list fills the gap with
+     * {@code null} values. Where the path names a position but no collection
+     * exists yet, the write starts a new list, so the gap starts at position 0.
+     * One write can add at most {@value #MAX_LIST_GAP} of those {@code null}
+     * values. While {@link #of(Map)} or a {@code merge} copies a map in, the
+     * positions that the map's own lists supply do not count toward the limit.
      * </p>
      *
      * @param path a navigable path key
-     * @return the components of the {@code path}, of which there is at least
-     *         one
+     * @return the components of the {@code path}; there is at least one
      * @throws IllegalArgumentException if the {@code path} has no components,
-     *             its first component is an integer, or its write would fill
-     *             more than {@value #MAX_LIST_GAP} positions with {@code null}
-     *             that the input of the call in progress does not supply
-     * @throws IndexOutOfBoundsException if a component of the {@code path}
-     *             names a negative position of a collection that the
-     *             structure already holds
+     *             its first component is an integer, or the write would add
+     *             more than {@value #MAX_LIST_GAP} {@code null} values
+     * @throws IndexOutOfBoundsException if a component is a negative position
+     *             in a collection that already exists
      */
     private String[] components(String path) {
         String[] components = path.split("\\.");
@@ -596,9 +591,8 @@ public abstract class Association extends AbstractMap<String, Object> {
                         }
                     }
                     if(index < 0 && source instanceof Collection) {
-                        // A negative position of a collection that the
-                        // structure already holds rejects the write, and
-                        // reading it here reports that before anything
+                        // Reading a negative position of an existing collection
+                        // throws, which rejects the write before anything
                         // changes.
                         source = Iterables.get((Collection<?>) source, index);
                     }
