@@ -36,10 +36,12 @@ import com.cinchapi.common.profile.Benchmark;
  * floor.
  * </p>
  * <p>
- * These tests measure rather than assert, so they are {@link Ignore ignored}
- * and run on request with
- * {@code ./gradlew test --tests "AssociationPerformanceTest"}. The numbers
- * move with the machine, so compare runs from one machine.
+ * These tests measure rather than assert, so they are {@link Ignore ignored}.
+ * JUnit skips an ignored class even when a filter selects it, so to run them,
+ * remove the annotation in a local checkout and run
+ * {@code ./gradlew test --tests "AssociationPerformanceTest"}. The printed
+ * lines appear in the test report. The numbers move with the machine, so
+ * compare runs from one machine.
  * </p>
  *
  * @author Jeff Nelson

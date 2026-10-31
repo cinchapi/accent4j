@@ -35,6 +35,7 @@ import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
+import com.cinchapi.common.base.AnyStrings;
 import com.cinchapi.common.base.CheckedExceptions;
 import com.cinchapi.common.base.Verify;
 import com.google.common.collect.Iterables;
@@ -50,12 +51,18 @@ import com.google.common.primitives.Ints;
  * <p>
  * The {@link Map} operations read a key as a path, so {@link #get(Object)},
  * {@link #put(String, Object)} and {@link #remove(Object)} reach the value at
- * the end of one. The entries are those of the outermost mapping, and
- * therefore so are {@link #size()}, {@link #keySet()} and
- * {@link #entrySet()}, which means a path of several components contributes
- * the one entry that its first component names. A removal changes the
- * container that holds the end of its path, so that container must permit the
- * change.
+ * the end of one. The entries are those of the outermost mapping, and therefore
+ * so are {@link #size()}, {@link #keySet()} and {@link #entrySet()}, which
+ * means a path of several components contributes the one entry that its first
+ * component names. {@link #containsValue(Object)} answers whether any value
+ * that the {@link Association} stores, or that a {@link Map} or
+ * {@link Collection} it stores holds at any depth, is equal to the one it is
+ * asked about.
+ * </p>
+ * <p>
+ * A removal changes the container that holds the end of its path, so that
+ * container must permit the change. A removal of a position clears it in place,
+ * so the position must be one of a {@link List}.
  * </p>
  *
  * @author Jeff Nelson
@@ -134,6 +141,35 @@ public abstract class Association extends AbstractMap<String, Object> {
                             value, created));
         }
         return association;
+    }
+
+    /**
+     * Return whether any of the {@code values}, or any value that a {@link Map}
+     * or {@link Collection} among them holds at any depth, is equal to the
+     * {@code value}.
+     *
+     * @param values the values to search
+     * @param value the value to look for, which may be {@code null}
+     * @return {@code true} if one of the values searched is equal to the
+     *         {@code value}
+     */
+    private static boolean holds(Collection<?> values,
+            @Nullable Object value) {
+        boolean held = false;
+        Iterator<?> it = values.iterator();
+        while (!held && it.hasNext()) {
+            Object element = it.next();
+            if(Objects.equals(element, value)) {
+                held = true;
+            }
+            else if(element instanceof Map) {
+                held = holds(((Map<?, ?>) element).values(), value);
+            }
+            else if(element instanceof Collection) {
+                held = holds((Collection<?>) element, value);
+            }
+        }
+        return held;
     }
 
     /**
@@ -240,12 +276,7 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public boolean containsValue(Object value) {
-        boolean contained = false;
-        Iterator<String> paths = paths().iterator();
-        while (!contained && paths.hasNext()) {
-            contained = Objects.equals(fetch(paths.next()), value);
-        }
-        return contained;
+        return holds(exploded.values(), value);
     }
 
     @Override
@@ -267,28 +298,7 @@ public abstract class Association extends AbstractMap<String, Object> {
         if(value == null && path.indexOf('.') >= 0) {
             String[] components = path.split("\\.");
             Verify.thatArgument(components.length > 0, "Invalid path {}", path);
-            Object source = exploded;
-            for (String component : components) {
-                Integer index;
-                if(source == null) {
-                    break;
-                }
-                else if((index = Ints.tryParse(component)) != null) {
-                    if(source instanceof Collection
-                            && ((Collection<T>) source).size() > index) {
-                        source = Iterables.get((Collection<T>) source, index);
-                    }
-                    else {
-                        source = null;
-                    }
-                }
-                else {
-                    source = source instanceof Map
-                            ? ((Map<String, Object>) source).get(component)
-                            : null;
-                }
-            }
-            return source != null ? (T) source : null;
+            return (T) navigate(components, components.length);
         }
         else {
             // A path of one component names a value of the map itself, which
@@ -412,15 +422,14 @@ public abstract class Association extends AbstractMap<String, Object> {
      */
     public Set<String> paths() {
         Set<String> paths = Sets.newLinkedHashSet();
-        // Every prefix of a flattened path is itself a path, and the text of
-        // the flattened path holds each one of them.
         flatten().keySet().forEach(key -> {
-            int end = key.indexOf('.');
-            while (end >= 0) {
-                paths.add(key.substring(0, end));
-                end = key.indexOf('.', end + 1);
+            String[] parts = key.split("\\.");
+            StringBuilder sb = new StringBuilder();
+            for (String path : parts) {
+                sb.append(path);
+                paths.add(sb.toString());
+                sb.append(".");
             }
-            paths.add(key);
         });
         return paths;
     }
@@ -432,20 +441,7 @@ public abstract class Association extends AbstractMap<String, Object> {
 
     @Override
     public Object remove(Object key) {
-        if(key instanceof String) {
-            String path = (String) key;
-            if(path.indexOf('.') >= 0 && exploded.containsKey(path)) {
-                // The map holds the whole path as a key of its own, as #set
-                // leaves it when a write finds the path there.
-                return exploded.remove(path);
-            }
-            else {
-                return detach(path);
-            }
-        }
-        else {
-            return null;
-        }
+        return key instanceof String ? detach((String) key) : null;
     }
 
     /**
@@ -618,36 +614,34 @@ public abstract class Association extends AbstractMap<String, Object> {
      * Take the value at the end of the {@code path} out of the container that
      * holds it and return that value.
      * <p>
-     * The container that holds the end of the {@code path} is the one that the
-     * components before it name, read as {@link #get(Object)} reads them, or
-     * the outermost mapping when the {@code path} names one component. A
-     * component that names a position of a
-     * list leaves the list as long as it was, with {@code null} at that
-     * position, so that every other position names the element it named
-     * before. The containers that the components before the last one name stay
-     * in place, even when the removal leaves one of them empty.
+     * The {@code path} splits into components as {@link #fetch(String)} splits
+     * it. The container that holds the end of the {@code path} is the stored
+     * container that the components before the last one name, or the outermost
+     * mapping when the {@code path} names one component. A last component that
+     * names a position of a list leaves the list as long as it was, with
+     * {@code null} at that position, so that every other position names the
+     * element it named before. The containers that the components before the
+     * last one name stay in place, even when the removal leaves one of them
+     * empty.
      * </p>
      *
      * @param path a navigable path key
      * @return the value that was at the end of the {@code path}, or
      *         {@code null} if no container held one there
-     * @throws UnsupportedOperationException if the container that holds the
-     *             end of the {@code path} does not permit the change
+     * @throws IllegalArgumentException if the {@code path} names no component
+     * @throws UnsupportedOperationException if the container that holds the end
+     *             of the {@code path} does not permit the change, or is a
+     *             {@link Collection} other than a {@link List} and the last
+     *             component names one of its positions
      */
     @SuppressWarnings("unchecked")
     @Nullable
     private Object detach(String path) {
-        int end = path.lastIndexOf('.');
-        Object holder;
-        String last;
-        if(end < 0) {
-            holder = exploded;
-            last = path;
-        }
-        else {
-            holder = fetch(path.substring(0, end));
-            last = path.substring(end + 1);
-        }
+        String[] components = path.split("\\.");
+        Verify.thatArgument(components.length > 0, "Invalid path {}", path);
+        int end = components.length - 1;
+        Object holder = navigate(components, end);
+        String last = components[end];
         Integer index = Ints.tryParse(last);
         Object detached;
         if(index == null && holder instanceof Map) {
@@ -656,6 +650,14 @@ public abstract class Association extends AbstractMap<String, Object> {
         else if(index != null && holder instanceof List && index >= 0
                 && index < ((List<Object>) holder).size()) {
             detached = ((List<Object>) holder).set(index, null);
+        }
+        else if(index != null && holder instanceof Collection && index >= 0
+                && index < ((Collection<Object>) holder).size()) {
+            // Only a list can hold null at one position while every other
+            // element keeps the position it had.
+            throw new UnsupportedOperationException(AnyStrings.format(
+                    "Cannot clear position {} of a {}, which is not a list",
+                    index, holder.getClass().getSimpleName()));
         }
         else {
             detached = null;
@@ -723,6 +725,39 @@ public abstract class Association extends AbstractMap<String, Object> {
         else {
             exploded.put(path, value);
         }
+    }
+
+    /**
+     * Return the value that the first {@code count} of the {@code components}
+     * name in the stored containers, or {@code null} if no container holds one
+     * there. An integer component names a position of a {@link Collection}, and
+     * any other component names a key of a {@link Map}. A {@code count} of zero
+     * names the outermost mapping.
+     *
+     * @param components the components of a path
+     * @param count how many of the {@code components} to read, from the first
+     * @return the value at the end of those components, or {@code null}
+     * @throws IndexOutOfBoundsException if a component that the read reaches
+     *             names a negative position of a {@link Collection}
+     */
+    @Nullable
+    private Object navigate(String[] components, int count) {
+        Object source = exploded;
+        for (int i = 0; i < count && source != null; ++i) {
+            Integer index = Ints.tryParse(components[i]);
+            if(index != null) {
+                source = source instanceof Collection
+                        && ((Collection<?>) source).size() > index
+                                ? Iterables.get((Collection<?>) source, index)
+                                : null;
+            }
+            else {
+                source = source instanceof Map
+                        ? ((Map<?, ?>) source).get(components[i])
+                        : null;
+            }
+        }
+        return source;
     }
 
     /**
