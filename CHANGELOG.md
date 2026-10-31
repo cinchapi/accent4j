@@ -1,15 +1,12 @@
 # Changelog
 
 #### Version 1.18.4 (TBD)
-* **Reading and writing a path on an `Association` costs less.** A key that
-  names one component names a value of the map itself rather than a value of a
-  container below it, so `fetch` answers such a key from the map without
-  splitting it and walking the containers that the components of a path name. A
-  write stores the first component of its path in the map directly, and reads
-  the structure below the map only for a path that names a list position, since
-  no other path can make a write fill one. Each of these operations answers what
-  it did, down to the order of the entries, the type of each container, and
-  whether a container that a caller already holds is replaced or updated.
+* **Reading and writing a path on an `Association` costs less.** A read of a key
+  that names one component and that the `Association` does not hold, and a write
+  of a path that names no list position, take less time. Each of these
+  operations answers what it did, down to the order of the entries, the type of
+  each container, and whether a container that a caller already holds is
+  replaced or updated.
 * Fixed a bug where `Association#containsValue` threw a `NullPointerException`
   when its search reached a path that held `null` before it found a match, so a
   caller could not search an `Association` built from data that held a `null`.
