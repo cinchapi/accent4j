@@ -29,6 +29,17 @@ def getVersion = { ->
   return stdout.toString().trim()
 }
 
+// The version that a build version publishes as, also from the "version.sh"
+// script, which drops only the build number and keeps the branch's name whole.
+def getPublishedVersion = { buildVersion ->
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'bash', 'version.sh', '--published', buildVersion
+    standardOutput = stdout
+  }
+  return stdout.toString().trim()
+}
+
 def getBranch = { ->
   def branch = System.getenv('CIRCLE_BRANCH')
       ?: System.getenv('GITHUB_HEAD_REF')
@@ -53,13 +64,9 @@ ext.currentBranch = getBranch()
 group = 'com.cinchapi'
 version = globalVersion
 
-// Drop the build component from version number and use that for publishing
-ext.mavenVersion = globalVersion.split('\\.')
-ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+-", "-")
-ext.mavenVersion[3] = ext.mavenVersion[3].replaceAll("[0-9]+", "").trim()
-ext.mavenVersion = ext.mavenVersion.join(".").replace(".-", "-").replaceAll('\\.$', "")
+ext.mavenVersion = getPublishedVersion(globalVersion)
 
-ext.isRelease = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?$')
+ext.isRelease = mavenVersion.matches('^[0-9]+\\.[0-9]+\\.[0-9]+$')
 ext.publishToMavenCentral = (currentBranch == 'master' && isRelease) || (currentBranch == 'develop' && mavenVersion.endsWith('-SNAPSHOT'))
 
 logger.lifecycle("Publishing: branch={}, mavenVersion={}, isRelease={}, publishToMavenCentral={}", currentBranch, mavenVersion, isRelease, publishToMavenCentral)
