@@ -128,6 +128,90 @@ public class NetworksTest {
     }
 
     /**
+     * <strong>Goal:</strong> Verify that {@code getPreferredCompanionPort()}
+     * returns the companion that its documented formula gives, so a program can
+     * compute the companion of a port without calling it.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@code getPreferredCompanionPort()} for ports below, inside, and
+     * above the preferred range.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each companion is 16384 plus the remainder of
+     * the port plus 8192, divided by 16384.
+     */
+    @Test
+    public void testGetPreferredCompanionPortFollowsDocumentedFormula() {
+        Assert.assertEquals(24577, Networks.getPreferredCompanionPort(1));
+        Assert.assertEquals(29143, Networks.getPreferredCompanionPort(4567));
+        Assert.assertEquals(24576, Networks.getPreferredCompanionPort(16384));
+        Assert.assertEquals(16384, Networks.getPreferredCompanionPort(24576));
+        Assert.assertEquals(24575, Networks.getPreferredCompanionPort(32767));
+        Assert.assertEquals(24575, Networks.getPreferredCompanionPort(65535));
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code getPreferredCompanionPort()}
+     * returns a port in the preferred range that differs from its input, for
+     * every valid port.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@code getPreferredCompanionPort()} for each port from 1 to
+     * 65535.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each companion is from
+     * {@value Networks#PREFERRED_OPEN_PORT_RANGE_START} to
+     * {@value Networks#PREFERRED_OPEN_PORT_RANGE_END} and differs from the port
+     * it came from.
+     */
+    @Test
+    public void testGetPreferredCompanionPortIsAnotherPortInRange() {
+        int start = Networks.PREFERRED_OPEN_PORT_RANGE_START;
+        int end = Networks.PREFERRED_OPEN_PORT_RANGE_END;
+        for (int port = 1; port <= 65535; ++port) {
+            int companion = Networks.getPreferredCompanionPort(port);
+            Assert.assertTrue(String.valueOf(port),
+                    companion >= start && companion <= end);
+            Assert.assertNotEquals(port, companion);
+        }
+    }
+
+    /**
+     * <strong>Goal:</strong> Verify that {@code getPreferredCompanionPort()}
+     * rejects a number that is not a valid port.
+     * <p>
+     * <strong>Start state:</strong> No prior state needed.
+     * <p>
+     * <strong>Workflow:</strong>
+     * <ul>
+     * <li>Call {@code getPreferredCompanionPort()} with {@code -1}, {@code 0},
+     * and {@code 65536}.</li>
+     * </ul>
+     * <p>
+     * <strong>Expected:</strong> Each call throws
+     * {@link IllegalArgumentException}.
+     */
+    @Test
+    public void testGetPreferredCompanionPortThrowsForInvalidPort() {
+        for (int port : new int[] { -1, 0, 65536 }) {
+            try {
+                Networks.getPreferredCompanionPort(port);
+                Assert.fail("Returned a companion for " + port);
+            }
+            catch (IllegalArgumentException e) {
+                // The port is outside 1 to 65535, as the caller expects.
+            }
+        }
+    }
+
+    /**
      * <strong>Goal:</strong> Verify that {@code getPreferredOpenPort()} returns
      * a port in the preferred range that no socket holds on all addresses or on
      * {@code 127.0.0.1}.
