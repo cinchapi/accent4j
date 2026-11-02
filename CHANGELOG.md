@@ -1,5 +1,17 @@
 # Changelog
 
+#### Version 1.18.5 (TBD)
+* Added `Networks.getPreferredCompanionPort(int)`, which returns a second port,
+  from 16384 to 32767, that every program derives from a first port in the same
+  way. By default, Linux, macOS and Windows assign only ports above that range
+  to outgoing connections, so such a connection does not hold the companion. It
+  can hold the port that the deprecated `getCompanionPort` returns. The
+  companion is 16384 plus the remainder of the port plus 8192, divided by 16384.
+
+  ```java
+  int shutdownPort = Networks.getPreferredCompanionPort(4567); // 29143
+  ```
+
 #### Version 1.18.4 (October 31, 2026)
 * **Reading and writing a path on an `Association` costs less.** A read of a key
   that names one component and that the `Association` does not hold, and a write

@@ -52,8 +52,10 @@ public final class Networks {
      * @return the companion port
      * @deprecated the operating system assigns ports in the companion range to
      *             outgoing connections, so another socket can hold the
-     *             companion port; use {@link #getPreferredOpenPort()} to choose
-     *             a second port instead
+     *             companion port; use {@link #getPreferredCompanionPort(int)}
+     *             for a second port that a program derives from the first, or
+     *             {@link #getPreferredOpenPort()} to choose any open port
+     *             instead
      */
     @Deprecated
     public static int getCompanionPort(int port) {
@@ -71,8 +73,10 @@ public final class Networks {
      * @return the companion port
      * @deprecated the operating system assigns ports in the companion range to
      *             outgoing connections, so another socket can hold the
-     *             companion port; use {@link #getPreferredOpenPort()} to choose
-     *             a second port instead
+     *             companion port; use {@link #getPreferredCompanionPort(int)}
+     *             for a second port that a program derives from the first, or
+     *             {@link #getPreferredOpenPort()} to choose any open port
+     *             instead
      */
     @Deprecated
     public static int getCompanionPort(int port, int rounds) {
@@ -156,6 +160,33 @@ public final class Networks {
             throw new IllegalStateException("No port from " + rangeStart
                     + " to " + rangeEnd + " is open");
         }
+    }
+
+    /**
+     * Return the companion of {@code port}, a second port from
+     * {@value #PREFERRED_OPEN_PORT_RANGE_START} to
+     * {@value #PREFERRED_OPEN_PORT_RANGE_END} that every program derives from
+     * {@code port} in the same way. So one program can find a port that another
+     * program binds without being told it.
+     * <p>
+     * The companion is {@value #PREFERRED_OPEN_PORT_RANGE_START} plus the
+     * remainder of {@code port + 8192} divided by 16384, so it differs from
+     * {@code port}. By default, Linux, macOS and Windows assign only ports
+     * above this range to outgoing connections and to binds to port 0, so such
+     * a socket does not hold the companion. Another program can still bind it.
+     * </p>
+     *
+     * @param port the port whose companion to return
+     * @return the companion port
+     * @throws IllegalArgumentException if {@code port} is less than 1 or
+     *             greater than {@value #MAX_PORT}
+     */
+    public static int getPreferredCompanionPort(int port) {
+        Preconditions.checkArgument(port > 0 && port <= MAX_PORT,
+                "port must be from 1 to %s", MAX_PORT);
+        int span = PREFERRED_OPEN_PORT_RANGE_END
+                - PREFERRED_OPEN_PORT_RANGE_START + 1;
+        return PREFERRED_OPEN_PORT_RANGE_START + (port + span / 2) % span;
     }
 
     /**
