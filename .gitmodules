@@ -2,4 +2,3 @@
 	path = .agents
 	url = git@github.com:cinchapi/cinchapi-agent-skills.git
 	branch = main
-	ignore = all
