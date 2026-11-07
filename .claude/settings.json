@@ -4,7 +4,7 @@
          {
             "hooks" : [
                {
-                  "command" : "[ -e .agents/.git ] || { git submodule update --init .agents >&2 && cat .agents/instructions/AGENTS.md; }",
+                  "command" : "if [ -e .agents/.git ]; then bash .agents/tools/follow-main --session; else git submodule update --init .agents >&2 && { bash .agents/tools/follow-main >&2; cat .agents/instructions/AGENTS.md; }; fi",
                   "type" : "command"
                }
             ]
