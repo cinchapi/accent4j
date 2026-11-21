@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
@@ -48,6 +49,19 @@ public class LazyTransformSetTest {
         Assert.assertEquals(4, count.get());
     }
 
+    @Test
+    public void testLazyStreamSkipVsGuava() {
+        // Tests to prove that the benefits of LazyTransformSet (e.g. skip tracking) cannot be achieved 
+        Set<Integer> original = ImmutableSet.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        AtomicInteger count = new AtomicInteger(0);
+        Collection<String> transformed = Collections2.transform(original, o -> {
+            count.incrementAndGet();
+            return o.toString();
+        });
+        transformed.stream().skip(3).limit(4).forEach(System.out::println);
+        Assert.assertNotEquals(4, count.get());
+    }
+    
     @Test
     public void testLazyStreamDoubleSkip() {
         Set<Integer> original = ImmutableSet.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
